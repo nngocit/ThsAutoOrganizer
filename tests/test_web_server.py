@@ -154,3 +154,15 @@ def test_sidebar_minimalist_structure(web_test_env):
         assert "onclick=\"showView('drive')\"" not in html
 
 
+def test_workspace_subtabs_presence(web_test_env):
+    base_url, _, _ = web_test_env
+    req = urllib.request.Request(f"{base_url}/")
+    with urllib.request.urlopen(req) as resp:
+        html = resp.read().decode("utf-8")
+        assert "subtabDocs" in html
+        assert "subtabSync" in html
+        assert "switchSubTab" in html
+        assert "unauthenticatedState" in html
+
+
+

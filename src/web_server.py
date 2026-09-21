@@ -1530,183 +1530,206 @@ def get_html_dashboard() -> str:
 
       <!-- VIEW 2: WORKSPACE VIEW (PERSONAL ORGANIZER & CLOUD STORAGE) -->
       <div id="workspaceView" class="view-content" style="display: none;">
-        <!-- Login Prompt Banner (Hiển thị khi chưa đăng nhập) -->
-        <div id="loginPromptBanner" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.18) 0%, rgba(139, 92, 246, 0.18) 100%); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: var(--radius-md); padding: 18px 22px; color: #f8fafc; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
-          <div style="display: flex; align-items: center; gap: 14px;">
-            <span style="font-size: 2rem;">🔒</span>
-            <div>
-              <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Chưa kết nối tài khoản sinh viên</div>
-              <div style="font-size: 0.82rem; color: #cbd5e1; margin-top: 3px; max-width: 620px; line-height: 1.45;">
-                Hệ thống chỉ quét và đồng bộ khi bạn đã đăng nhập đúng tài khoản Gmail và thư mục máy tính của mình. Hãy đăng nhập để bắt đầu!
-              </div>
-            </div>
+        <!-- Workspace Header & Sub-Tabs Navigation -->
+        <div class="workspace-header-bar" style="margin-bottom: 20px; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--border-subtle); padding-bottom: 14px;">
+          <div>
+            <h1 style="font-size: 1.35rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px;">Tổ chức tài liệu</h1>
+            <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">Không gian quản lý tài liệu học tập cá nhân & đồng bộ đám mây.</div>
           </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn btn-google" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">🔑 Đăng nhập Google</button>
-            <button class="btn btn-secondary" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">⚡ Đăng nhập nhanh</button>
-          </div>
-        </div>
-
-        <!-- User Machine Folder Bar (Chỉ hiển thị khi đã đăng nhập) -->
-        <div id="userFolderBar" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.15) 0%, rgba(0, 242, 254, 0.08) 100%); border: 1px solid rgba(0, 242, 254, 0.35); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 1.6rem;">📁</span>
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <span style="font-weight: 700; font-size: 0.92rem; color: #fff;">Thư mục máy tính của bạn:</span>
-                <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
-              </div>
-              <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <span>Tài khoản: <b id="displayUserEmail" style="color: #60a5fa;">--</b></span>
-                <span>|</span>
-                <span id="displayUserDrive" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">--</span>
-              </div>
-            </div>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-            <button class="btn btn-secondary" onclick="openChangeFolderModal()" style="font-size: 0.8rem; padding: 7px 12px;">
-              ✏️ Đổi thư mục máy
+          <!-- Sub-Tabs Switcher -->
+          <div class="subtabs-bar" style="display: flex; gap: 6px; background: var(--bg-surface); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+            <button class="subtab-btn active" id="tabBtnDocs" onclick="switchSubTab('docs')" style="padding: 7px 14px; border-radius: var(--radius-sm); border: none; background: var(--bg-subtle); color: var(--text-primary); font-size: 0.84rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+              <span>📁</span> Kho tài liệu & Phân loại
             </button>
-            <button class="btn btn-primary" onclick="triggerServerScan()" id="btnServerScan" style="font-size: 0.8rem; padding: 7px 16px;">
-              🔍 Quét & Đồng bộ thư mục ngay
+            <button class="subtab-btn" id="tabBtnSync" onclick="switchSubTab('sync')" style="padding: 7px 14px; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--text-secondary); font-size: 0.84rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+              <span>⚡</span> Nạp & Kết nối
             </button>
           </div>
         </div>
 
-        <!-- Cross-Platform Upload Banner -->
-        <div class="upload-action-banner">
-          <div class="upload-banner-text">
-            <div class="upload-banner-title">
-              <span>⚡ Nạp tài liệu đa thiết bị</span>
-              <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: normal;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
-            </div>
-            <div class="upload-banner-sub">
-              Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
-            </div>
-          </div>
-
-          <div class="upload-btn-group">
-            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
-            <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()">
-              📸 Chụp bài giảng
-            </button>
-
-            <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
-            <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
-              📤 Nạp tệp (PDF/Word/Ảnh)
-            </button>
-
-            <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
-              📁 Chọn thư mục máy tính
-            </button>
+        <!-- Unauthenticated Calm State (Chỉ hiện khi chưa login) -->
+        <div id="unauthenticatedState" style="display: none; padding: 60px 24px; text-align: center; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); margin: 20px 0;">
+          <div style="font-size: 2.8rem; margin-bottom: 14px;">🏛️</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Không gian Học tập Cá nhân</div>
+          <p style="font-size: 0.88rem; color: var(--text-secondary); max-width: 520px; margin: 0 auto 20px; line-height: 1.6;">
+            Đăng nhập bằng tài khoản Google để hệ thống tự động kết nối thư mục máy tính và Google Drive cá nhân của bạn, giữ trọn vẹn sự riêng tư và bảo mật học thuật.
+          </p>
+          <button class="btn btn-secondary" onclick="openLoginModal()" style="border: 1px solid var(--border-focus); padding: 10px 24px; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">
+            🔑 Đăng nhập Google
+          </button>
+          <div style="margin-top: 14px;">
+            <a href="javascript:void(0)" onclick="openLoginModal()" style="font-size: 0.78rem; color: var(--text-tertiary); text-decoration: underline;">
+              Hoặc đăng nhập nhanh bằng Email sinh viên (Chế độ kiểm thử)
+            </a>
           </div>
         </div>
 
-        <!-- Stats Row -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-header">
-              <span>Kho tài liệu của bạn</span>
-              <span>📁</span>
+        <!-- SUBTAB 1: KHO TÀI LIỆU & PHÂN LOẠI -->
+        <div id="subtabDocs" class="subtab-content">
+          <!-- Stats Row -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-header">
+                <span>Kho tài liệu của bạn</span>
+                <span>📁</span>
+              </div>
+              <div class="stat-value" id="statTotalFiles">0</div>
+              <div class="stat-subtitle" id="statStoragePath">Chưa kết nối thư mục</div>
             </div>
-            <div class="stat-value" id="statTotalFiles">0</div>
-            <div class="stat-subtitle" id="statStoragePath">Tự động phân loại theo môn</div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span>Google Drive cá nhân</span>
+                <span style="color: var(--accent-emerald);">☁️</span>
+              </div>
+              <div class="stat-value" id="statUploaded" style="color: var(--accent-emerald);">0</div>
+              <div class="stat-subtitle" id="statDriveFolder">Chưa kết nối Google Drive</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span>Tài liệu mới (&lt;24h)</span>
+                <span style="color: var(--accent-purple);">✨</span>
+              </div>
+              <div class="stat-value" id="statNewCount" style="color: var(--accent-purple);">0</div>
+              <div class="stat-subtitle">Nhận diện theo thời gian nạp</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span>Môn học theo dõi</span>
+                <span style="color: var(--accent-purple);">🎓</span>
+              </div>
+              <div class="stat-value" id="statSubjectsCount" style="color: var(--accent-purple);">0</div>
+              <div class="stat-subtitle" id="statSubjectsList">Toán KH Dữ liệu, Triết học...</div>
+            </div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-header">
-              <span>Google Drive cá nhân</span>
-              <span style="color: var(--accent-green);">☁️</span>
+          <!-- Toolbar -->
+          <div class="toolbar-container">
+            <div class="toolbar-row-top">
+              <div class="search-box">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, môn học..." oninput="applyFilters()">
+              </div>
+
+              <div class="filter-chips">
+                <div class="chip active" id="chipAll" onclick="setQuickFilter('ALL')">
+                  🔥 Tất cả <span class="chip-badge" id="countAll">0</span>
+                </div>
+                <div class="chip" id="chipNew" onclick="setQuickFilter('NEW')">
+                  ✨ Mới (&lt;24h) <span class="chip-badge" id="countNew">0</span>
+                </div>
+                <div class="chip" id="chipDrive" onclick="setQuickFilter('DRIVE')">
+                  ☁️ Trên Drive <span class="chip-badge" id="countDrive">0</span>
+                </div>
+              </div>
             </div>
-            <div class="stat-value" id="statUploaded" style="color: var(--accent-green);">0</div>
-            <div class="stat-subtitle" id="statDriveFolder">Thư mục: ThacSi_HTTT</div>
+
+            <div class="toolbar-row-bottom">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <select class="filter-select" id="filterSubject" onchange="applyFilters()">
+                  <option value="">Tất cả môn học</option>
+                </select>
+                <select class="filter-select" id="filterType" onchange="applyFilters()">
+                  <option value="">Tất cả loại tài liệu</option>
+                  <option value="Giáo trình">Giáo trình</option>
+                  <option value="Slide">Slide</option>
+                  <option value="Ôn thi">Ôn thi</option>
+                  <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
+                </select>
+                <select class="filter-select" id="filterSort" onchange="applyFilters()">
+                  <option value="NEWEST">⏱️ Mới nhất trước</option>
+                  <option value="NAME">🔤 Tên file A-Z</option>
+                  <option value="SIZE">💾 Dung lượng</option>
+                </select>
+              </div>
+
+              <div class="view-switcher">
+                <button class="view-btn active" id="btnViewCards" onclick="setViewMode('cards')">🎴 Thẻ</button>
+                <button class="view-btn" id="btnViewTable" onclick="setViewMode('table')">📑 Bảng</button>
+              </div>
+            </div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-header">
-              <span>Tài liệu mới (<24h)</span>
-              <span style="color: var(--accent-cyan);">✨</span>
-            </div>
-            <div class="stat-value" id="statNewCount" style="color: var(--accent-cyan);">0</div>
-            <div class="stat-subtitle">Nhận diện theo thời gian nạp</div>
-          </div>
+          <!-- Cards Grid -->
+          <div class="cards-grid" id="cardsContainer"></div>
 
-          <div class="stat-card">
-            <div class="stat-header">
-              <span>Môn học theo dõi</span>
-              <span style="color: var(--accent-purple);">🎓</span>
-            </div>
-            <div class="stat-value" id="statSubjectsCount" style="color: var(--accent-purple);">0</div>
-            <div class="stat-subtitle" id="statSubjectsList">Toán KH Dữ liệu, Triết học...</div>
+          <!-- Table View -->
+          <div class="table-container" id="tableContainer">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tập tin</th>
+                  <th>Môn học</th>
+                  <th>Phân loại</th>
+                  <th>Dung lượng</th>
+                  <th>Thời gian nạp</th>
+                  <th>Trạng thái</th>
+                  <th style="text-align: right;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="filesTableBody"></tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Toolbar -->
-        <div class="toolbar-container">
-          <div class="toolbar-row-top">
-            <div class="search-box">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, môn học..." oninput="applyFilters()">
+        <!-- SUBTAB 2: NẠP & KẾT NỐI (Ingestion & Sync Hub) -->
+        <div id="subtabSync" class="subtab-content" style="display: none;">
+          <!-- User Machine Folder Bar (Chỉ hiển thị khi đã đăng nhập) -->
+          <div id="userFolderBar" style="display:none; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 1.6rem;">📁</span>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">Thư mục máy tính của bạn:</span>
+                  <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-purple); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
+                </div>
+                <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span>Tài khoản: <b id="displayUserEmail" style="color: #93c5fd;">--</b></span>
+                  <span>|</span>
+                  <span id="displayUserDrive" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">--</span>
+                </div>
+              </div>
             </div>
-
-            <div class="filter-chips">
-              <div class="chip active" id="chipAll" onclick="setQuickFilter('ALL')">
-                🔥 Tất cả <span class="chip-badge" id="countAll">0</span>
-              </div>
-              <div class="chip" id="chipNew" onclick="setQuickFilter('NEW')">
-                ✨ Mới (<24h) <span class="chip-badge" id="countNew">0</span>
-              </div>
-              <div class="chip" id="chipDrive" onclick="setQuickFilter('DRIVE')">
-                ☁️ Trên Drive <span class="chip-badge" id="countDrive">0</span>
-              </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              <button class="btn btn-secondary" onclick="openChangeFolderModal()" style="font-size: 0.8rem; padding: 7px 12px; border: 1px solid var(--border-subtle);">
+                ✏️ Đổi thư mục máy
+              </button>
+              <button class="btn btn-primary" onclick="triggerServerScan()" id="btnServerScan" style="font-size: 0.8rem; padding: 7px 16px;">
+                🔍 Quét & Đồng bộ thư mục ngay
+              </button>
             </div>
           </div>
 
-          <div class="toolbar-row-bottom">
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <select class="filter-select" id="filterSubject" onchange="applyFilters()">
-                <option value="">Tất cả môn học</option>
-              </select>
-              <select class="filter-select" id="filterType" onchange="applyFilters()">
-                <option value="">Tất cả loại tài liệu</option>
-                <option value="Giáo trình">Giáo trình</option>
-                <option value="Slide">Slide</option>
-                <option value="Ôn thi">Ôn thi</option>
-                <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
-              </select>
-              <select class="filter-select" id="filterSort" onchange="applyFilters()">
-                <option value="NEWEST">⏱️ Mới nhất trước</option>
-                <option value="NAME">🔤 Tên file A-Z</option>
-                <option value="SIZE">💾 Dung lượng</option>
-              </select>
+          <!-- Cross-Platform Upload Banner -->
+          <div class="upload-action-banner" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 20px;">
+            <div class="upload-banner-text">
+              <div class="upload-banner-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">
+                <span>⚡ Nạp tài liệu đa thiết bị</span>
+                <span style="font-size: 0.76rem; color: var(--accent-purple); font-weight: normal; margin-left: 6px;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
+              </div>
+              <div class="upload-banner-sub" style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 4px;">
+                Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
+              </div>
             </div>
 
-            <div class="view-switcher">
-              <button class="view-btn active" id="btnViewCards" onclick="setViewMode('cards')">🎴 Thẻ</button>
-              <button class="view-btn" id="btnViewTable" onclick="setViewMode('table')">📑 Bảng</button>
+            <div class="upload-btn-group" style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+              <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
+              <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()" style="border: 1px solid var(--border-subtle);">
+                📸 Chụp bài giảng
+              </button>
+
+              <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
+              <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="border: 1px solid var(--border-subtle);">
+                📤 Nạp tệp (PDF/Word/Ảnh)
+              </button>
+
+              <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
+                📁 Chọn thư mục máy tính
+              </button>
             </div>
           </div>
-        </div>
-
-        <!-- Cards Grid -->
-        <div class="cards-grid" id="cardsContainer"></div>
-
-        <!-- Table View -->
-        <div class="table-container" id="tableContainer">
-          <table>
-            <thead>
-              <tr>
-                <th>Tập tin</th>
-                <th>Môn học</th>
-                <th>Phân loại</th>
-                <th>Dung lượng</th>
-                <th>Thời gian nạp</th>
-                <th>Trạng thái</th>
-                <th style="text-align: right;">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="filesTableBody"></tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -1908,15 +1931,41 @@ def get_html_dashboard() -> str:
         if (navH) navH.classList.remove('active');
         if (navW) navW.classList.add('active');
         
+        const unauth = document.getElementById('unauthenticatedState');
+        const subDocs = document.getElementById('subtabDocs');
+        const subSync = document.getElementById('subtabSync');
         if (!currentUser) {
-          document.getElementById('loginPromptBanner').style.display = 'flex';
+          if (unauth) unauth.style.display = 'block';
+          if (subDocs) subDocs.style.display = 'none';
+          if (subSync) subSync.style.display = 'none';
         } else {
-          document.getElementById('loginPromptBanner').style.display = 'none';
+          if (unauth) unauth.style.display = 'none';
+          switchSubTab('docs');
           loadStats();
           loadFiles();
         }
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function switchSubTab(tabName) {
+      const tabDocs = document.getElementById('subtabDocs');
+      const tabSync = document.getElementById('subtabSync');
+      const btnDocs = document.getElementById('tabBtnDocs');
+      const btnSync = document.getElementById('tabBtnSync');
+      if (!tabDocs || !tabSync) return;
+
+      if (tabName === 'sync') {
+        tabDocs.style.display = 'none';
+        tabSync.style.display = 'block';
+        if (btnDocs) { btnDocs.style.background = 'transparent'; btnDocs.style.color = 'var(--text-secondary)'; }
+        if (btnSync) { btnSync.style.background = 'var(--bg-subtle)'; btnSync.style.color = 'var(--text-primary)'; }
+      } else {
+        tabDocs.style.display = 'block';
+        tabSync.style.display = 'none';
+        if (btnDocs) { btnDocs.style.background = 'var(--bg-subtle)'; btnDocs.style.color = 'var(--text-primary)'; }
+        if (btnSync) { btnSync.style.background = 'transparent'; btnSync.style.color = 'var(--text-secondary)'; }
+      }
     }
 
     function handleHeroCardClick(type) {
@@ -1926,6 +1975,7 @@ def get_html_dashboard() -> str:
           openLoginModal();
         } else {
           showView('workspace');
+          switchSubTab('sync');
           openChangeFolderModal();
         }
       } else {
@@ -1934,6 +1984,7 @@ def get_html_dashboard() -> str:
           openLoginModal();
         } else {
           showView('workspace');
+          switchSubTab('sync');
           document.getElementById('fileInput').click();
         }
       }
@@ -1941,16 +1992,12 @@ def get_html_dashboard() -> str:
 
     function triggerNavUpload() {
       showView('workspace');
-      document.getElementById('fileInput').click();
+      switchSubTab('sync');
     }
 
     function openDriveNav() {
-      if (currentUser && currentUser.drive_account) {
-        showToast(`☁️ Google Drive kết nối: ${currentUser.drive_account}`);
-      } else {
-        showToast('☁️ Tài liệu được lưu trữ máy tính cục bộ & đồng bộ Drive cá nhân khi liên kết.');
-      }
       showView('workspace');
+      switchSubTab('sync');
     }
 
     function scrollToTester() {
