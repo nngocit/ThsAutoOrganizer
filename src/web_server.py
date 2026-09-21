@@ -51,41 +51,37 @@ def get_html_dashboard() -> str:
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-base: #060913;
-      --bg-sidebar: #050814;
-      --bg-main: #070b16;
-      --bg-surface: rgba(13, 19, 36, 0.85);
-      --bg-card: rgba(16, 23, 42, 0.72);
-      --bg-card-hover: rgba(26, 36, 64, 0.9);
+      --bg-base: #111113;
+      --bg-sidebar: #141416;
+      --bg-main: #111113;
+      --bg-surface: #18181B;
+      --bg-card: #18181B;
+      --bg-card-hover: #222226;
+      --bg-subtle: #222226;
       --border-color: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(0, 242, 254, 0.5);
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-dim: #64748b;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(255, 255, 255, 0.22);
+      --text-main: #F4F4F5;
+      --text-primary: #F4F4F5;
+      --text-muted: #A1A1AA;
+      --text-secondary: #A1A1AA;
+      --text-dim: #71717A;
+      --text-tertiary: #71717A;
 
-      --accent-blue: #1a73e8;
-      --accent-cyan: #00f2fe;
-      --accent-purple: #8b5cf6;
-      --accent-pink: #ec4899;
-      --accent-green: #10b981;
-      --accent-amber: #f59e0b;
-      --accent-red: #ef4444;
+      --accent-purple: #A855F7;
+      --accent-emerald: #10B981;
+      --accent-amber: #F59E0B;
+      --accent-red: #EF4444;
+      --accent-blue: #3B82F6;
+      --accent-cyan: #A855F7;
+      --accent-green: #10B981;
 
-      --grad-studio: linear-gradient(135deg, #1a73e8 0%, #8b5cf6 50%, #00f2fe 100%);
-      --grad-hero-text: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
-      --grad-ths-cyan: linear-gradient(135deg, rgba(0, 242, 254, 0.25) 0%, rgba(26, 115, 232, 0.12) 100%);
-      --grad-ths-purple: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(236, 72, 153, 0.12) 100%);
-      --grad-glow: radial-gradient(ellipse at 50% -20%, rgba(26, 115, 232, 0.25), rgba(139, 92, 246, 0.15), transparent 70%);
-      --grad-new: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 18px;
-      --radius-xl: 24px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
       --radius-full: 9999px;
-      --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-      --shadow-glow-cyan: 0 0 25px rgba(0, 242, 254, 0.35);
-      --shadow-glow-purple: 0 0 25px rgba(139, 92, 246, 0.35);
+      --shadow-glass: 0 4px 20px rgba(0, 0, 0, 0.4);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }

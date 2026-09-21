@@ -131,3 +131,14 @@ def test_api_scan_trigger(web_test_env):
         assert res["ok"] is True
         assert res["count"] == 5
         assert len(scan_called) == 1
+
+
+def test_obsidian_minimalist_css_tokens(web_test_env):
+    base_url, _, _ = web_test_env
+    req = urllib.request.Request(f"{base_url}/")
+    with urllib.request.urlopen(req) as resp:
+        html = resp.read().decode("utf-8")
+        assert "--bg-base: #111113" in html
+        assert "--bg-surface: #18181b" in html.lower()
+        assert "--border-subtle" in html
+
