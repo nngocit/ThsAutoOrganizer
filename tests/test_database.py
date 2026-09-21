@@ -162,3 +162,30 @@ def test_invalid_status_raises(db: Database) -> None:
             status="INVALID_STATUS",
         )
     assert "Trạng thái không hợp lệ" in str(exc.value)
+
+
+def test_majors_and_subjects_schema_and_seed(tmp_path: Path):
+    from src.database import Database
+    db = Database(tmp_path / "majors_test.db")
+    db.initialize()
+
+    majors = db.get_all_majors()
+    assert len(majors) == 14
+    major_names = [m["name"] for m in majors]
+    assert "Hệ thống thông tin" in major_names
+    assert "Quản trị kinh doanh" in major_names
+    assert "Luật kinh tế" in major_names
+
+    # Kiểm tra môn học mẫu của ngành Hệ thống thông tin
+    httt = next(m for m in majors if m["code"] == "HTTT")
+    subjects = db.get_subjects_by_major(httt["id"])
+    assert len(subjects) >= 2
+    sub_names = [s["name"] for s in subjects]
+    assert "Cơ sở dữ liệu" in sub_names
+
+    # Kiểm tra liên kết major_id trong users
+    user = db.get_or_create_user("student@univ.edu", "Sinh Viên")
+    assert user.get("major_id") is None
+    db.set_user_major("student@univ.edu", httt["id"])
+    updated_user = db.get_user_by_email("student@univ.edu")
+    assert updated_user["major_id"] == httt["id"]

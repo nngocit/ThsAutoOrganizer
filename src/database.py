@@ -64,6 +64,7 @@ class Database:
             access_token TEXT,
             refresh_token TEXT,
             token_expiry TEXT,
+            major_id INTEGER,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -84,6 +85,33 @@ class Database:
             updated_at TEXT NOT NULL
         );
         """
+
+        create_table_majors = """
+        CREATE TABLE IF NOT EXISTS majors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            folder_name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+
+        create_table_subjects = """
+        CREATE TABLE IF NOT EXISTS subjects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            major_id INTEGER NOT NULL REFERENCES majors(id) ON DELETE CASCADE,
+            code TEXT NOT NULL,
+            name TEXT NOT NULL,
+            folder_name TEXT NOT NULL,
+            keywords TEXT DEFAULT '[]',
+            is_default INTEGER DEFAULT 1,
+            created_by TEXT DEFAULT 'admin',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
         create_index_sha256 = """
         CREATE INDEX IF NOT EXISTS idx_files_sha256 ON files(sha256);
         """
@@ -93,12 +121,18 @@ class Database:
         create_index_user_email = """
         CREATE INDEX IF NOT EXISTS idx_files_user_email ON files(user_email);
         """
+        create_index_subjects_major = """
+        CREATE INDEX IF NOT EXISTS idx_subjects_major_id ON subjects(major_id);
+        """
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(create_table_users)
             cursor.execute(create_table_files)
-            # Migration an toàn nếu bảng cũ chưa có cột user_email hoặc local_folder
+            cursor.execute(create_table_majors)
+            cursor.execute(create_table_subjects)
+
+            # Migration an toàn nếu bảng cũ chưa có các cột mới
             try:
                 cursor.execute("ALTER TABLE files ADD COLUMN user_email TEXT DEFAULT 'default@user';")
             except Exception:
@@ -109,9 +143,15 @@ class Database:
             except Exception:
                 pass  # Cột đã tồn tại
 
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN major_id INTEGER;")
+            except Exception:
+                pass  # Cột đã tồn tại
+
             cursor.execute(create_index_sha256)
             cursor.execute(create_index_status)
             cursor.execute(create_index_user_email)
+            cursor.execute(create_index_subjects_major)
 
             # Tự động chuyển các file của tài khoản gốc default@user về xuanngocit@gmail.com
             try:
@@ -122,6 +162,7 @@ class Database:
             except Exception:
                 pass
 
+            self._seed_default_majors_and_subjects(cursor)
             conn.commit()
 
         logger.debug("Database initialized tại '%s'", self.db_path)
@@ -447,10 +488,182 @@ class Database:
 
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Lấy danh sách tất cả người dùng trong hệ thống."""
-        sql = "SELECT id, email, name, avatar_url, drive_root_folder_id, created_at, updated_at FROM users ORDER BY id DESC;"
+        sql = "SELECT id, email, name, avatar_url, drive_root_folder_id, major_id, created_at, updated_at FROM users ORDER BY id DESC;"
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql)
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
+
+    # ==================== Major & Subject Management ====================
+
+    def _seed_default_majors_and_subjects(self, cursor: sqlite3.Cursor) -> None:
+        """Khởi tạo 14 chuyên ngành Thạc sĩ chuẩn và các môn học mẫu nếu chưa có dữ liệu."""
+        cursor.execute("SELECT COUNT(*) FROM majors;")
+        if cursor.fetchone()[0] > 0:
+            return
+
+        now = current_iso_time()
+        majors_data = [
+            ("QLGD", "Quản lý giáo dục", "Quan_Ly_Giao_Duc", "Thạc sĩ Quản lý giáo dục", [
+                ("QLTH", "Quản lý trường học", "Quan_Ly_Truong_Hoc", '["quan ly truong hoc", "giao duc"]'),
+                ("DGGD", "Đánh giá trong giáo dục", "Danh_Gia_Trong_Giao_Duc", '["danh gia", "kiem dinh giao duc"]'),
+            ]),
+            ("QTKD", "Quản trị kinh doanh", "Quan_Tri_Kinh_Doanh", "Thạc sĩ Quản trị kinh doanh (MBA)", [
+                ("MKT", "Marketing căn bản", "Marketing_Can_Ban", '["marketing", "mkt", "thi truong"]'),
+                ("QTCL", "Quản trị chiến lược", "Quan_Tri_Chien_Luoc", '["chien luoc", "strategy", "quan tri"]'),
+            ]),
+            ("TCNH", "Tài chính ngân hàng", "Tai_Chinh_Ngan_Hang", "Thạc sĩ Tài chính - Ngân hàng", [
+                ("TTTC", "Thị trường tài chính", "Thi_Truong_Tai_Chinh", '["tai chinh", "thi truong", "chung khoan"]'),
+                ("QTNH", "Quản trị ngân hàng", "Quan_Tri_Ngan_Hang", '["ngan hang", "tin dung", "rui ro"]'),
+            ]),
+            ("KT", "Kế toán", "Ke_Toan", "Thạc sĩ Kế toán", [
+                ("KTTC", "Kế toán tài chính nâng cao", "Ke_Toan_Tai_Chinh_Nang_Cao", '["ke toan", "bao cao tai chinh"]'),
+                ("KTQT", "Kiểm toán nâng cao", "Kiem_Toan_Nang_Cao", '["kiem toan", "kiem soat noi bo"]'),
+            ]),
+            ("LKT", "Luật kinh tế", "Luat_Kinh_Te", "Thạc sĩ Luật kinh tế", [
+                ("PLHD", "Pháp luật hợp đồng", "Phap_Luat_Hop_Dong", '["hop dong", "dan su", "thuong mai"]'),
+                ("PLDN", "Pháp luật doanh nghiệp", "Phap_Luat_Doanh_Nghiep", '["doanh nghiep", "pha san", "dau tu"]'),
+            ]),
+            ("VH", "Văn học Việt Nam", "Van_Hoc_Viet_Nam", "Thạc sĩ Văn học Việt Nam", [
+                ("LLVH", "Lý luận văn học", "Ly_Luan_Van_Hoc", '["ly luan", "phe binh van hoc"]'),
+                ("VHD", "Văn học hiện đại", "Van_Hoc_Hien_Dai", '["van hoc", "tho ca", "truyen"]'),
+            ]),
+            ("NNA", "Ngôn ngữ Anh", "Ngon_Ngu_Anh", "Thạc sĩ Ngôn ngữ Anh", [
+                ("NDH", "Ngữ dụng học", "Ngu_Dung_Hoc", '["pragmatics", "linguistics", "ngon ngu"]'),
+                ("GDTA", "Phương pháp giảng dạy tiếng Anh", "Phuong_Phap_Giang_Day_Tieng_Anh", '["tesol", "tefl", "teaching"]'),
+            ]),
+            ("LSVN", "Lịch sử Việt Nam", "Lich_Su_Viet_Nam", "Thạc sĩ Lịch sử Việt Nam", [
+                ("LSCD", "Lịch sử cận đại", "Lich_Su_Can_Dai", '["can dai", "lich su", "khang chien"]'),
+                ("PPSH", "Phương pháp sử học", "Phuong_Phap_Su_Hoc", '["su hoc", "su lieu", "phuong phap"]'),
+            ]),
+            ("TLH", "Tâm lý học", "Tam_Ly_Hoc", "Thạc sĩ Tâm lý học", [
+                ("TLPT", "Tâm lý học phát triển", "Tam_Ly_Hoc_Phat_Trien", '["phat trien", "lua tuoi", "tam ly"]'),
+                ("TLXH", "Tâm lý học xã hội", "Tam_Ly_Hoc_Xa_Hoi", '["xa hoi", "hanh vi", "giao tiep"]'),
+            ]),
+            ("CTXH", "Công tác xã hội", "Cong_Tac_Xa_Hoi", "Thạc sĩ Công tác xã hội", [
+                ("CTXHCN", "Công tác xã hội cá nhân", "Cong_Tac_Xa_Hoi_Ca_Nhan", '["tham van", "ca nhan", "ho tro"]'),
+                ("PTCD", "Phát triển cộng đồng", "Phat_Trien_Cong_Dong", '["cong dong", "du an xa hoi"]'),
+            ]),
+            ("HH", "Hóa học", "Hoa_Hoc", "Thạc sĩ Hóa học", [
+                ("HHHC", "Hóa học hữu cơ nâng cao", "Hoa_Hoc_Huu_Co_Nang_Cao", '["huu co", "tong hop hoa hoc"]'),
+                ("HPT", "Hóa phân tích hiện đại", "Hoa_Phan_Tich_Hien_Dai", '["phan tich", "quang pho", "sac ky"]'),
+            ]),
+            ("KHMT", "Khoa học môi trường", "Khoa_Hoc_Moi_Truong", "Thạc sĩ Khoa học môi trường", [
+                ("DTMT", "Đánh giá tác động môi trường", "Danh_Gia_Tac_Dong_Moi_Truong", '["dtm", "moi truong", "o nhiem"]'),
+                ("QLTN", "Quản lý tài nguyên", "Quan_Ly_Tai_Nguyen", '["tai nguyen", "sinh thai", "ben vung"]'),
+            ]),
+            ("TH", "Toán học", "Toan_Hoc", "Thạc sĩ Toán học", [
+                ("DSTT", "Đại số trừu tượng", "Dai_So_Truu_Tuong", '["dai so", "nhom", "vanh", "truong"]'),
+                ("GTT", "Giải tích thực", "Giai_Tich_Thuc", '["giai tich", "do luong", "tich phan"]'),
+            ]),
+            ("HTTT", "Hệ thống thông tin", "He_Thong_Thong_Tin", "Thạc sĩ Hệ thống thông tin", [
+                ("CSDL", "Cơ sở dữ liệu", "Co_So_Du_Lieu", '["csdl", "database", "sql", "co so du lieu"]'),
+                ("TOAN_DS", "Toán khoa học dữ liệu", "Toan_Khoa_Hoc_Du_Lieu", '["toan", "data science", "xac suat", "thong ke", "khoa hoc du lieu"]'),
+                ("TRIET", "Triết học", "Triet_Hoc", '["triet", "triet hoc", "mac lenin"]'),
+                ("PPNC", "Phương pháp nghiên cứu", "Phuong_Phap_Nghien_Cuu", '["ppnc", "nghien cuu", "phuong phap"]'),
+                ("NOTE", "Phương pháp ghi chú", "Phuong_Phap_Ghi_Chu", '["ghi chu", "zettelkasten", "note"]'),
+            ]),
+        ]
+
+        for code, name, folder, desc, subs in majors_data:
+            cursor.execute(
+                """
+                INSERT INTO majors (code, name, folder_name, description, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (code, name, folder, desc, now, now),
+            )
+            major_id = cursor.lastrowid
+            for sub_code, sub_name, sub_folder, sub_kw in subs:
+                cursor.execute(
+                    """
+                    INSERT INTO subjects (major_id, code, name, folder_name, keywords, is_default, created_by, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 1, 'admin', ?, ?);
+                    """,
+                    (major_id, sub_code, sub_name, sub_folder, sub_kw, now, now),
+                )
+
+    def get_all_majors(self) -> List[Dict[str, Any]]:
+        """Lấy danh sách tất cả chuyên ngành."""
+        sql = "SELECT * FROM majors ORDER BY id ASC;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def get_major_by_id(self, major_id: int) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin chuyên ngành theo ID."""
+        sql = "SELECT * FROM majors WHERE id = ? LIMIT 1;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (major_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_major_by_code(self, code: str) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin chuyên ngành theo mã code."""
+        sql = "SELECT * FROM majors WHERE UPPER(code) = UPPER(?) LIMIT 1;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (code.strip(),))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_subjects_by_major(self, major_id: int) -> List[Dict[str, Any]]:
+        """Lấy danh sách các môn học thuộc chuyên ngành."""
+        sql = "SELECT * FROM subjects WHERE major_id = ? ORDER BY id ASC;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (major_id,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def add_major(self, code: str, name: str, folder_name: str, description: str = "") -> int:
+        """Thêm một chuyên ngành mới (dành cho Admin)."""
+        now = current_iso_time()
+        sql = """
+        INSERT INTO majors (code, name, folder_name, description, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (code.strip().upper(), name.strip(), folder_name.strip(), description.strip(), now, now))
+            conn.commit()
+            return cursor.lastrowid
+
+    def add_subject(
+        self,
+        major_id: int,
+        code: str,
+        name: str,
+        folder_name: str,
+        keywords: str = "[]",
+        is_default: int = 1,
+        created_by: str = "admin",
+    ) -> int:
+        """Thêm môn học cho chuyên ngành."""
+        now = current_iso_time()
+        sql = """
+        INSERT INTO subjects (major_id, code, name, folder_name, keywords, is_default, created_by, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                sql,
+                (major_id, code.strip().upper(), name.strip(), folder_name.strip(), keywords, is_default, created_by, now, now),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def set_user_major(self, email: str, major_id: int) -> None:
+        """Cập nhật chuyên ngành của người dùng (luồng Onboarding)."""
+        now = current_iso_time()
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE users SET major_id = ?, updated_at = ? WHERE LOWER(email) = LOWER(?);",
+                (major_id, now, email.strip()),
+            )
+            conn.commit()
+
 
