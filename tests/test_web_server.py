@@ -313,6 +313,29 @@ def test_admin_sidebar_item_visibility(tmp_path: Path):
         server.shutdown()
 
 
+def test_logout_comprehensive_cleanup_and_empty_demo_state(web_test_env):
+    base_url, _, _ = web_test_env
+    req = urllib.request.Request(f"{base_url}/")
+    with urllib.request.urlopen(req) as resp:
+        html = resp.read().decode("utf-8")
+
+        # 1. Khung Demo Trang chu phai sach se, khong duoc fix cung ten file hay mo the ket qua san
+        assert 'value="BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong1.pdf"' not in html
+        assert 'id="testerResultCard" class="tester-result-box" style="display: none;"' in html
+        assert 'Sandbox' in html or 'Trải Nghiệm Thử AI' in html
+
+        # 2. Ham renderLoggedOutState phai don dep sach se moi form, input va the demo
+        assert "document.getElementById('demoInputFile').value = '';" in html
+        assert "document.getElementById('testerResultCard').style.display = 'none';" in html
+        assert "document.getElementById('settingsUserEmail').textContent = '';" in html
+        assert "document.getElementById('cfgRootFolder').value = '';" in html
+        assert "document.getElementById('inputUserFolder').value = '';" in html
+        assert "document.getElementById('testEmailInput').value = '';" in html
+        assert "document.getElementById('testNameInput').value = '';" in html
+        assert "document.getElementById('searchQuery').value = '';" in html
+
+
+
 
 
 

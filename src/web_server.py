@@ -1466,7 +1466,12 @@ def get_html_dashboard() -> str:
 
         <!-- THỬ NGAY: Interactive AI Document Classifier -->
         <section class="ths-tester-section" id="sectionTester">
-          <div class="tester-tag-label">THỬ NGAY</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+            <div class="tester-tag-label">THỬ NGAY</div>
+            <div style="font-size: 0.72rem; padding: 2px 8px; border-radius: var(--radius-full); background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              <span>🧪</span> Sandbox Trải Nghiệm Thử AI
+            </div>
+          </div>
           <h2 class="tester-title">Thử ngay: AI đang nói gì về tài liệu của bạn?</h2>
           <div class="tester-sub-en">Build your AI document classification health check.</div>
           <p class="tester-desc">
@@ -1486,7 +1491,7 @@ def get_html_dashboard() -> str:
           </div>
 
           <div class="tester-input-bar">
-            <input type="text" id="demoInputFile" class="tester-input" placeholder="Nhập tên tệp bài giảng của bạn..." value="BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong1.pdf">
+            <input type="text" id="demoInputFile" class="tester-input" placeholder="Ví dụ: BaiGiang_Chuong1.pdf, DeCuong_OnThi.docx...">
             <button class="tester-btn" onclick="runDemoClassifier()">
               <span>🪄</span> Tạo câu hỏi kiểm tra
             </button>
@@ -1502,7 +1507,7 @@ def get_html_dashboard() -> str:
           </div>
 
           <!-- Live AI Output Card -->
-          <div id="testerResultCard" class="tester-result-box" style="display: flex;">
+          <div id="testerResultCard" class="tester-result-box" style="display: none;">
             <div class="result-info-left">
               <div class="result-subject-title">
                 <span>🤖 Dự đoán AI:</span>
@@ -2225,7 +2230,6 @@ def get_html_dashboard() -> str:
           <span class="sample-chip" onclick="setDemoInput('Giao_Trinh_Quan_Tri_Chien_Luoc.pdf')">Quản trị chiến lược (Giáo trình)</span>
           <span class="sample-chip" onclick="setDemoInput('De_Cuong_On_Thi_Marketing.docx')">Marketing (Ôn thi)</span>
         `;
-        document.getElementById('demoInputFile').value = 'Marketing_Can_Ban_Chuong1.pptx';
       } else if (major === 'LKT') {
         chipsContainer.innerHTML = `
           <span class="tester-samples-label">Gợi ý thử nhanh (LKT):</span>
@@ -2233,21 +2237,18 @@ def get_html_dashboard() -> str:
           <span class="sample-chip" onclick="setDemoInput('Slide_Phap_Luat_Doanh_Nghiep.pptx')">Pháp luật doanh nghiệp (Slide)</span>
           <span class="sample-chip" onclick="setDemoInput('On_Thi_Luat_Kinh_Te.docx')">Luật kinh tế (Ôn thi)</span>
         `;
-        document.getElementById('demoInputFile').value = 'Phap_Luat_Hop_Dong_Thuong_Mai.pdf';
       } else if (major === 'QLGD') {
         chipsContainer.innerHTML = `
           <span class="tester-samples-label">Gợi ý thử nhanh (QLGD):</span>
           <span class="sample-chip" onclick="setDemoInput('Quan_Ly_Truong_Hoc_Hien_Dai.pdf')">Quản lý trường học (Giáo trình)</span>
           <span class="sample-chip" onclick="setDemoInput('Slide_Danh_Gia_Trong_Giao_Duc.pptx')">Đánh giá trong GD (Slide)</span>
         `;
-        document.getElementById('demoInputFile').value = 'Quan_Ly_Truong_Hoc_Hien_Dai.pdf';
       } else if (major === 'TH') {
         chipsContainer.innerHTML = `
           <span class="tester-samples-label">Gợi ý thử nhanh (Toán học):</span>
           <span class="sample-chip" onclick="setDemoInput('Giao_Trinh_Dai_So_Truu_Tuong.pdf')">Đại số trừu tượng (Giáo trình)</span>
           <span class="sample-chip" onclick="setDemoInput('Slide_Giai_Tich_Thuc.pptx')">Giải tích thực (Slide)</span>
         `;
-        document.getElementById('demoInputFile').value = 'Giao_Trinh_Dai_So_Truu_Tuong.pdf';
       } else {
         chipsContainer.innerHTML = `
           <span class="tester-samples-label">Gợi ý thử nhanh (HTTT):</span>
@@ -2256,9 +2257,15 @@ def get_html_dashboard() -> str:
           <span class="sample-chip" onclick="setDemoInput('Slide_Co_So_Du_Lieu_Nang_Cao.pptx')">Cơ sở dữ liệu (Slide)</span>
           <span class="sample-chip" onclick="setDemoInput('Giao_Trinh_Phuong_Phap_Nghien_Cuu.pdf')">PP Nghiên cứu (Giáo trình)</span>
         `;
-        document.getElementById('demoInputFile').value = 'BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong2.pdf';
       }
-      runDemoClassifier();
+
+      const curInput = (document.getElementById('demoInputFile').value || '').trim();
+      if (curInput) {
+        runDemoClassifier();
+      } else {
+        const resBox = document.getElementById('testerResultCard');
+        if (resBox) resBox.style.display = 'none';
+      }
     }
 
     function setDemoInput(filename) {
@@ -2268,7 +2275,12 @@ def get_html_dashboard() -> str:
 
     async function runDemoClassifier() {
       const input = document.getElementById('demoInputFile').value.trim();
-      if (!input) return;
+      const resBox = document.getElementById('testerResultCard');
+      if (!input) {
+        if (resBox) resBox.style.display = 'none';
+        return;
+      }
+      if (resBox) resBox.style.display = 'flex';
 
       const sel = document.getElementById('demoMajorSelect');
       const majorCode = sel ? sel.value : 'HTTT';
@@ -2494,6 +2506,33 @@ def get_html_dashboard() -> str:
 
       const fSub = document.getElementById('filterSubject');
       if (fSub) fSub.innerHTML = '<option value="">Tất cả môn học</option>';
+
+      // 1. Reset các form & input cá nhân trong Modal và View
+      const setMail = document.getElementById('settingsUserEmail');
+      if (setMail) document.getElementById('settingsUserEmail').textContent = '';
+      const cfgRoot = document.getElementById('cfgRootFolder');
+      if (cfgRoot) document.getElementById('cfgRootFolder').value = '';
+      const inUserFolder = document.getElementById('inputUserFolder');
+      if (inUserFolder) document.getElementById('inputUserFolder').value = '';
+      const testMail = document.getElementById('testEmailInput');
+      if (testMail) document.getElementById('testEmailInput').value = '';
+      const testName = document.getElementById('testNameInput');
+      if (testName) document.getElementById('testNameInput').value = '';
+      const searchQ = document.getElementById('searchQuery');
+      if (searchQ) document.getElementById('searchQuery').value = '';
+
+      // 2. Reset khung Demo Trang chu
+      const demoInput = document.getElementById('demoInputFile');
+      if (demoInput) document.getElementById('demoInputFile').value = '';
+      const demoRes = document.getElementById('testerResultCard');
+      if (demoRes) document.getElementById('testerResultCard').style.display = 'none';
+
+      // 3. Reset các bộ lọc và trạng thái tạm
+      currentQuickFilter = 'ALL';
+      const fType = document.getElementById('filterType');
+      if (fType) fType.value = '';
+      selectedOnboardingMajorId = null;
+      adminSelectedMajor = null;
 
       const container = document.getElementById('cardsContainer');
       if (container) container.innerHTML = '';
@@ -2790,8 +2829,12 @@ def get_html_dashboard() -> str:
         await fetch('/auth/logout', { method: 'POST' });
         showToast('🚪 Đã đăng xuất thành công.');
         closeSettingsModal();
+        closeChangeFolderModal();
+        closeLoginModal();
+        closeOnboardingModal();
         currentUser = null;
         allFiles = [];
+        renderLoggedOutState();
         showView('home');
         await checkCurrentUser();
       } catch (e) {
