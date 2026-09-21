@@ -39,13 +39,13 @@ SESSION_STORE: Dict[str, Dict[str, Any]] = {}
 
 
 def get_html_dashboard() -> str:
-    """Trả về giao diện Web AkiTao Studio Responsive đa thiết bị (Desktop, iPad, Mobile)."""
+    """Trả về giao diện Web ThsAutoOrganizer Studio Responsive đa thiết bị (Desktop, iPad, Mobile)."""
     return """<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AkiTao – Hệ Thống Hóa Học Tập & Tài Liệu Số | ThsAutoOrganizer Studio Edition</title>
+  <title>ThsAutoOrganizer – Hệ Thống Hóa Học Tập & Quản Lý Tài Liệu Số | Studio Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
@@ -73,8 +73,8 @@ def get_html_dashboard() -> str:
 
       --grad-studio: linear-gradient(135deg, #1a73e8 0%, #8b5cf6 50%, #00f2fe 100%);
       --grad-hero-text: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
-      --grad-akitao-cyan: linear-gradient(135deg, rgba(0, 242, 254, 0.25) 0%, rgba(26, 115, 232, 0.12) 100%);
-      --grad-akitao-purple: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(236, 72, 153, 0.12) 100%);
+      --grad-ths-cyan: linear-gradient(135deg, rgba(0, 242, 254, 0.25) 0%, rgba(26, 115, 232, 0.12) 100%);
+      --grad-ths-purple: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(236, 72, 153, 0.12) 100%);
       --grad-glow: radial-gradient(ellipse at 50% -20%, rgba(26, 115, 232, 0.25), rgba(139, 92, 246, 0.15), transparent 70%);
       --grad-new: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
 
@@ -110,8 +110,8 @@ def get_html_dashboard() -> str:
       position: relative;
     }
 
-    /* ==================== LEFT SIDEBAR (AKITAO STYLE) ==================== */
-    .akitao-sidebar {
+    /* ==================== LEFT SIDEBAR ==================== */
+    .ths-sidebar {
       width: 240px;
       min-width: 240px;
       background: var(--bg-sidebar);
@@ -126,7 +126,7 @@ def get_html_dashboard() -> str:
       user-select: none;
     }
 
-    .akitao-sidebar.collapsed {
+    .ths-sidebar.collapsed {
       width: 72px;
       min-width: 72px;
     }
@@ -178,8 +178,8 @@ def get_html_dashboard() -> str:
     }
     .brand-lang-badge span.active { color: var(--accent-cyan); }
 
-    .akitao-sidebar.collapsed .brand-title-group,
-    .akitao-sidebar.collapsed .brand-lang-badge {
+    .ths-sidebar.collapsed .brand-title-group,
+    .ths-sidebar.collapsed .brand-lang-badge {
       display: none;
     }
 
@@ -240,12 +240,12 @@ def get_html_dashboard() -> str:
       padding: 18px 14px 6px;
     }
 
-    .akitao-sidebar.collapsed .nav-label,
-    .akitao-sidebar.collapsed .nav-badge-ver,
-    .akitao-sidebar.collapsed .nav-section-title {
+    .ths-sidebar.collapsed .nav-label,
+    .ths-sidebar.collapsed .nav-badge-ver,
+    .ths-sidebar.collapsed .nav-section-title {
       display: none;
     }
-    .akitao-sidebar.collapsed .nav-item {
+    .ths-sidebar.collapsed .nav-item {
       justify-content: center;
       padding: 12px;
     }
@@ -277,7 +277,7 @@ def get_html_dashboard() -> str:
       background: rgba(255, 255, 255, 0.1);
       color: #fff;
     }
-    .akitao-sidebar.collapsed .sidebar-collapse-btn {
+    .ths-sidebar.collapsed .sidebar-collapse-btn {
       align-self: center;
       transform: rotate(180deg);
     }
@@ -302,10 +302,10 @@ def get_html_dashboard() -> str:
       background: rgba(0, 242, 254, 0.16);
       border-color: var(--accent-cyan);
     }
-    .akitao-sidebar.collapsed .btn-sidebar-auth span.text { display: none; }
+    .ths-sidebar.collapsed .btn-sidebar-auth span.text { display: none; }
 
     /* ==================== MAIN CONTENT AREA ==================== */
-    .akitao-main-area {
+    .ths-main-area {
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -318,7 +318,7 @@ def get_html_dashboard() -> str:
     }
 
     /* Top Bar */
-    .akitao-topbar {
+    .ths-topbar {
       position: sticky;
       top: 0;
       z-index: 100;
@@ -511,7 +511,7 @@ def get_html_dashboard() -> str:
     .onetap-name { font-size: 0.82rem; font-weight: 600; color: #fff; }
     .onetap-email { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ==================== VIEW 1: HOMEPAGE VIEW (AKITAO STYLE) ==================== */
+    /* ==================== VIEW 1: HOMEPAGE VIEW ==================== */
     .view-content {
       padding: 32px 36px 60px;
       max-width: 1400px;
@@ -520,7 +520,7 @@ def get_html_dashboard() -> str:
     }
 
     /* Hero Section */
-    .akitao-hero-section {
+    .ths-hero-section {
       display: grid;
       grid-template-columns: 1.15fr 0.85fr;
       gap: 40px;
@@ -691,7 +691,7 @@ def get_html_dashboard() -> str:
     }
 
     /* THỬ NGAY Interactive Section */
-    .akitao-tester-section {
+    .ths-tester-section {
       background: linear-gradient(180deg, rgba(16, 23, 42, 0.6) 0%, rgba(10, 15, 28, 0.8) 100%);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: var(--radius-xl);
@@ -700,7 +700,7 @@ def get_html_dashboard() -> str:
       position: relative;
       overflow: hidden;
     }
-    .akitao-tester-section::before {
+    .ths-tester-section::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
@@ -851,7 +851,7 @@ def get_html_dashboard() -> str:
     }
 
     /* Feature Grid */
-    .akitao-features-grid {
+    .ths-features-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 18px;
@@ -1265,7 +1265,7 @@ def get_html_dashboard() -> str:
 
     /* Mobile Responsive */
     @media (max-width: 900px) {
-      .akitao-hero-section {
+      .ths-hero-section {
         grid-template-columns: 1fr;
         padding: 10px 0 30px;
       }
@@ -1283,11 +1283,11 @@ def get_html_dashboard() -> str:
     }
 
     @media (max-width: 768px) {
-      .akitao-sidebar {
+      .ths-sidebar {
         position: fixed;
         left: -240px;
       }
-      .akitao-sidebar.mobile-open {
+      .ths-sidebar.mobile-open {
         left: 0;
       }
       .mobile-menu-toggle { display: block; }
@@ -1307,14 +1307,14 @@ def get_html_dashboard() -> str:
 
   <div class="app-layout">
     <!-- ==================== LEFT SIDEBAR ==================== -->
-    <aside class="akitao-sidebar" id="akitaoSidebar">
+    <aside class="ths-sidebar" id="thsSidebar">
       <!-- Brand Logo & Lang -->
       <div class="sidebar-brand">
-        <div class="brand-logo-circle" title="AkiTao / ThsAutoOrganizer">
+        <div class="brand-logo-circle" title="ThsAutoOrganizer Studio">
           <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.84L19.53 19H4.47L12 5.84zM11 10h2v4h-2zm0 6h2v2h-2z"/></svg>
         </div>
         <div class="brand-title-group">
-          <span class="brand-title-text">AkiTao</span>
+          <span class="brand-title-text">ThsOrganizer</span>
         </div>
         <div class="brand-lang-badge">
           <span class="active">VI</span>
@@ -1389,9 +1389,9 @@ def get_html_dashboard() -> str:
     </aside>
 
     <!-- ==================== MAIN AREA ==================== -->
-    <div class="akitao-main-area">
+    <div class="ths-main-area">
       <!-- Topbar Header -->
-      <header class="akitao-topbar">
+      <header class="ths-topbar">
         <div class="topbar-left">
           <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
           <div class="topbar-subtitle">
@@ -1414,13 +1414,13 @@ def get_html_dashboard() -> str:
         </div>
       </header>
 
-      <!-- VIEW 1: HOMEPAGE VIEW (AKITAO STYLE LANDING PAGE) -->
+      <!-- VIEW 1: HOMEPAGE VIEW (STUDIO EDITION LANDING PAGE) -->
       <div id="homepageView" class="view-content">
         <!-- Floating Google One-Tap Widget -->
         <div class="google-onetap-widget" id="oneTapWidget">
           <div class="onetap-header">
             <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
-            <span>Đăng nhập vào akitao bằng tài khoản google</span>
+            <span>Đăng nhập vào ThsAutoOrganizer bằng tài khoản Google</span>
             <button onclick="document.getElementById('oneTapWidget').style.display='none'" style="background:none; border:none; color:#94a3b8; cursor:pointer; margin-left:auto;">✕</button>
           </div>
           <div class="onetap-user-item" onclick="quickLoginAs('xuanngocit@gmail.com', 'Nguyen XuanNgoc')">
@@ -1447,10 +1447,10 @@ def get_html_dashboard() -> str:
         </div>
 
         <!-- Hero Section -->
-        <section class="akitao-hero-section">
+        <section class="ths-hero-section">
           <div class="hero-content-left">
             <h1 class="hero-title">
-              Hệ thống hóa <span class="gradient-text-hero">học tập & brand số.</span>
+              Hệ thống hóa <span class="gradient-text-hero">học tập & tài liệu số.</span>
             </h1>
             <div class="hero-subtitle-en">Systemize your digital academic & research workspace.</div>
             <p class="hero-description">
@@ -1529,7 +1529,7 @@ def get_html_dashboard() -> str:
         </section>
 
         <!-- THỬ NGAY: Interactive AI Document Classifier -->
-        <section class="akitao-tester-section" id="sectionTester">
+        <section class="ths-tester-section" id="sectionTester">
           <div class="tester-tag-label">THỬ NGAY</div>
           <h2 class="tester-title">Thử ngay: AI đang nói gì về tài liệu của bạn?</h2>
           <div class="tester-sub-en">Build your AI document classification health check.</div>
@@ -1572,7 +1572,7 @@ def get_html_dashboard() -> str:
         </section>
 
         <!-- 4 Feature Highlights Grid -->
-        <div class="akitao-features-grid">
+        <div class="ths-features-grid">
           <div class="feature-card">
             <div class="feature-icon-wrapper" style="color:var(--accent-cyan);">🤖</div>
             <div class="feature-title">AI Tự động Phân loại</div>
@@ -1897,11 +1897,11 @@ def get_html_dashboard() -> str:
   <div class="modal-backdrop" id="aboutModal">
     <div class="modal-box">
       <div class="modal-header">
-        <div style="font-weight: 700; font-size: 1rem;">ℹ️ Giới thiệu AkiTao Cloud Studio</div>
+        <div style="font-weight: 700; font-size: 1rem;">ℹ️ Giới thiệu ThsAutoOrganizer Cloud Studio</div>
         <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;" onclick="closeAboutModal()">&times;</button>
       </div>
       <div class="modal-body" style="font-size: 0.84rem; line-height: 1.6; color: var(--text-muted);">
-        <p><b>AkiTao Cloud Studio</b> là nền tảng quản lý và tự động phân loại tài liệu học tập, nghiên cứu Thạc sĩ Hệ thống Thông tin đa thiết bị (PC, iPad, Điện thoại).</p>
+        <p><b>ThsAutoOrganizer Studio</b> là nền tảng quản lý và tự động phân loại tài liệu học tập, nghiên cứu Thạc sĩ Hệ thống Thông tin đa thiết bị (PC, iPad, Điện thoại).</p>
         <div style="background:rgba(255,255,255,0.04); padding:12px; border-radius:8px; border:1px solid var(--border-color); margin-top:8px;">
           <div>⚡ <b>Phiên bản:</b> 0.29.0 Studio Edition</div>
           <div>☁️ <b>Kiến trúc:</b> Multi-User SaaS với Google Drive & Local Storage riêng biệt</div>
@@ -1957,7 +1957,7 @@ def get_html_dashboard() -> str:
       setTimeout(() => { t.style.display = 'none'; }, 3500);
     }
 
-    /* View Navigation (AkiTao Homepage vs Workspace) */
+    /* View Navigation (Homepage vs Workspace) */
     function showView(viewName) {
       currentActiveView = viewName;
       const homeEl = document.getElementById('homepageView');
@@ -2043,12 +2043,12 @@ def get_html_dashboard() -> str:
     }
 
     function toggleSidebarCollapse() {
-      const sb = document.getElementById('akitaoSidebar');
+      const sb = document.getElementById('thsSidebar');
       sb.classList.toggle('collapsed');
     }
 
     function toggleMobileMenu() {
-      const sb = document.getElementById('akitaoSidebar');
+      const sb = document.getElementById('thsSidebar');
       sb.classList.toggle('mobile-open');
     }
 
@@ -2541,7 +2541,7 @@ def get_html_dashboard() -> str:
       }
     }
 
-    /* ĐĂNG XUẤT: HỦY SESSION VÀ ĐÁ VỀ HOMEPAGE AKITAO */
+    /* ĐĂNG XUẤT: HỦY SESSION VÀ ĐÁ VỀ TRANG CHỦ BAN ĐẦU */
     async function logoutUser() {
       try {
         await fetch('/auth/logout', { method: 'POST' });
