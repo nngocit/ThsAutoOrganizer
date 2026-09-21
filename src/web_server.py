@@ -3526,7 +3526,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     f"redirect_uri={urllib.parse.quote(redirect_uri)}&"
                     f"response_type=code&"
                     f"scope={urllib.parse.quote('openid email profile https://www.googleapis.com/auth/drive.file')}&"
-                    f"access_type=offline&prompt=consent"
+                    f"access_type=offline&prompt=select_account"
                 )
             else:
                 oauth_url = "/?login_error=missing_credentials"

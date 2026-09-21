@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger("ThsAutoOrganizer.drive")
 
 # Scopes yêu cầu để tạo folder và upload tài liệu học tập
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
