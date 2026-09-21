@@ -1335,8 +1335,9 @@ def get_html_dashboard() -> str:
       .view-content { padding: 18px 16px 40px; }
       .dual-action-cards { grid-template-columns: 1fr; }
       .upload-action-banner { flex-direction: column; align-items: stretch; }
+      .upload-selector-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
       .upload-btn-group { justify-content: stretch; }
-      .upload-btn-group button { flex: 1; }
+      .upload-btn-group button { flex: 1; min-width: 140px; }
       .cards-grid { grid-template-columns: 1fr; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .tester-input-bar { flex-direction: column; padding: 10px; }
@@ -1791,27 +1792,60 @@ def get_html_dashboard() -> str:
             <!-- Cross-Platform Upload Banner -->
             <div class="upload-action-banner" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 20px;">
               <div class="upload-banner-text">
-                <div class="upload-banner-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">
-                  <span>⚡ Nạp tài liệu đa thiết bị</span>
-                  <span style="font-size: 0.76rem; color: var(--accent-purple); font-weight: normal; margin-left: 6px;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
+                <div class="upload-banner-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                  <div>
+                    <span>⚡ Nạp tài liệu đa thiết bị</span>
+                    <span style="font-size: 0.76rem; color: var(--accent-purple); font-weight: normal; margin-left: 6px;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
+                  </div>
+                  <span id="uploadTargetBadge" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 6px; background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); border: 1px solid rgba(168, 85, 247, 0.3); font-weight: 600;">
+                    🎯 Yêu cầu chọn Môn học
+                  </span>
                 </div>
                 <div class="upload-banner-sub" style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 4px;">
                   Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
                 </div>
               </div>
 
+              <!-- Option 1: Chọn môn học & loại tài liệu trực tiếp trên banner -->
+              <div class="upload-selector-box" style="margin-top: 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;" class="upload-selector-grid">
+                  <div>
+                    <label for="uploadTargetSubject" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                      <span>🎯 Môn học <span style="color: #ef4444; font-weight: bold;">* (Bắt buộc)</span>:</span>
+                      <span style="font-size: 0.72rem; color: var(--accent-purple);">Thư mục môn</span>
+                    </label>
+                    <select id="uploadTargetSubject" class="form-control" style="cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;" onchange="onUploadTargetSubjectChange()">
+                      <option value="">-- Chọn Môn học trước khi nạp --</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label for="uploadTargetDocType" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                      <span>📁 Loại tài liệu:</span>
+                      <span style="font-size: 0.72rem; color: var(--text-muted);">Chuẩn 4 thư mục con</span>
+                    </label>
+                    <select id="uploadTargetDocType" class="form-control" style="cursor: pointer;">
+                      <option value="Slide" selected>02_Slide (Bài giảng, slide, ảnh bảng)</option>
+                      <option value="Giáo trình">01_Giáo trình (Sách học phần, tài liệu chính)</option>
+                      <option value="Tài liệu tham khảo">03_Tài liệu tham khảo (Paper, ebook, đọc thêm)</option>
+                      <option value="Ôn thi">04_Ôn thi (Đề thi, bài tập, tóm tắt)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div class="upload-btn-group" style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
-                <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()" style="border: 1px solid var(--border-subtle);">
+                <button class="btn btn-secondary" onclick="triggerCameraCapture()" style="border: 1px solid var(--border-subtle); display: inline-flex; align-items: center; gap: 6px;">
                   📸 Chụp bài giảng
                 </button>
 
                 <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
-                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="border: 1px solid var(--border-subtle);">
+                <button class="btn btn-secondary" onclick="triggerFileUpload()" style="border: 1px solid var(--border-subtle); display: inline-flex; align-items: center; gap: 6px;">
                   📤 Nạp tệp (PDF/Word/Ảnh)
                 </button>
 
-                <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
+                <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder" style="display: inline-flex; align-items: center; gap: 6px;">
                   📁 Chọn thư mục máy tính
                 </button>
               </div>
@@ -2524,6 +2558,7 @@ def get_html_dashboard() -> str:
 
           await loadStats();
           await loadFiles();
+          await populateUploadTargetSubjects();
 
           if (currentUser && !currentUser.major_id) {
             openOnboardingModal();
@@ -2590,6 +2625,19 @@ def get_html_dashboard() -> str:
       const fSub = document.getElementById('filterSubject');
       if (fSub) fSub.innerHTML = '<option value="">Tất cả môn học</option>';
 
+      const targetSub = document.getElementById('uploadTargetSubject');
+      if (targetSub) {
+        targetSub.innerHTML = '<option value="">-- Chọn Môn học trước khi nạp --</option>';
+        targetSub.value = '';
+      }
+      const targetBadge = document.getElementById('uploadTargetBadge');
+      if (targetBadge) {
+        targetBadge.textContent = '🎯 Yêu cầu chọn Môn học';
+        targetBadge.style.background = 'rgba(168, 85, 247, 0.15)';
+        targetBadge.style.color = 'var(--accent-purple)';
+        targetBadge.style.borderColor = 'rgba(168, 85, 247, 0.3)';
+      }
+
       // 1. Reset các form & input cá nhân trong Modal và View
       const setMail = document.getElementById('settingsUserEmail');
       if (setMail) document.getElementById('settingsUserEmail').textContent = '';
@@ -2653,6 +2701,7 @@ def get_html_dashboard() -> str:
           });
           fSub.value = curVal;
         }
+        await populateUploadTargetSubjects(data.subjects || []);
       } catch (err) {
         console.error('Lỗi stats:', err);
       }
@@ -2799,6 +2848,140 @@ def get_html_dashboard() -> str:
       tbody.innerHTML = html;
     }
 
+    function getStoredTargetSubject() {
+      try { return localStorage.getItem('ths_target_subject') || ''; } catch (e) { return ''; }
+    }
+
+    function setStoredTargetSubject(val) {
+      try {
+        if (val) localStorage.setItem('ths_target_subject', val);
+        else localStorage.removeItem('ths_target_subject');
+      } catch (e) {}
+    }
+
+    function onUploadTargetSubjectChange() {
+      const select = document.getElementById('uploadTargetSubject');
+      const badge = document.getElementById('uploadTargetBadge');
+      if (!select) return;
+      const val = select.value;
+      if (val) {
+        select.style.borderColor = '';
+        select.style.boxShadow = '';
+        setStoredTargetSubject(val);
+        if (badge) {
+          const optText = select.options[select.selectedIndex]?.text || val;
+          badge.textContent = `🎯 Môn: ${optText}`;
+          badge.style.background = 'rgba(16, 185, 129, 0.15)';
+          badge.style.color = '#34d399';
+          badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        }
+      } else {
+        setStoredTargetSubject('');
+        if (badge) {
+          badge.textContent = '🎯 Yêu cầu chọn Môn học';
+          badge.style.background = 'rgba(168, 85, 247, 0.15)';
+          badge.style.color = 'var(--accent-purple)';
+          badge.style.borderColor = 'rgba(168, 85, 247, 0.3)';
+        }
+      }
+    }
+
+    function triggerCameraCapture() {
+      const subSelect = document.getElementById('uploadTargetSubject');
+      if (!subSelect || !subSelect.value) {
+        showToast('⚠️ Vui lòng chọn Môn học trước khi chụp bài giảng!');
+        if (subSelect) {
+          subSelect.focus();
+          subSelect.style.borderColor = '#ef4444';
+          subSelect.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.35)';
+        }
+        return;
+      }
+      subSelect.style.borderColor = '';
+      subSelect.style.boxShadow = '';
+      const docTypeSelect = document.getElementById('uploadTargetDocType');
+      if (docTypeSelect && !docTypeSelect.value) {
+        docTypeSelect.value = 'Slide';
+      }
+      const camInput = document.getElementById('cameraInput');
+      if (camInput) camInput.click();
+    }
+
+    function triggerFileUpload() {
+      const subSelect = document.getElementById('uploadTargetSubject');
+      if (!subSelect || !subSelect.value) {
+        showToast('⚠️ Vui lòng chọn Môn học trước khi nạp tệp!');
+        if (subSelect) {
+          subSelect.focus();
+          subSelect.style.borderColor = '#ef4444';
+          subSelect.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.35)';
+        }
+        return;
+      }
+      subSelect.style.borderColor = '';
+      subSelect.style.boxShadow = '';
+      const fInput = document.getElementById('fileInput');
+      if (fInput) fInput.click();
+    }
+
+    async function populateUploadTargetSubjects(extraSubjects = []) {
+      const select = document.getElementById('uploadTargetSubject');
+      if (!select) return;
+      const remembered = getStoredTargetSubject();
+      const curVal = select.value || remembered;
+
+      const map = new Map();
+
+      if (currentUser && currentUser.major_id) {
+        try {
+          const res = await fetch(`/api/majors/${currentUser.major_id}/subjects`);
+          const d = await res.json();
+          if (d.ok && Array.isArray(d.subjects)) {
+            d.subjects.forEach(s => {
+              map.set(s.name, {
+                name: s.name,
+                folder: s.folder_name || s.name,
+                code: s.code || ''
+              });
+            });
+          }
+        } catch (e) {
+          console.warn('Lỗi tải môn theo chuyên ngành:', e);
+        }
+      }
+
+      if (Array.isArray(extraSubjects)) {
+        extraSubjects.forEach(s => {
+          if (s && typeof s === 'string' && !map.has(s)) {
+            map.set(s, { name: s, folder: s, code: '' });
+          }
+        });
+      }
+
+      if (map.size === 0) {
+        const defaults = [
+          { name: 'Cơ sở dữ liệu', folder: 'Co_So_Du_Lieu', code: 'CSDL' },
+          { name: 'Toán khoa học dữ liệu', folder: 'Toan_Khoa_Hoc_Du_Lieu', code: 'TOAN_DS' },
+          { name: 'Triết học', folder: 'Triet_Hoc', code: 'TRIET' },
+          { name: 'Phương pháp nghiên cứu', folder: 'Phuong_Phap_Nghien_Cuu', code: 'PPNC' },
+          { name: 'Phương pháp ghi chú', folder: 'Phuong_Phap_Ghi_Chu', code: 'NOTE' }
+        ];
+        defaults.forEach(d => map.set(d.name, d));
+      }
+
+      let html = '<option value="">-- Chọn Môn học trước khi nạp --</option>';
+      map.forEach(item => {
+        const codeSuffix = item.code ? ` (${item.code})` : '';
+        html += `<option value="${item.name}" data-name="${item.name}" data-folder="${item.folder}">${item.name}${codeSuffix}</option>`;
+      });
+      select.innerHTML = html;
+
+      if (curVal && map.has(curVal)) {
+        select.value = curVal;
+      }
+      onUploadTargetSubjectChange();
+    }
+
     async function handleFileInput(fileList) {
       if (!fileList || fileList.length === 0) return;
       if (!currentUser) {
@@ -2806,7 +2989,25 @@ def get_html_dashboard() -> str:
         openLoginModal();
         return;
       }
-      showToast(`Đang nạp ${fileList.length} tệp...`);
+
+      const targetSubjectSelect = document.getElementById('uploadTargetSubject');
+      const targetSubject = targetSubjectSelect ? targetSubjectSelect.value : '';
+      if (!targetSubject) {
+        showToast('⚠️ Vui lòng chọn Môn học trước khi nạp tài liệu!');
+        if (targetSubjectSelect) {
+          targetSubjectSelect.focus();
+          targetSubjectSelect.style.borderColor = '#ef4444';
+          targetSubjectSelect.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.35)';
+        }
+        return;
+      }
+
+      const selectedOpt = targetSubjectSelect.options[targetSubjectSelect.selectedIndex];
+      const subjectName = selectedOpt ? (selectedOpt.getAttribute('data-name') || selectedOpt.value) : targetSubject;
+      const subjectFolder = selectedOpt ? (selectedOpt.getAttribute('data-folder') || selectedOpt.value) : targetSubject;
+      const targetDocType = document.getElementById('uploadTargetDocType')?.value || 'Slide';
+
+      showToast(`Đang nạp ${fileList.length} tệp vào [${subjectName}]...`);
 
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
@@ -2818,6 +3019,9 @@ def get_html_dashboard() -> str:
               filename: file.name,
               content_base64: base64Data,
               size_bytes: file.size,
+              subject: subjectName,
+              subject_folder: subjectFolder,
+              document_type: targetDocType
             };
             const res = await fetch('/api/upload', {
               method: 'POST',
@@ -2826,7 +3030,7 @@ def get_html_dashboard() -> str:
             });
             const data = await res.json();
             if (data.ok) {
-              showToast(`✅ Đã nạp thành công: ${file.name}`);
+              showToast(`✅ Đã nạp thành công: ${file.name} (${subjectName})`);
               loadStats();
               loadFiles();
             } else {
@@ -2846,6 +3050,19 @@ def get_html_dashboard() -> str:
         openLoginModal();
         return;
       }
+      const targetSubjectSelect = document.getElementById('uploadTargetSubject');
+      if (!targetSubjectSelect || !targetSubjectSelect.value) {
+        showToast('⚠️ Vui lòng chọn Môn học trước khi chọn thư mục máy tính!');
+        if (targetSubjectSelect) {
+          targetSubjectSelect.focus();
+          targetSubjectSelect.style.borderColor = '#ef4444';
+          targetSubjectSelect.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.35)';
+        }
+        return;
+      }
+      targetSubjectSelect.style.borderColor = '';
+      targetSubjectSelect.style.boxShadow = '';
+
       if (!window.showDirectoryPicker) {
         document.getElementById('fileInput').click();
         return;
@@ -3927,6 +4144,8 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 # Phân loại
                 subject = body.get("subject")
                 doc_type = body.get("document_type")
+                subject_folder = body.get("subject_folder")
+
                 if not subject or not doc_type:
                     inferred_sub, inferred_type = infer_file_classification(
                         filename, current_user, self.database
@@ -3934,12 +4153,55 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     subject = subject or inferred_sub
                     doc_type = doc_type or inferred_type
 
+                # Tìm thư mục môn và loại tài liệu chuẩn trên ổ đĩa
+                if not subject_folder and self.database and current_user and current_user.get("major_id"):
+                    try:
+                        major_subs = self.database.get_subjects_by_major(current_user["major_id"])
+                        for s in major_subs:
+                            if s.get("name") == subject or s.get("folder_name") == subject or s.get("code") == subject:
+                                subject_folder = s.get("folder_name")
+                                subject = s.get("name")
+                                break
+                    except Exception:
+                        pass
+
+                if not subject_folder:
+                    from src.classifier import DEFAULT_SUBJECT_MAP
+                    rev_map = {v.lower(): k for k, v in DEFAULT_SUBJECT_MAP.items()}
+                    subject_folder = rev_map.get(subject.lower(), subject)
+
+                doc_folder_map = {
+                    "Giáo trình": "01_Giao_Trinh",
+                    "Slide": "02_Slide",
+                    "Tài liệu tham khảo": "03_Tai_Lieu_Tham_Khao",
+                    "Ôn thi": "04_On_Thi",
+                    "01_Giao_Trinh": "01_Giao_Trinh",
+                    "02_Slide": "02_Slide",
+                    "03_Tai_Lieu_Tham_Khao": "03_Tai_Lieu_Tham_Khao",
+                    "04_On_Thi": "04_On_Thi",
+                }
+                sub_doc_folder = doc_folder_map.get(doc_type, "02_Slide" if doc_type == "Slide" else doc_type)
+
                 # Lưu file vào thư mục lưu trữ CỦA TỪNG USER (Cách ly hoàn toàn)
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
                 config_root = cfg.get("root_folder", "")
                 user_folder = get_user_storage_folder(current_user, config_root)
-                dest_dir = user_folder / subject
+
+                # Kiểm tra xem user có folder chuyên ngành hay lưu trực tiếp
+                major_folder = None
+                if current_user and current_user.get("major_id") and self.database:
+                    m = self.database.get_major_by_id(current_user["major_id"])
+                    if m and m.get("folder_name"):
+                        cand_dir = user_folder / m["folder_name"]
+                        if cand_dir.exists():
+                            major_folder = m["folder_name"]
+
+                if major_folder:
+                    dest_dir = user_folder / major_folder / subject_folder / sub_doc_folder
+                else:
+                    dest_dir = user_folder / subject_folder / sub_doc_folder
+
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 dest_path = dest_dir / filename
                 with open(dest_path, "wb") as f_out:
@@ -3985,6 +4247,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     "document_type": doc_type,
                     "status": file_status,
                     "drive_file_id": drive_file_id,
+                    "saved_path": str(dest_path),
                 })
                 return
             except Exception as exc:

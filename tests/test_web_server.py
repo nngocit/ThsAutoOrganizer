@@ -462,6 +462,77 @@ def test_persistent_session_restoration_across_restart(web_test_env):
         assert me_data2.get("authenticated") is False
 
 
+def test_option_1_mandatory_subject_banner_and_upload(tmp_path: Path):
+    """Kiểm tra Option 1: UI Banner nạp đa thiết bị có dropdown chọn môn bắt buộc & phân loại thư mục chuẩn 4 cấp con."""
+    from src.database import Database
+    from src.web_server import start_web_server, get_html_dashboard
+    import base64
+    import urllib.request
+    import json
+
+    # 1. Kiểm tra HTML Dashboard giao diện có đầy đủ thành phần Phương án 1
+    html = get_html_dashboard()
+    assert "uploadTargetSubject" in html
+    assert "uploadTargetDocType" in html
+    assert "uploadTargetBadge" in html
+    assert "triggerCameraCapture()" in html
+    assert "triggerFileUpload()" in html
+    assert "populateUploadTargetSubjects" in html
+    assert "onUploadTargetSubjectChange" in html
+
+    # 2. Khởi tạo server và test upload có chọn môn & loại tài liệu
+    db = Database(tmp_path / "opt1_test.db")
+    db.initialize()
+    cfg_path = tmp_path / "cfg.json"
+    root_folder = tmp_path / "Root_Opt1"
+    root_folder.mkdir(parents=True, exist_ok=True)
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(root_folder)}, f)
+
+    port = 19207
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # Đăng nhập
+        login_req = urllib.request.Request(
+            f"{base_url}/auth/test-login",
+            data=json.dumps({"email": "student_opt1@univ.edu", "name": "Sinh Vien"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(login_req) as resp:
+            cookie = resp.headers.get("Set-Cookie").split(";")[0]
+
+        # Nạp ảnh chụp bài giảng môn Cơ sở dữ liệu, loại Slide
+        fake_content = base64.b64encode(b"lecture slide image content").decode("utf-8")
+        payload = {
+            "filename": "Photo_Lecture_01.jpg",
+            "content_base64": fake_content,
+            "subject": "Cơ sở dữ liệu",
+            "subject_folder": "Co_So_Du_Lieu",
+            "document_type": "Slide"
+        }
+        upload_req = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Cookie": cookie},
+            method="POST"
+        )
+        with urllib.request.urlopen(upload_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+            assert data["subject"] == "Cơ sở dữ liệu"
+            assert data["document_type"] == "Slide"
+            saved_path = Path(data["saved_path"])
+            assert saved_path.exists()
+            # Kiểm tra phân bổ chuẩn vào thư mục Co_So_Du_Lieu/02_Slide
+            assert "Co_So_Du_Lieu" in saved_path.parts
+            assert "02_Slide" in saved_path.parts
+    finally:
+        server.shutdown()
+
+
+
 
 
 
