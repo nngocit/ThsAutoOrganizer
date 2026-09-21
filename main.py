@@ -151,7 +151,7 @@ def worker_loop(
     stable_wait_seconds: float,
     stop_event: threading.Event,
 ) -> None:
-    """Luồng worker lấy file từ hàng đợi, chờ ổn định và tiến hành xử lý."""
+    """Luồng worker lấy file từ hàng đợi, chờ ổn định và tiến hành xử lý theo từng user."""
     logger.info("Worker thread đã sẵn sàng nhận việc.")
     while not stop_event.is_set():
         try:
@@ -164,14 +164,19 @@ def worker_loop(
             task_queue.task_done()
             break
 
-        file_path = Path(item)
+        if isinstance(item, tuple):
+            file_path, user_email = item
+        else:
+            file_path, user_email = item, "default@user"
+
+        file_path = Path(file_path)
         try:
-            logger.debug("Worker nhận file: %s", file_path)
+            logger.debug("Worker nhận file: %s (User: %s)", file_path, user_email)
             # Kiểm tra file đã sao chép/ghi hoàn tất hay chưa
             if not is_file_stable(file_path, wait_seconds=stable_wait_seconds):
                 logger.warning("File '%s' chưa ổn định hoặc bị khóa, bỏ qua lượt này.", file_path)
             else:
-                processor.process_file(file_path)
+                processor.process_file(file_path, user_email=user_email)
         except Exception as exc:
             logger.error("Lỗi không kiểm soát trong worker khi xử lý '%s': %s", file_path, exc, exc_info=True)
         finally:
@@ -184,22 +189,24 @@ def scan_existing_files(
     root_folder: Path,
     processor: FileProcessor,
     task_queue: queue.Queue,
+    user_email: str = "default@user",
 ) -> int:
-    """Quét toàn bộ thư mục root_folder để tìm và xử lý các file đã có từ trước."""
-    if not root_folder.is_dir():
-        logger.warning("Thư mục root '%s' chưa tồn tại trên máy.", root_folder)
+    """Quét toàn bộ thư mục root_folder để tìm và xử lý các file đã có từ trước cho tài khoản user."""
+    target_path = Path(root_folder).resolve()
+    if not target_path.is_dir():
+        logger.warning("Thư mục root '%s' chưa tồn tại trên máy.", target_path)
         return 0
 
     count = 0
-    for path in root_folder.rglob("*"):
+    for path in target_path.rglob("*"):
         if path.is_file() and processor.should_process_file(path):
-            task_queue.put(path)
+            task_queue.put((path, user_email))
             count += 1
 
     if count > 0:
-        logger.info("Đã phát hiện %d file có sẵn trong thư mục. Đã đưa vào hàng đợi.", count)
+        logger.info("Đã phát hiện %d file trong '%s' (User: %s). Đã đưa vào hàng đợi.", count, target_path, user_email)
     else:
-        logger.info("Không có file nào có sẵn cần xử lý trong thư mục root.")
+        logger.info("Không có file nào có sẵn cần xử lý trong thư mục '%s'.", target_path)
     return count
 
 
@@ -276,9 +283,11 @@ def main() -> None:
     worker.start()
 
     # 6. Quét file có sẵn nếu được cấu hình
-    if config.get("process_existing_files_on_start", True):
+    if config.get("process_existing_files_on_start", False):
         logger.info("Đang quét các file đã tồn tại trong thư mục root...")
         scan_existing_files(root_folder, processor, task_queue)
+    else:
+        logger.info("Chế độ chờ đăng nhập: Chưa quét tự động. Hãy đăng nhập tài khoản và bấm Quét từ Web Studio.")
 
     # 7. Khởi động Watchdog Observer
     event_handler = WatchdogHandler(task_queue, processor)
@@ -312,8 +321,10 @@ def main() -> None:
     if config.get("enable_web_ui", True):
         from src.web_server import start_web_server
 
-        def trigger_rescan() -> int:
-            return scan_existing_files(root_folder, processor, task_queue)
+        def trigger_rescan(target_folder: Optional[str] = None, user_email: str = "default@user") -> int:
+            folder = Path(target_folder).resolve() if target_folder else root_folder
+            logger.info("Quét thư mục máy tính '%s' cho tài khoản: %s", folder, user_email)
+            return scan_existing_files(folder, processor, task_queue, user_email=user_email)
 
         web_port = int(config.get("web_port", 8080))
         try:

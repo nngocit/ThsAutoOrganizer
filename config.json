@@ -3,7 +3,7 @@
   "database": "data\\files.db",
   "google_drive_root_folder_id": "",
   "create_drive_subfolders": true,
-  "process_existing_files_on_start": true,
+  "process_existing_files_on_start": false,
   "allow_direct_subject_files": true,
   "auto_sync_drive": true,
   "drive_sync_interval_minutes": 3,

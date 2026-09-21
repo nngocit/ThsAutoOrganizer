@@ -141,10 +141,10 @@ class FileProcessor:
 
         return True
 
-    def process_file(self, file_path: Path | str) -> ProcessingResult:
-        """Thực thi toàn bộ pipeline cho một file."""
+    def process_file(self, file_path: Path | str, user_email: str = "default@user") -> ProcessingResult:
+        """Thực thi toàn bộ pipeline cho một file gắn với tài khoản người dùng."""
         path = Path(file_path).resolve()
-        logger.info("Detected: %s", path.name)
+        logger.info("Detected: %s (User: %s)", path.name, user_email)
 
         if not path.is_file():
             err_msg = f"File không tồn tại hoặc đã bị xóa: '{path}'"
@@ -212,7 +212,7 @@ class FileProcessor:
 
         # 4. Kiểm tra trùng lặp trong SQLite
         # 4a. Nếu chính file này (cùng đường dẫn) đã được xử lý và upload thành công trước đó:
-        existing_path_rec = self.database.find_by_path(str(path))
+        existing_path_rec = self.database.find_by_path(str(path), user_email=user_email)
         if existing_path_rec:
             if existing_path_rec.get("sha256") == file_sha256 and existing_path_rec.get("status") == STATUS_UPLOADED:
                 logger.info("File '%s' đã tồn tại và đã upload Drive từ trước (SHA256: %s). Skip upload.", path.name, file_sha256[:10])
@@ -226,7 +226,7 @@ class FileProcessor:
                 )
 
         # 4b. Nếu file ở đường dẫn khác nhưng nội dung trùng SHA-256:
-        existing_sha = self.database.find_by_sha256(file_sha256)
+        existing_sha = self.database.find_by_sha256(file_sha256, user_email=user_email)
         if existing_sha and existing_sha.get("status") == STATUS_UPLOADED:
             logger.info("Duplicate detected by SHA256 (trùng nội dung với: %s)", existing_sha.get("path"))
             logger.info("Skip upload (Drive ID: %s)", existing_sha.get("drive_file_id"))
@@ -240,6 +240,7 @@ class FileProcessor:
                     document_type=document_type,
                     status=STATUS_DUPLICATE,
                     drive_file_id=existing_sha.get("drive_file_id"),
+                    user_email=user_email,
                 )
             return ProcessingResult(
                 file_path=str(path),
@@ -267,6 +268,7 @@ class FileProcessor:
                     document_type=document_type,
                     status=STATUS_ERROR,
                     error=err_msg,
+                    user_email=user_email,
                 )
                 return ProcessingResult(
                     file_path=str(path),
@@ -284,6 +286,7 @@ class FileProcessor:
             subject=subject,
             document_type=document_type,
             status=STATUS_PENDING,
+            user_email=user_email,
         )
 
         # 7. Upload lên Google Drive

@@ -115,3 +115,76 @@ def test_multi_user_web_api(tmp_path: Path):
             assert files_data[0]["subject"] == "Triết học"
     finally:
         server.shutdown()
+
+
+def test_user_folder_and_scan(tmp_path: Path):
+    """Kiểm tra lưu thư mục cá nhân và kích hoạt quét đúng thư mục + email."""
+    db_path = tmp_path / "folder_scan.db"
+    db = Database(db_path)
+    db.initialize()
+
+    cfg_path = tmp_path / "config.json"
+    root_folder = tmp_path / "Default_Root"
+    root_folder.mkdir(parents=True, exist_ok=True)
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(root_folder)}, f)
+
+    scan_invocations = []
+
+    def mock_scan(target_folder=None, user_email="default@user"):
+        scan_invocations.append((target_folder, user_email))
+        return 7
+
+    import random
+    port = random.randint(20000, 20999)
+    server = start_web_server(port=port, database=db, config_path=cfg_path, scan_callback=mock_scan)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # 1. Đăng nhập với email cụ thể
+        login_payload = json.dumps({"email": "mongxuancomestic@gmail.com", "name": "Mộng Xuân"}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base_url}/auth/test-login",
+            data=login_payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req) as resp:
+            cookie = resp.headers.get("Set-Cookie")
+
+        # 2. Cập nhật thư mục máy tính riêng cho user
+        custom_folder = str(tmp_path / "MongXuan_Folder")
+        folder_payload = json.dumps({"local_folder": custom_folder}).encode("utf-8")
+        folder_req = urllib.request.Request(
+            f"{base_url}/api/user/folder",
+            data=folder_payload,
+            headers={"Content-Type": "application/json", "Cookie": cookie},
+        )
+        with urllib.request.urlopen(folder_req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["ok"] is True
+            assert res["local_folder"] == custom_folder
+
+        # Kiểm tra database đã lưu folder
+        u = db.get_user_by_email("mongxuancomestic@gmail.com")
+        assert u is not None
+        assert u["local_folder"] == custom_folder
+
+        # 3. Kích hoạt quét thư mục cho user này
+        scan_req = urllib.request.Request(
+            f"{base_url}/api/scan",
+            data=json.dumps({"folder_path": custom_folder}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Cookie": cookie},
+        )
+        with urllib.request.urlopen(scan_req) as resp:
+            assert resp.status == 200
+            scan_res = json.loads(resp.read().decode("utf-8"))
+            assert scan_res["ok"] is True
+            assert scan_res["count"] == 7
+            assert scan_res["user_email"] == "mongxuancomestic@gmail.com"
+            assert scan_res["folder"] == custom_folder
+
+        assert len(scan_invocations) == 1
+        assert scan_invocations[0] == (custom_folder, "mongxuancomestic@gmail.com")
+    finally:
+        server.shutdown()

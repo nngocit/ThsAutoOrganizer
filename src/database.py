@@ -57,6 +57,7 @@ class Database:
             email TEXT UNIQUE NOT NULL,
             name TEXT,
             avatar_url TEXT,
+            local_folder TEXT DEFAULT '',
             drive_root_folder_id TEXT,
             access_token TEXT,
             refresh_token TEXT,
@@ -95,9 +96,14 @@ class Database:
             cursor = conn.cursor()
             cursor.execute(create_table_users)
             cursor.execute(create_table_files)
-            # Migration an toàn nếu bảng files cũ chưa có cột user_email
+            # Migration an toàn nếu bảng cũ chưa có cột user_email hoặc local_folder
             try:
                 cursor.execute("ALTER TABLE files ADD COLUMN user_email TEXT DEFAULT 'default@user';")
+            except Exception:
+                pass  # Cột đã tồn tại
+
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN local_folder TEXT DEFAULT '';")
             except Exception:
                 pass  # Cột đã tồn tại
 
@@ -318,16 +324,24 @@ class Database:
         email: str,
         name: str = "",
         avatar_url: str = "",
+        local_folder: str = "",
     ) -> Dict[str, Any]:
         """Lấy thông tin người dùng theo email hoặc tạo mới nếu chưa có."""
         user = self.get_user_by_email(email)
         if user:
-            if name or avatar_url:
+            if name or avatar_url or local_folder:
                 now = current_iso_time()
                 with self._get_connection() as conn:
                     conn.execute(
-                        "UPDATE users SET name = COALESCE(NULLIF(?, ''), name), avatar_url = COALESCE(NULLIF(?, ''), avatar_url), updated_at = ? WHERE email = ?;",
-                        (name, avatar_url, now, email),
+                        """
+                        UPDATE users 
+                        SET name = COALESCE(NULLIF(?, ''), name), 
+                            avatar_url = COALESCE(NULLIF(?, ''), avatar_url),
+                            local_folder = COALESCE(NULLIF(?, ''), local_folder),
+                            updated_at = ? 
+                        WHERE email = ?;
+                        """,
+                        (name, avatar_url, local_folder, now, email),
                     )
                     conn.commit()
             return self.get_user_by_email(email) or {}
@@ -335,8 +349,8 @@ class Database:
         now = current_iso_time()
         with self._get_connection() as conn:
             conn.execute(
-                "INSERT INTO users (email, name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?);",
-                (email, name, avatar_url, now, now),
+                "INSERT INTO users (email, name, avatar_url, local_folder, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?);",
+                (email, name, avatar_url, local_folder, now, now),
             )
             conn.commit()
         return self.get_user_by_email(email) or {}
@@ -351,6 +365,16 @@ class Database:
             if row:
                 return dict(row)
             return None
+
+    def update_user_folder(self, email: str, local_folder: str) -> None:
+        """Cập nhật đường dẫn thư mục máy tính cho người dùng."""
+        now = current_iso_time()
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE users SET local_folder = ?, updated_at = ? WHERE email = ?;",
+                (str(local_folder), now, email),
+            )
+            conn.commit()
 
     def update_user_tokens(
         self,

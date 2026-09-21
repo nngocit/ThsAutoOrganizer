@@ -689,6 +689,47 @@ def get_html_dashboard() -> str:
 
   <!-- Main Content -->
   <main>
+    <!-- Login Prompt Banner (Hiển thị khi chưa đăng nhập) -->
+    <div id="loginPromptBanner" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.18) 0%, rgba(139, 92, 246, 0.18) 100%); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: var(--radius-md); padding: 18px 22px; color: #f8fafc; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <span style="font-size: 2rem;">🔒</span>
+        <div>
+          <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Chưa kết nối tài khoản & thư mục máy</div>
+          <div style="font-size: 0.82rem; color: #cbd5e1; margin-top: 3px; max-width: 620px; line-height: 1.45;">
+            Hệ thống chỉ quét và đồng bộ khi bạn đã đăng nhập đúng tài khoản Gmail và thư mục máy tính của mình. Hãy đăng nhập để bắt đầu!
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-google" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">🔑 Đăng nhập Google</button>
+        <button class="btn btn-secondary" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">⚡ Đăng nhập nhanh</button>
+      </div>
+    </div>
+
+    <!-- User Machine Folder Bar (Chỉ hiển thị khi đã đăng nhập) -->
+    <div id="userFolderBar" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.15) 0%, rgba(0, 242, 254, 0.08) 100%); border: 1px solid rgba(0, 242, 254, 0.35); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 1.6rem;">📁</span>
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-weight: 700; font-size: 0.92rem; color: #fff;">Thư mục máy tính của bạn:</span>
+            <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
+          </div>
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px;">
+            Tài khoản: <b id="displayUserEmail" style="color: #60a5fa;">--</b> (Quét và đồng bộ riêng biệt cho tài khoản này)
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+        <button class="btn btn-secondary" onclick="openChangeFolderModal()" style="font-size: 0.8rem; padding: 7px 12px;">
+          ✏️ Đổi thư mục máy
+        </button>
+        <button class="btn btn-primary" onclick="triggerServerScan()" id="btnServerScan" style="font-size: 0.8rem; padding: 7px 16px; background: linear-gradient(135deg, #1a73e8, #00f2fe);">
+          🔍 Quét & Đồng bộ thư mục ngay
+        </button>
+      </div>
+    </div>
+
     <!-- Cross-Platform Upload Banner -->
     <div class="upload-action-banner">
       <div class="upload-banner-text">
@@ -848,17 +889,47 @@ def get_html_dashboard() -> str:
             Đăng nhập bằng Google Workspace / Gmail
           </a>
 
-          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- HOẶC THỬ NGHIỆM NHANH BẰNG EMAIL SINH VIÊN -</div>
+          <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 10px 12px; margin-top: 4px; font-size: 0.76rem; line-height: 1.45;">
+            <div style="color: #f87171; font-weight: 700; margin-bottom: 3px;">⚠️ Gặp lỗi 403 "access_denied" từ Google?</div>
+            <div style="color: #cbd5e1;">
+              Ứng dụng Google Cloud đang ở chế độ <b>Testing</b>. Bạn hãy thêm email vào mục <b>Test users</b> trên Google Cloud Console, HOẶC nhập email vào ô dưới để <b>Đăng nhập nhanh</b> ngay lập tức (không lo Google chặn)!
+            </div>
+          </div>
+
+          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- HOẶC ĐĂNG NHẬP NHANH BẰNG EMAIL SINH VIÊN -</div>
 
           <div style="display: flex; flex-direction: column; gap: 6px;">
-            <input type="email" id="testEmailInput" class="form-control" placeholder="Nhập email (vd: sinhvienA@fit.hcmus.edu.vn)">
+            <input type="email" id="testEmailInput" class="form-control" placeholder="Nhập email (vd: mongxuancomestic@gmail.com)">
             <input type="text" id="testNameInput" class="form-control" placeholder="Họ và tên của bạn">
-            <button class="btn btn-primary" onclick="submitTestLogin()" style="margin-top: 4px;">🚀 Vào kho tài liệu của tôi</button>
+            <button class="btn btn-primary" onclick="submitTestLogin()" style="margin-top: 4px; background: linear-gradient(135deg, #10b981, #00f2fe);">🚀 Vào kho tài liệu của tôi</button>
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeLoginModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Đổi Thư Mục Máy Tính Của User -->
+  <div class="modal-backdrop" id="changeFolderModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="font-weight: 700; font-size: 1rem;">📁 Đổi thư mục máy tính của bạn</div>
+        <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;" onclick="closeChangeFolderModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+          Nhập đường dẫn thư mục chứa tài liệu học tập trên máy tính của bạn (Windows/Mac/Linux). Hệ thống sẽ quét các tài liệu trong thư mục này và liên kết riêng cho tài khoản của bạn.
+        </div>
+        <div>
+          <label style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; display: block;">Đường dẫn thư mục máy:</label>
+          <input type="text" id="inputUserFolder" class="form-control" style="margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;" placeholder="Ví dụ: D:/ThacSi_HTTT hoặc H:/Mon_Hoc">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeChangeFolderModal()">Hủy</button>
+        <button class="btn btn-primary" onclick="saveUserFolderAndScan()">💾 Lưu & Quét ngay</button>
       </div>
     </div>
   </div>
@@ -983,13 +1054,25 @@ def get_html_dashboard() -> str:
       }
     }
 
+    let defaultRootFolder = '';
+
     async function checkCurrentUser() {
       try {
         const res = await fetch('/api/me');
         const data = await res.json();
+        defaultRootFolder = data.default_folder || '';
         const userSec = document.getElementById('userSection');
+        const banner = document.getElementById('loginPromptBanner');
+        const folderBar = document.getElementById('userFolderBar');
+
         if (data.authenticated && data.user) {
           currentUser = data.user;
+          if (banner) banner.style.display = 'none';
+          if (folderBar) {
+            folderBar.style.display = 'flex';
+            document.getElementById('displayUserFolder').textContent = currentUser.local_folder || defaultRootFolder || 'Chưa đặt';
+            document.getElementById('displayUserEmail').textContent = currentUser.email;
+          }
           const initial = (currentUser.name || currentUser.email || 'U')[0].toUpperCase();
           userSec.innerHTML = `
             <div class="user-profile-chip" onclick="openSettingsModal()" title="${currentUser.email}">
@@ -998,16 +1081,59 @@ def get_html_dashboard() -> str:
             </div>
           `;
           document.getElementById('settingsUserEmail').textContent = currentUser.email;
+          const cfgInput = document.getElementById('cfgRootFolder');
+          if (cfgInput) cfgInput.value = currentUser.local_folder || defaultRootFolder;
+
+          await loadStats();
+          await loadFiles();
         } else {
           currentUser = null;
+          if (banner) banner.style.display = 'flex';
+          if (folderBar) folderBar.style.display = 'none';
           userSec.innerHTML = `
             <button class="btn btn-google" onclick="openLoginModal()">
               🔑 Đăng nhập Google
             </button>
           `;
+          renderLoggedOutState();
         }
       } catch (e) {
         console.error('Lỗi check user:', e);
+      }
+    }
+
+    function renderLoggedOutState() {
+      allFiles = [];
+      document.getElementById('statTotalFiles').textContent = '0';
+      document.getElementById('statUploaded').textContent = '0';
+      document.getElementById('statNewCount').textContent = '0';
+      document.getElementById('statSubjectsCount').textContent = '0';
+      document.getElementById('countAll').textContent = '0';
+      document.getElementById('countNew').textContent = '0';
+      document.getElementById('countDrive').textContent = '0';
+
+      const container = document.getElementById('cardsContainer');
+      if (container) {
+        container.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 50px 20px; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
+            <div style="font-size: 2.5rem; margin-bottom: 12px;">🔒</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #fff; margin-bottom: 6px;">Chưa đăng nhập tài khoản</div>
+            <div style="font-size: 0.85rem; color: var(--text-dim); max-width: 500px; margin: 0 auto 18px; line-height: 1.5;">
+              Hệ thống sẽ kết nối đúng thư mục trên máy tính và tài khoản Google Drive cá nhân của bạn ngay sau khi đăng nhập.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+              <button class="btn btn-google" onclick="openLoginModal()" style="display: inline-flex;">
+                🔑 Đăng nhập Google
+              </button>
+              <button class="btn btn-secondary" onclick="openLoginModal()" style="display: inline-flex;">
+                ⚡ Đăng nhập bằng Email sinh viên
+              </button>
+            </div>
+          </div>`;
+      }
+      const tbody = document.getElementById('filesTableBody');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:36px; color:var(--text-dim);">Vui lòng đăng nhập để xem danh sách tài liệu của bạn.</td></tr>`;
       }
     }
 
@@ -1175,7 +1301,12 @@ def get_html_dashboard() -> str:
     /* Cross-Platform Upload Functions */
     async function handleFileInput(fileList) {
       if (!fileList || fileList.length === 0) return;
-      showToast(`Đang tải lên ${fileList.length} tệp...`);
+      if (!currentUser) {
+        showToast('⚠️ Vui lòng đăng nhập tài khoản trước khi nạp tài liệu!');
+        openLoginModal();
+        return;
+      }
+      showToast(`Đang nạp ${fileList.length} tệp...`);
 
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
@@ -1211,6 +1342,11 @@ def get_html_dashboard() -> str:
 
     /* HTML5 File System Access API cho Desktop */
     async function pickDirectoryOnDesktop() {
+      if (!currentUser) {
+        showToast('⚠️ Vui lòng đăng nhập tài khoản trước khi chọn thư mục máy tính!');
+        openLoginModal();
+        return;
+      }
       if (!window.showDirectoryPicker) {
         document.getElementById('fileInput').click();
         return;
@@ -1229,7 +1365,7 @@ def get_html_dashboard() -> str:
             }
           }
         }
-        showToast(`🎉 Đã quét và gửi nạp ${count} tài liệu từ ${dirHandle.name}!`);
+        showToast(`🎉 Đã quét và nạp ${count} tài liệu từ ${dirHandle.name}!`);
       } catch (err) {
         if (err.name !== 'AbortError') {
           showToast(`Lỗi chọn thư mục: ${err.message}`);
@@ -1309,6 +1445,78 @@ def get_html_dashboard() -> str:
       } catch (e) { alert('Lỗi: ' + e); }
     }
 
+    function openChangeFolderModal() {
+      const cur = (currentUser && currentUser.local_folder) || defaultRootFolder || '';
+      document.getElementById('inputUserFolder').value = cur;
+      document.getElementById('changeFolderModal').style.display = 'flex';
+    }
+    function closeChangeFolderModal() {
+      document.getElementById('changeFolderModal').style.display = 'none';
+    }
+
+    async function saveUserFolderAndScan() {
+      const folder = document.getElementById('inputUserFolder').value.trim();
+      if (!folder) { alert('Vui lòng nhập đường dẫn thư mục!'); return; }
+      try {
+        const res = await fetch('/api/user/folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ local_folder: folder })
+        });
+        const d = await res.json();
+        if (d.ok) {
+          if (currentUser) currentUser.local_folder = folder;
+          document.getElementById('displayUserFolder').textContent = folder;
+          closeChangeFolderModal();
+          showToast('✅ Đã cập nhật thư mục máy tính!');
+          await triggerServerScan();
+        } else {
+          alert('Lỗi: ' + (d.error || 'Không thể lưu thư mục'));
+        }
+      } catch (e) {
+        alert('Lỗi: ' + e.message);
+      }
+    }
+
+    async function triggerServerScan() {
+      if (!currentUser) {
+        showToast('⚠️ Vui lòng đăng nhập tài khoản trước khi quét!');
+        openLoginModal();
+        return;
+      }
+      const folder = (currentUser && currentUser.local_folder) || defaultRootFolder;
+      const btn = document.getElementById('btnServerScan');
+      const oldText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.innerHTML = '⏳ Đang quét...';
+        btn.disabled = true;
+      }
+      showToast(`🔍 Đang quét thư mục máy cho ${currentUser.email}...`);
+
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder_path: folder })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`🎉 Quét hoàn tất! Đã tìm thấy ${data.count} tài liệu.`);
+          await loadStats();
+          await loadFiles();
+        } else {
+          showToast(`⚠️ Lỗi quét: ${data.error || 'Thất bại'}`);
+        }
+      } catch (e) {
+        showToast(`⚠️ Lỗi kết nối: ${e.message}`);
+      } finally {
+        if (btn) {
+          btn.innerHTML = oldText;
+          btn.disabled = false;
+        }
+      }
+    }
+
     function openSettingsModal() { document.getElementById('settingsModal').style.display = 'flex'; }
     function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
     async function saveSettings() {
@@ -1326,8 +1534,6 @@ def get_html_dashboard() -> str:
 
     window.addEventListener('DOMContentLoaded', () => {
       checkCurrentUser();
-      loadStats();
-      loadFiles();
     });
   </script>
 </body>
@@ -1396,10 +1602,24 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             drive_connected = False
             if self.drive_manager and self.drive_manager.is_configured():
                 drive_connected = True
+
+            default_folder = ""
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                default_folder = cfg.get("root_folder", "")
+            except Exception:
+                pass
+
+            user_data = dict(current_user) if current_user else None
+            if user_data and not user_data.get("local_folder"):
+                user_data["local_folder"] = default_folder
+
             self._send_json({
                 "authenticated": bool(current_user),
-                "user": current_user,
+                "user": user_data,
                 "drive_connected": drive_connected,
+                "default_folder": default_folder,
             })
             return
 
@@ -1771,15 +1991,60 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(exc)}, 500)
                 return
 
+        if path == "/api/user/folder":
+            if not current_user or not self.database:
+                self._send_json({"ok": False, "error": "Vui lòng đăng nhập tài khoản"}, 401)
+                return
+            folder = body.get("local_folder", "").strip()
+            if folder:
+                self.database.update_user_folder(current_user["email"], folder)
+                current_user["local_folder"] = folder
+            self._send_json({"ok": True, "local_folder": folder})
+            return
+
         if path == "/api/scan":
+            folder_path = body.get("folder_path") if isinstance(body, dict) else None
+            user_email = current_user.get("email") if current_user else "default@user"
+
+            if current_user and folder_path and self.database:
+                try:
+                    self.database.update_user_folder(current_user["email"], folder_path)
+                    current_user["local_folder"] = folder_path
+                except Exception as exc:
+                    logger.warning("Không thể lưu folder user: %s", exc)
+
+            target_folder = folder_path
+            if not target_folder and current_user:
+                target_folder = current_user.get("local_folder")
+            if not target_folder:
+                try:
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                    target_folder = cfg.get("root_folder")
+                except Exception:
+                    pass
+
             count = 0
             cb = DashboardRequestHandler.scan_callback
             if cb:
                 try:
-                    count = cb()
+                    import inspect
+                    sig = inspect.signature(cb)
+                    if len(sig.parameters) >= 2:
+                        count = cb(target_folder=target_folder, user_email=user_email)
+                    elif len(sig.parameters) == 1:
+                        count = cb(target_folder=target_folder)
+                    else:
+                        count = cb()
                 except Exception as exc:
                     logger.error("Lỗi callback scan: %s", exc)
-            self._send_json({"ok": True, "count": count})
+
+            self._send_json({
+                "ok": True,
+                "count": count,
+                "folder": str(target_folder) if target_folder else "",
+                "user_email": user_email,
+            })
             return
 
         self.send_response(404)
