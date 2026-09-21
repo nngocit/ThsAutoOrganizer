@@ -35,7 +35,7 @@
 - Consumes: CSS Variables trong `:root`
 - Produces: Hệ thống biến màu `--bg-base`, `--bg-surface`, `--border-subtle`, `--text-primary`, `--accent-purple`, `--accent-emerald`, typography Inter/JetBrains Mono.
 
-- [ ] **Step 1: Viết test kiểm tra các token CSS mới trong web server**
+- [x] **Step 1: Viết test kiểm tra các token CSS mới trong web server**
 
 Thêm test case vào `tests/test_web_server.py`:
 ```python
@@ -59,18 +59,18 @@ def test_obsidian_minimalist_css_tokens(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận test thất bại**
+- [x] **Step 2: Chạy test để xác nhận test thất bại**
 Run: `pytest tests/test_web_server.py::test_obsidian_minimalist_css_tokens -v`
 Expected: FAIL
 
-- [ ] **Step 3: Cập nhật CSS variables và rules trong `src/web_server.py`**
+- [x] **Step 3: Cập nhật CSS variables và rules trong `src/web_server.py`**
 Thay thế các gradient chói sáng và màu neon cũ bằng bảng màu Obsidian Minimalist, tinh chỉnh card borders, buttons, sub-tabs styling.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_web_server.py::test_obsidian_minimalist_css_tokens -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_web_server.py
 git commit -m "style: apply Obsidian Minimalist design tokens and calm palette"
@@ -88,7 +88,7 @@ git commit -m "style: apply Obsidian Minimalist design tokens and calm palette"
 - Consumes: Navigation elements, `#userSection`, `#sidebarUserBox`
 - Produces: Sidebar 4 mục (`home`, `workspace`, `search`, `about`), Topbar nút Đăng nhập đơn nhất.
 
-- [ ] **Step 1: Viết test kiểm tra cấu trúc menu Sidebar mới**
+- [x] **Step 1: Viết test kiểm tra cấu trúc menu Sidebar mới**
 
 Thêm test vào `tests/test_web_server.py`:
 ```python
@@ -111,20 +111,20 @@ def test_sidebar_minimalist_structure(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận test thất bại**
+- [x] **Step 2: Chạy test để xác nhận test thất bại**
 Run: `pytest tests/test_web_server.py::test_sidebar_minimalist_structure -v`
 Expected: FAIL
 
-- [ ] **Step 3: Cập nhật HTML Sidebar và Topbar trong `src/web_server.py`**
+- [x] **Step 3: Cập nhật HTML Sidebar và Topbar trong `src/web_server.py`**
 - Rút gọn menu bên trái thành: *Trang chủ*, *Tổ chức tài liệu*, *Tra cứu*, *Giới thiệu*.
 - Chuyển nút Đăng nhập lên góc phải Topbar là nơi duy nhất quản lý Auth.
 - Xóa các button đăng nhập rải rác.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_web_server.py::test_sidebar_minimalist_structure -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_web_server.py
 git commit -m "refactor(ui): streamline sidebar navigation and unify single topbar login point"
@@ -142,7 +142,7 @@ git commit -m "refactor(ui): streamline sidebar navigation and unify single topb
 - Consumes: `#workspaceView`
 - Produces: `#subtabDocs` (Kho tệp & Lọc môn), `#subtabSync` (Nạp tệp đa thiết bị & Đồng bộ Drive), `#unauthenticatedState` (Khung tĩnh lặng khi chưa login), hàm JS `switchSubTab(tabName)`.
 
-- [ ] **Step 1: Viết test kiểm tra 2 sub-tabs trong Workspace**
+- [x] **Step 1: Viết test kiểm tra 2 sub-tabs trong Workspace**
 
 Thêm test vào `tests/test_web_server.py`:
 ```python
@@ -166,21 +166,21 @@ def test_workspace_subtabs_presence(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận test thất bại**
+- [x] **Step 2: Chạy test để xác nhận test thất bại**
 Run: `pytest tests/test_web_server.py::test_workspace_subtabs_presence -v`
 Expected: FAIL
 
-- [ ] **Step 3: Cập nhật HTML `#workspaceView` và hàm `switchSubTab` trong `src/web_server.py`**
+- [x] **Step 3: Cập nhật HTML `#workspaceView` và hàm `switchSubTab` trong `src/web_server.py`**
 - Thêm thanh chuyển Sub-Tabs: `Kho tài liệu & Phân loại` và `Nạp & Kết nối`.
 - Di chuyển khu vực nạp đa thiết bị và cấu hình thư mục máy/Drive vào `#subtabSync`.
 - Giữ 4 thẻ thống kê và bảng danh mục tài liệu trong `#subtabDocs`.
 - Thêm `#unauthenticatedState` với 1 nút Đăng nhập Google trang nhã khi sinh viên chưa đăng nhập.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_web_server.py::test_workspace_subtabs_presence -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_web_server.py
 git commit -m "feat(ui): implement dual sub-tabs and calm unauthenticated state in Workspace"
@@ -198,7 +198,7 @@ git commit -m "feat(ui): implement dual sub-tabs and calm unauthenticated state 
 - Consumes: `logoutUser()`, `renderLoggedOutState()`
 - Produces: Hoàn toàn reset `statStoragePath`, `statDriveFolder`, `displayUserFolder`, `displayUserEmail`, `displayUserDrive`, `allFiles = []`, `currentUser = null`, điều hướng về `showView('home')`.
 
-- [ ] **Step 1: Viết test kiểm tra mã JS `renderLoggedOutState` xóa sạch đường dẫn và Drive**
+- [x] **Step 1: Viết test kiểm tra mã JS `renderLoggedOutState` xóa sạch đường dẫn và Drive**
 
 Thêm test vào `tests/test_web_server.py`:
 ```python
@@ -223,11 +223,11 @@ def test_render_logged_out_state_clears_paths(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận test thất bại**
+- [x] **Step 2: Chạy test để xác nhận test thất bại**
 Run: `pytest tests/test_web_server.py::test_render_logged_out_state_clears_paths -v`
 Expected: FAIL
 
-- [ ] **Step 3: Cập nhật hàm `renderLoggedOutState()` và `logoutUser()` trong `src/web_server.py`**
+- [x] **Step 3: Cập nhật hàm `renderLoggedOutState()` và `logoutUser()` trong `src/web_server.py`**
 - Đảm bảo dọn dẹp sạch sẽ toàn bộ text trên DOM:
   ```javascript
   document.getElementById('statStoragePath').textContent = 'Chưa kết nối thư mục máy tính';
@@ -238,11 +238,11 @@ Expected: FAIL
   ```
 - Đặt `showView('home')` ngay khi logout thành công.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_web_server.py::test_render_logged_out_state_clears_paths -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_web_server.py
 git commit -m "fix(auth): implement zero-leak logout protocol and DOM state reset"
@@ -260,14 +260,14 @@ git commit -m "fix(auth): implement zero-leak logout protocol and DOM state rese
 - Consumes: Toàn bộ pipeline và web server
 - Produces: 45+ test cases pass 100%.
 
-- [ ] **Step 1: Bổ sung end-to-end multi-user login/logout test case**
+- [x] **Step 1: Bổ sung end-to-end multi-user login/logout test case**
 Viết kịch bản: Sinh viên Mộng Xuân đăng nhập -> xem thư mục riêng `Users_Storage/...` -> đăng xuất -> kiểm tra endpoint `/api/me` trả về `authenticated: false` và các thống kê không bị rò rỉ.
 
-- [ ] **Step 2: Chạy toàn bộ test suite pytest**
+- [x] **Step 2: Chạy toàn bộ test suite pytest**
 Run: `pytest tests/`
 Expected: 45+ passed in < 7s
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 ```bash
 git add tests/test_multi_user.py tests/test_web_server.py
 git commit -m "test: add end-to-end zero-leak logout and multi-user integration tests"
