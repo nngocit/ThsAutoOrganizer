@@ -1325,62 +1325,28 @@ def get_html_dashboard() -> str:
           <span class="nav-label">Trang chủ</span>
         </a>
         <a href="javascript:void(0)" class="nav-item" id="navWorkspace" onclick="showView('workspace')">
-          <span class="nav-icon">📁</span>
-          <span class="nav-label">Kho tài liệu</span>
+          <span class="nav-icon">📚</span>
+          <span class="nav-label">Tổ chức tài liệu</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="triggerNavUpload()">
-          <span class="nav-icon">⚡</span>
-          <span class="nav-label">Nạp đa thiết bị</span>
+        <a href="javascript:void(0)" class="nav-item" id="navSearch" onclick="focusSearch()">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-label">Tra cứu</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="openDriveNav()">
-          <span class="nav-icon">☁️</span>
-          <span class="nav-label">Google Drive</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="scrollToTester()">
-          <span class="nav-icon">🤖</span>
-          <span class="nav-label">AI Phân loại</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="openAboutModal()">
+        <a href="javascript:void(0)" class="nav-item" id="navAbout" onclick="openAboutModal()">
           <span class="nav-icon">ℹ️</span>
           <span class="nav-label">Giới thiệu</span>
         </a>
-        <div class="nav-item" style="opacity: 0.7; cursor: default;">
+        <div class="nav-item" style="opacity: 0.5; cursor: default; margin-top: auto;">
           <span class="nav-icon">📜</span>
-          <span class="nav-label">Ghi chú phát hành</span>
-          <span class="nav-badge-ver">0.29.0</span>
+          <span class="nav-label">Phiên bản</span>
+          <span class="nav-badge-ver">v1.0</span>
         </div>
-
-        <div class="nav-section-title">NỘI DUNG</div>
-        <a href="javascript:void(0)" class="nav-item" onclick="focusSearch()">
-          <span class="nav-icon">🔍</span>
-          <span class="nav-label">Tìm kiếm</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="filterBySubjectNav()">
-          <span class="nav-icon">🏷️</span>
-          <span class="nav-label">Môn học</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="showToast('💡 Kiến thức: Kho tài liệu giáo trình & đề cương ThS HTTT')">
-          <span class="nav-icon">💡</span>
-          <span class="nav-label">Kiến thức</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="showToast('📰 Tin tức: Lịch học, thông báo bảo vệ đề cương')">
-          <span class="nav-icon">📰</span>
-          <span class="nav-label">Tin tức</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="showToast('📝 Bài viết: Nghiên cứu khoa học & hướng dẫn phương pháp')">
-          <span class="nav-icon">📝</span>
-          <span class="nav-label">Bài viết</span>
-        </a>
       </nav>
 
       <!-- Sidebar Bottom -->
       <div class="sidebar-footer">
         <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Thu gọn">&lt;</button>
-        <div id="sidebarUserBox">
-          <button class="btn-sidebar-auth" onclick="openLoginModal()" id="btnSidebarLogin">
-            🔑 <span class="text">Đăng nhập</span>
-          </button>
-        </div>
+        <div id="sidebarUserBox" style="display:none;"></div>
       </div>
     </aside>
 
@@ -1391,18 +1357,17 @@ def get_html_dashboard() -> str:
         <div class="topbar-left">
           <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
           <div class="topbar-subtitle">
-            <span style="font-weight:700; color:#fff;">ThsAutoOrganizer</span>
+            <span style="font-weight:700; color:var(--text-primary);">ThsAutoOrganizer</span>
             <span>•</span>
             <span class="badge-edition">Studio Edition</span>
           </div>
         </div>
 
         <div class="topbar-right">
-          <!-- User Profile or Sign-in button -->
+          <!-- Single User Profile or Sign-in button -->
           <div id="userSection">
-            <button class="btn btn-google" onclick="openLoginModal()" id="btnLoginGoogle">
-              <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
-              Đăng nhập Google
+            <button class="btn btn-secondary" onclick="openLoginModal()" id="btnLoginGoogle" style="border: 1px solid var(--border-subtle); color: var(--text-primary); font-size: 0.85rem;">
+              🔑 Đăng nhập
             </button>
           </div>
 
@@ -1412,35 +1377,6 @@ def get_html_dashboard() -> str:
 
       <!-- VIEW 1: HOMEPAGE VIEW (STUDIO EDITION LANDING PAGE) -->
       <div id="homepageView" class="view-content">
-        <!-- Floating Google One-Tap Widget -->
-        <div class="google-onetap-widget" id="oneTapWidget">
-          <div class="onetap-header">
-            <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
-            <span>Đăng nhập vào ThsAutoOrganizer bằng tài khoản Google</span>
-            <button onclick="document.getElementById('oneTapWidget').style.display='none'" style="background:none; border:none; color:#94a3b8; cursor:pointer; margin-left:auto;">✕</button>
-          </div>
-          <div class="onetap-user-item" onclick="quickLoginAs('xuanngocit@gmail.com', 'Nguyen XuanNgoc')">
-            <div class="onetap-avatar" style="background:#e11d48;">N</div>
-            <div class="onetap-info">
-              <span class="onetap-name">Nguyenx (Admin)</span>
-              <span class="onetap-email">xuanngocit@gmail.com</span>
-            </div>
-          </div>
-          <div class="onetap-user-item" onclick="quickLoginAs('mongxuancomestic@gmail.com', 'Mộng Xuân')">
-            <div class="onetap-avatar" style="background:#0284c7;">C</div>
-            <div class="onetap-info">
-              <span class="onetap-name">Comestic Store Mộng Xuân</span>
-              <span class="onetap-email">mongxuancomestic@gmail.com</span>
-            </div>
-          </div>
-          <div class="onetap-user-item" onclick="quickLoginAs('it.xuanngoc@gmail.com', 'it xuanngoc')">
-            <div class="onetap-avatar" style="background:#6366f1;">I</div>
-            <div class="onetap-info">
-              <span class="onetap-name">it xuanngoc</span>
-              <span class="onetap-email">it.xuanngoc@gmail.com</span>
-            </div>
-          </div>
-        </div>
 
         <!-- Hero Section -->
         <section class="ths-hero-section">
@@ -2183,11 +2119,7 @@ def get_html_dashboard() -> str:
           `;
           if (userSec) userSec.innerHTML = userHtml;
           if (sidebarUserBox) {
-            sidebarUserBox.innerHTML = `
-              <button class="btn-sidebar-auth" onclick="logoutUser()" style="color:var(--accent-red); border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.08);">
-                🚪 <span class="text">Đăng xuất</span>
-              </button>
-            `;
+            sidebarUserBox.innerHTML = '';
           }
 
           document.getElementById('settingsUserEmail').textContent = currentUser.email;
@@ -2198,21 +2130,17 @@ def get_html_dashboard() -> str:
           await loadFiles();
         } else {
           currentUser = null;
-          if (banner) banner.style.display = 'flex';
+          if (banner) banner.style.display = 'none';
           if (folderBar) folderBar.style.display = 'none';
           if (userSec) {
             userSec.innerHTML = `
-              <button class="btn btn-google" onclick="openLoginModal()">
-                🔑 Đăng nhập Google
+              <button class="btn btn-secondary" onclick="openLoginModal()" style="border: 1px solid var(--border-subtle); color: var(--text-primary); font-size: 0.85rem;">
+                🔑 Đăng nhập
               </button>
             `;
           }
           if (sidebarUserBox) {
-            sidebarUserBox.innerHTML = `
-              <button class="btn-sidebar-auth" onclick="openLoginModal()">
-                🔑 <span class="text">Đăng nhập</span>
-              </button>
-            `;
+            sidebarUserBox.innerHTML = '';
           }
           renderLoggedOutState();
         }

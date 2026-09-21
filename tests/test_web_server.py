@@ -142,3 +142,15 @@ def test_obsidian_minimalist_css_tokens(web_test_env):
         assert "--bg-surface: #18181b" in html.lower()
         assert "--border-subtle" in html
 
+
+def test_sidebar_minimalist_structure(web_test_env):
+    base_url, _, _ = web_test_env
+    req = urllib.request.Request(f"{base_url}/")
+    with urllib.request.urlopen(req) as resp:
+        html = resp.read().decode("utf-8")
+        assert "Tổ chức tài liệu" in html
+        assert "onclick=\"showView('workspace')\"" in html
+        assert "onclick=\"showView('upload')\"" not in html
+        assert "onclick=\"showView('drive')\"" not in html
+
+
