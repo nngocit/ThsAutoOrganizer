@@ -2762,6 +2762,20 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(content)
 
+    def _is_admin(self, current_user: Optional[Dict[str, Any]]) -> bool:
+        """Kiểm tra xem người dùng hiện tại có phải là Admin hệ thống không."""
+        if not current_user:
+            return False
+        user_email = current_user.get("email", "").strip().lower()
+        root_email = "xuanngocit@gmail.com"
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                root_email = cfg.get("root_account_email", "xuanngocit@gmail.com")
+        except Exception:
+            pass
+        return user_email == root_email.strip().lower()
+
     def do_GET(self) -> None:
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
@@ -2793,6 +2807,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
             self._send_json({
                 "authenticated": bool(current_user),
+                "is_admin": self._is_admin(current_user),
                 "user": user_data,
                 "drive_connected": drive_connected,
                 "drive_account": drive_account,
@@ -3031,6 +3046,35 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Chua co log.")
             return
+
+        if path == "/api/majors":
+            if not self.database:
+                self._send_json({"ok": False, "majors": []}, 500)
+                return
+            majors = self.database.get_all_majors()
+            self._send_json({"ok": True, "majors": majors})
+            return
+
+        if path.startswith("/api/majors/") and path.endswith("/subjects"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[1] == "majors" and parts[3] == "subjects":
+                try:
+                    major_id = int(parts[2])
+                    subjects = self.database.get_subjects_by_major(major_id) if self.database else []
+                    self._send_json({"ok": True, "subjects": subjects})
+                    return
+                except ValueError:
+                    self._send_json({"ok": False, "error": "Invalid major ID"}, 400)
+                    return
+
+        if path == "/api/admin/majors":
+            if not self._is_admin(current_user):
+                self._send_json({"ok": False, "error": "Forbidden: Admin access required"}, 403)
+                return
+            majors = self.database.get_all_majors() if self.database else []
+            self._send_json({"ok": True, "majors": majors})
+            return
+
 
         self.send_response(404)
         self.end_headers()
@@ -3283,6 +3327,60 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 "user_email": user_email,
             })
             return
+
+        if path == "/api/admin/majors":
+            if not self._is_admin(current_user):
+                self._send_json({"ok": False, "error": "Forbidden: Admin access required"}, 403)
+                return
+
+            code = body.get("code", "").strip()
+            name = body.get("name", "").strip()
+            folder_name = body.get("folder_name", "").strip()
+            description = body.get("description", "").strip()
+
+            if not code or not name or not folder_name:
+                self._send_json({"ok": False, "error": "Vui lòng cung cấp đầy đủ code, name, folder_name"}, 400)
+                return
+
+            try:
+                major_id = self.database.add_major(code, name, folder_name, description)
+                self._send_json({"ok": True, "major_id": major_id, "message": "Thêm chuyên ngành thành công"})
+            except Exception as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+            return
+
+        if path == "/api/admin/subjects":
+            if not self._is_admin(current_user):
+                self._send_json({"ok": False, "error": "Forbidden: Admin access required"}, 403)
+                return
+
+            major_id = body.get("major_id")
+            code = body.get("code", "").strip()
+            name = body.get("name", "").strip()
+            folder_name = body.get("folder_name", "").strip()
+            keywords = body.get("keywords", "[]")
+            if isinstance(keywords, list):
+                keywords = json.dumps(keywords, ensure_ascii=False)
+
+            if not major_id or not code or not name or not folder_name:
+                self._send_json({"ok": False, "error": "Vui lòng cung cấp đầy đủ major_id, code, name, folder_name"}, 400)
+                return
+
+            try:
+                sub_id = self.database.add_subject(
+                    major_id=int(major_id),
+                    code=code,
+                    name=name,
+                    folder_name=folder_name,
+                    keywords=keywords,
+                    is_default=1,
+                    created_by=current_user.get("email", "admin")
+                )
+                self._send_json({"ok": True, "subject_id": sub_id, "message": "Thêm môn học thành công"})
+            except Exception as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+            return
+
 
         self.send_response(404)
         self.end_headers()

@@ -176,5 +176,53 @@ def test_render_logged_out_state_clears_paths(web_test_env):
         assert "document.getElementById('statDriveFolder').textContent = 'Chưa kết nối Google Drive';" in html
 
 
+def test_admin_majors_api_access_control(tmp_path: Path):
+    from src.database import Database
+    from src.web_server import start_web_server
+    import urllib.request
+    import urllib.error
+    import json
+
+    db = Database(tmp_path / "admin_test.db")
+    db.initialize()
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_account_email": "xuanngocit@gmail.com", "root_folder": str(tmp_path)}, f)
+
+    port = 19201
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # 1. Sinh viên thường đăng nhập
+        login_student = json.dumps({"email": "student@gmail.com", "name": "Sinh Viên"}).encode("utf-8")
+        req = urllib.request.Request(f"{base_url}/auth/test-login", data=login_student, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            student_cookie = resp.headers.get("Set-Cookie")
+
+        # Sinh viên gọi API Admin -> Bị chặn 403
+        req_admin = urllib.request.Request(f"{base_url}/api/admin/majors", headers={"Cookie": student_cookie})
+        try:
+            urllib.request.urlopen(req_admin)
+            assert False, "Sinh viên thường không được phép truy cập API admin"
+        except urllib.error.HTTPError as e:
+            assert e.code == 403
+
+        # 2. Admin đăng nhập
+        login_admin = json.dumps({"email": "xuanngocit@gmail.com", "name": "Admin"}).encode("utf-8")
+        req_adm_login = urllib.request.Request(f"{base_url}/auth/test-login", data=login_admin, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req_adm_login) as resp:
+            admin_cookie = resp.headers.get("Set-Cookie")
+
+        # Admin gọi API Admin -> Thành công 200
+        req_admin_ok = urllib.request.Request(f"{base_url}/api/admin/majors", headers={"Cookie": admin_cookie})
+        with urllib.request.urlopen(req_admin_ok) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert len(data.get("majors", [])) == 14
+    finally:
+        server.shutdown()
+
+
 
 
