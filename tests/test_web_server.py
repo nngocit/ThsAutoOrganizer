@@ -266,6 +266,54 @@ def test_upload_strictly_requires_auth(tmp_path: Path):
         server.shutdown()
 
 
+def test_admin_sidebar_item_visibility(tmp_path: Path):
+    from src.database import Database
+    from src.web_server import start_web_server
+    import urllib.request
+    import json
+
+    db = Database(tmp_path / "admin_view_test.db")
+    db.initialize()
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_account_email": "xuanngocit@gmail.com", "root_folder": str(tmp_path)}, f)
+
+    port = 19204
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # Sinh viên đăng nhập -> /api/me trả về is_admin: False
+        login_student = json.dumps({"email": "student@gmail.com", "name": "SV"}).encode("utf-8")
+        req = urllib.request.Request(f"{base_url}/auth/test-login", data=login_student, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            cookie_sv = resp.headers.get("Set-Cookie")
+        req_me_sv = urllib.request.Request(f"{base_url}/api/me", headers={"Cookie": cookie_sv})
+        with urllib.request.urlopen(req_me_sv) as resp:
+            data_sv = json.loads(resp.read().decode("utf-8"))
+            assert data_sv.get("is_admin") is False
+
+        # Admin đăng nhập -> /api/me trả về is_admin: True
+        login_adm = json.dumps({"email": "xuanngocit@gmail.com", "name": "Admin"}).encode("utf-8")
+        req_adm = urllib.request.Request(f"{base_url}/auth/test-login", data=login_adm, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req_adm) as resp:
+            cookie_adm = resp.headers.get("Set-Cookie")
+        req_me_adm = urllib.request.Request(f"{base_url}/api/me", headers={"Cookie": cookie_adm})
+        with urllib.request.urlopen(req_me_adm) as resp:
+            data_adm = json.loads(resp.read().decode("utf-8"))
+            assert data_adm.get("is_admin") is True
+
+        # Kiểm tra trang chủ chứa menu admin navItemAdmin và adminView
+        req_page = urllib.request.Request(f"{base_url}/")
+        with urllib.request.urlopen(req_page) as page_resp:
+            html = page_resp.read().decode("utf-8")
+            assert "navItemAdmin" in html
+            assert "adminView" in html
+    finally:
+        server.shutdown()
+
+
+
 
 
 

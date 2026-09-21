@@ -1336,6 +1336,10 @@ def get_html_dashboard() -> str:
           <span class="nav-icon">ℹ️</span>
           <span class="nav-label">Giới thiệu</span>
         </a>
+        <a href="javascript:void(0)" class="nav-item" id="navItemAdmin" onclick="showView('admin')" style="display: none;">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Quản trị Đào tạo</span>
+        </a>
         <div class="nav-item" style="opacity: 0.5; cursor: default; margin-top: auto;">
           <span class="nav-icon">📜</span>
           <span class="nav-label">Phiên bản</span>
@@ -1761,6 +1765,109 @@ def get_html_dashboard() -> str:
           </div>
         </div>
       </div>
+
+      <!-- VIEW 3: ADMIN MANAGEMENT VIEW (CHƯƠNG TRÌNH ĐÀO TẠO & CHUYÊN NGÀNH) -->
+      <div id="adminView" class="view-content" style="display: none; padding: 24px 28px;">
+        <!-- Admin Header -->
+        <div style="margin-bottom: 24px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 40px; height: 40px; border-radius: var(--radius-md); background: rgba(168, 85, 247, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">⚙️</div>
+            <div>
+              <h1 style="font-size: 1.35rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px;">Quản trị Chương trình Đào tạo & Chuyên ngành</h1>
+              <div style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 2px;">
+                Quản lý 14 Chuyên ngành Thạc sĩ và danh mục Học phần chuẩn 4 thư mục con (01_Giao_Trinh, 02_Slide, 03_Tai_Lieu_Tham_Khao, 04_On_Thi).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-Column Obsidian Zinc Grid -->
+        <div style="display: grid; grid-template-columns: 360px 1fr; gap: 20px; align-items: start;" class="admin-grid-layout">
+          <!-- Left Column: Chuyên ngành -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>🎓</span> Chuyên ngành (<span id="adminMajorCount">0</span>)
+              </h3>
+              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.78rem; border: 1px solid var(--border-subtle);" onclick="toggleAddMajorForm()">+ Thêm ngành</button>
+            </div>
+
+            <!-- Form thêm ngành (ẩn mặc định) -->
+            <div id="adminAddMajorForm" style="display: none; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;">
+              <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Tạo chuyên ngành mới</div>
+              <input type="text" id="newMajorCode" class="form-control" placeholder="Mã ngành (vd: KHMT, QTKD)" style="margin-bottom: 6px; font-size: 0.8rem;">
+              <input type="text" id="newMajorName" class="form-control" placeholder="Tên chuyên ngành (vd: Khoa học máy tính)" style="margin-bottom: 6px; font-size: 0.8rem;">
+              <input type="text" id="newMajorFolder" class="form-control" placeholder="Tên thư mục (vd: Khoa_Hoc_May_Tinh)" style="margin-bottom: 6px; font-size: 0.8rem;">
+              <textarea id="newMajorDesc" class="form-control" placeholder="Mô tả ngành..." style="height: 50px; margin-bottom: 8px; font-size: 0.8rem;"></textarea>
+              <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="toggleAddMajorForm()">Hủy</button>
+                <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.78rem;" onclick="submitNewMajor()">Lưu</button>
+              </div>
+            </div>
+
+            <!-- Danh sách chuyên ngành cuộn -->
+            <div id="adminMajorsList" style="max-height: 560px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              <!-- Render by JS -->
+            </div>
+          </div>
+
+          <!-- Right Column: Danh mục Học phần / Môn học của ngành đang chọn -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <div>
+                <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                  <span>📚</span> Học phần: <span id="adminSelectedMajorName" style="color: var(--accent-cyan); font-weight: 600;">--</span>
+                </h3>
+                <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+                  Mỗi học phần tự động chuẩn bị 4 thư mục: 01_Giao_Trinh, 02_Slide, 03_Tai_Lieu_Tham_Khao, 04_On_Thi.
+                </div>
+              </div>
+              <button class="btn btn-primary" id="btnAdminAddSubject" style="padding: 4px 12px; font-size: 0.78rem;" onclick="toggleAddSubjectForm()" disabled>+ Thêm môn học</button>
+            </div>
+
+            <!-- Form thêm học phần (ẩn mặc định) -->
+            <div id="adminAddSubjectForm" style="display: none; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 14px;">
+              <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); margin-bottom: 10px;">Thêm môn học vào chuyên ngành đang chọn</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                <input type="text" id="newSubjectCode" class="form-control" placeholder="Mã môn (vd: KTTK_PM, ML)" style="font-size: 0.8rem;">
+                <input type="text" id="newSubjectName" class="form-control" placeholder="Tên môn học (vd: Kiến trúc thiết kế PM)" style="font-size: 0.8rem;">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <input type="text" id="newSubjectFolder" class="form-control" placeholder="Tên thư mục lưu trữ (vd: Kien_Truc_Thiet_Ke_PM)" style="font-size: 0.8rem;">
+              </div>
+              <div style="margin-bottom: 10px;">
+                <input type="text" id="newSubjectKeywords" class="form-control" placeholder="Từ khóa nhận diện AI (phân cách bằng dấu phẩy, vd: kientruc, software architecture)" style="font-size: 0.8rem;">
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="toggleAddSubjectForm()">Hủy</button>
+                <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.78rem;" onclick="submitNewSubject()">Lưu môn học</button>
+              </div>
+            </div>
+
+            <!-- Danh sách học phần dạng bảng Obsidian Zinc -->
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border-subtle); text-align: left; color: var(--text-secondary);">
+                    <th style="padding: 8px 10px; font-weight: 600;">Mã</th>
+                    <th style="padding: 8px 10px; font-weight: 600;">Tên môn học</th>
+                    <th style="padding: 8px 10px; font-weight: 600;">Thư mục</th>
+                    <th style="padding: 8px 10px; font-weight: 600;">Từ khóa AI</th>
+                    <th style="padding: 8px 10px; font-weight: 600; text-align: center;">4 Thư mục con</th>
+                  </tr>
+                </thead>
+                <tbody id="adminSubjectsTableBody">
+                  <tr>
+                    <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-dim);">
+                      Vui lòng chọn một chuyên ngành từ cột bên trái để xem danh mục môn học.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1971,24 +2078,38 @@ def get_html_dashboard() -> str:
       setTimeout(() => { t.style.display = 'none'; }, 3500);
     }
 
-    /* View Navigation (Homepage vs Workspace) */
+    /* View Navigation (Homepage vs Workspace vs Admin) */
     function showView(viewName) {
       currentActiveView = viewName;
       const homeEl = document.getElementById('homepageView');
       const workEl = document.getElementById('workspaceView');
+      const adminEl = document.getElementById('adminView');
       const navH = document.getElementById('navHome');
       const navW = document.getElementById('navWorkspace');
+      const navA = document.getElementById('navItemAdmin');
 
       if (viewName === 'home') {
-        homeEl.style.display = 'block';
-        workEl.style.display = 'none';
+        if (homeEl) homeEl.style.display = 'block';
+        if (workEl) workEl.style.display = 'none';
+        if (adminEl) adminEl.style.display = 'none';
         if (navH) navH.classList.add('active');
         if (navW) navW.classList.remove('active');
+        if (navA) navA.classList.remove('active');
+      } else if (viewName === 'admin') {
+        if (homeEl) homeEl.style.display = 'none';
+        if (workEl) workEl.style.display = 'none';
+        if (adminEl) adminEl.style.display = 'block';
+        if (navH) navH.classList.remove('active');
+        if (navW) navW.classList.remove('active');
+        if (navA) navA.classList.add('active');
+        loadAdminMajors();
       } else {
-        homeEl.style.display = 'none';
-        workEl.style.display = 'block';
+        if (homeEl) homeEl.style.display = 'none';
+        if (workEl) workEl.style.display = 'block';
+        if (adminEl) adminEl.style.display = 'none';
         if (navH) navH.classList.remove('active');
         if (navW) navW.classList.add('active');
+        if (navA) navA.classList.remove('active');
         
         const unauth = document.getElementById('unauthenticatedState');
         const subDocs = document.getElementById('subtabDocs');
@@ -2297,6 +2418,11 @@ def get_html_dashboard() -> str:
           if (lockCard) lockCard.style.display = 'none';
           if (syncContent) syncContent.style.display = 'block';
 
+          const navAdmin = document.getElementById('navItemAdmin');
+          if (navAdmin) {
+            navAdmin.style.display = data.is_admin ? 'flex' : 'none';
+          }
+
           document.getElementById('settingsUserEmail').textContent = currentUser.email;
           const cfgInput = document.getElementById('cfgRootFolder');
           if (cfgInput) cfgInput.value = currentUser.local_folder || defaultRootFolder;
@@ -2311,6 +2437,8 @@ def get_html_dashboard() -> str:
           currentUser = null;
           if (banner) banner.style.display = 'none';
           if (folderBar) folderBar.style.display = 'none';
+          const navAdmin = document.getElementById('navItemAdmin');
+          if (navAdmin) navAdmin.style.display = 'none';
           if (userSec) {
             userSec.innerHTML = `
               <button class="btn btn-secondary" onclick="openLoginModal()" style="border: 1px solid var(--border-subtle); color: var(--text-primary); font-size: 0.85rem;">
@@ -2331,6 +2459,11 @@ def get_html_dashboard() -> str:
     function renderLoggedOutState() {
       allFiles = [];
       currentUser = null;
+      const navAdmin = document.getElementById('navItemAdmin');
+      if (navAdmin) navAdmin.style.display = 'none';
+      if (currentActiveView === 'admin') {
+        showView('home');
+      }
       document.getElementById('statTotalFiles').textContent = '0';
       document.getElementById('statUploaded').textContent = '0';
       document.getElementById('statNewCount').textContent = '0';
@@ -2885,6 +3018,205 @@ def get_html_dashboard() -> str:
           btn.disabled = false;
           btn.textContent = '🚀 Bắt đầu học tập';
         }
+      }
+    }
+
+    /* ==================== ADMIN MANAGEMENT VIEW JS ==================== */
+    let adminSelectedMajor = null;
+    let adminMajorsList = [];
+
+    async function loadAdminMajors() {
+      try {
+        const res = await fetch('/api/admin/majors');
+        if (res.status === 403) {
+          showToast('Bạn không có quyền truy cập trang Quản trị');
+          showView('home');
+          return;
+        }
+        const data = await res.json();
+        if (data.ok) {
+          adminMajorsList = data.majors || [];
+          const countEl = document.getElementById('adminMajorCount');
+          if (countEl) countEl.textContent = adminMajorsList.length;
+          renderAdminMajors();
+          if (adminMajorsList.length > 0) {
+            if (!adminSelectedMajor || !adminMajorsList.find(m => m.id === adminSelectedMajor.id)) {
+              selectAdminMajor(adminMajorsList[0].id);
+            } else {
+              selectAdminMajor(adminSelectedMajor.id);
+            }
+          } else {
+            adminSelectedMajor = null;
+            document.getElementById('adminSelectedMajorName').textContent = '--';
+            document.getElementById('btnAdminAddSubject').disabled = true;
+            document.getElementById('adminSubjectsTableBody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-dim);">Chưa có chuyên ngành nào.</td></tr>';
+          }
+        }
+      } catch (e) {
+        console.error('Lỗi khi tải danh sách ngành:', e);
+      }
+    }
+
+    function renderAdminMajors() {
+      const container = document.getElementById('adminMajorsList');
+      if (!container) return;
+      container.innerHTML = adminMajorsList.map(m => {
+        const isSel = adminSelectedMajor && adminSelectedMajor.id === m.id;
+        return `
+          <div onclick="selectAdminMajor(${m.id})" style="padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid ${isSel ? 'var(--accent-purple)' : 'var(--border-subtle)'}; background: ${isSel ? 'rgba(168, 85, 247, 0.12)' : 'var(--bg-subtle)'}; cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-weight: 600; font-size: 0.84rem; color: ${isSel ? 'var(--accent-purple)' : 'var(--text-primary)'};">${m.name}</span>
+              <span class="badge" style="background: var(--bg-card); color: var(--text-secondary); font-size: 0.7rem; font-family: 'JetBrains Mono', monospace;">${m.code}</span>
+            </div>
+            <div style="font-size: 0.74rem; color: var(--text-dim); margin-top: 3px; font-family: 'JetBrains Mono', monospace;">Thư mục: ${m.folder_name}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function selectAdminMajor(majorId) {
+      const m = adminMajorsList.find(item => item.id === majorId);
+      if (!m) return;
+      adminSelectedMajor = m;
+      renderAdminMajors();
+      const nameEl = document.getElementById('adminSelectedMajorName');
+      if (nameEl) nameEl.textContent = `${m.name} (${m.code})`;
+      const btnAdd = document.getElementById('btnAdminAddSubject');
+      if (btnAdd) btnAdd.disabled = false;
+
+      const tbody = document.getElementById('adminSubjectsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--text-dim);">Đang tải danh mục môn học...</td></tr>';
+
+      try {
+        const res = await fetch(`/api/majors/${majorId}/subjects`);
+        const data = await res.json();
+        if (data.ok) {
+          const subjects = data.subjects || [];
+          if (subjects.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-dim);">Chuyên ngành này chưa có môn học nào. Hãy bấm "+ Thêm môn học" để tạo.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = subjects.map(s => {
+            let kwStr = '--';
+            try {
+              const kwList = typeof s.keywords === 'string' ? JSON.parse(s.keywords) : s.keywords;
+              if (Array.isArray(kwList) && kwList.length > 0) {
+                kwStr = kwList.slice(0, 3).join(', ') + (kwList.length > 3 ? '...' : '');
+              }
+            } catch (e) {}
+
+            return `
+              <tr style="border-bottom: 1px solid var(--border-subtle);">
+                <td style="padding: 10px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan);">${s.code}</td>
+                <td style="padding: 10px; font-weight: 500; color: var(--text-primary);">${s.name}</td>
+                <td style="padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-secondary);">${s.folder_name}</td>
+                <td style="padding: 10px; font-size: 0.75rem; color: var(--text-dim);">${kwStr}</td>
+                <td style="padding: 10px; text-align: center;">
+                  <span title="01_Giao_Trinh, 02_Slide, 03_Tai_Lieu_Tham_Khao, 04_On_Thi" style="display: inline-flex; gap: 4px; justify-content: center;">
+                    <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">01-04 Chuẩn</span>
+                  </span>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--accent-red);">Lỗi tải môn học: ${e}</td></tr>`;
+      }
+    }
+
+    function toggleAddMajorForm() {
+      const form = document.getElementById('adminAddMajorForm');
+      if (form) {
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    async function submitNewMajor() {
+      const code = (document.getElementById('newMajorCode').value || '').trim();
+      const name = (document.getElementById('newMajorName').value || '').trim();
+      const folder_name = (document.getElementById('newMajorFolder').value || '').trim();
+      const description = (document.getElementById('newMajorDesc').value || '').trim();
+
+      if (!code || !name || !folder_name) {
+        alert('Vui lòng điền đủ Mã ngành, Tên ngành và Thư mục lưu trữ');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/majors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, name, folder_name, description })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Đã thêm chuyên ngành "${name}" thành công!`);
+          document.getElementById('newMajorCode').value = '';
+          document.getElementById('newMajorName').value = '';
+          document.getElementById('newMajorFolder').value = '';
+          document.getElementById('newMajorDesc').value = '';
+          toggleAddMajorForm();
+          await loadAdminMajors();
+        } else {
+          alert('Lỗi: ' + (data.error || 'Không thể tạo chuyên ngành'));
+        }
+      } catch (e) {
+        alert('Lỗi kết nối: ' + e);
+      }
+    }
+
+    function toggleAddSubjectForm() {
+      const form = document.getElementById('adminAddSubjectForm');
+      if (form) {
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    async function submitNewSubject() {
+      if (!adminSelectedMajor) {
+        alert('Vui lòng chọn một chuyên ngành trước');
+        return;
+      }
+      const code = (document.getElementById('newSubjectCode').value || '').trim();
+      const name = (document.getElementById('newSubjectName').value || '').trim();
+      const folder_name = (document.getElementById('newSubjectFolder').value || '').trim();
+      const kwInput = (document.getElementById('newSubjectKeywords').value || '').trim();
+
+      if (!code || !name || !folder_name) {
+        alert('Vui lòng điền đủ Mã môn, Tên môn và Thư mục lưu trữ');
+        return;
+      }
+
+      const keywords = kwInput ? kwInput.split(',').map(k => k.trim()).filter(Boolean) : [];
+
+      try {
+        const res = await fetch('/api/admin/subjects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            major_id: adminSelectedMajor.id,
+            code,
+            name,
+            folder_name,
+            keywords
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Đã thêm môn học "${name}" thành công!`);
+          document.getElementById('newSubjectCode').value = '';
+          document.getElementById('newSubjectName').value = '';
+          document.getElementById('newSubjectFolder').value = '';
+          document.getElementById('newSubjectKeywords').value = '';
+          toggleAddSubjectForm();
+          await selectAdminMajor(adminSelectedMajor.id);
+        } else {
+          alert('Lỗi: ' + (data.error || 'Không thể tạo môn học'));
+        }
+      } catch (e) {
+        alert('Lỗi kết nối: ' + e);
       }
     }
 
