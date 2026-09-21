@@ -264,3 +264,83 @@ class DriveManager:
 
         logger.info("Upload thành công '%s' (Drive ID: %s)", file_name, drive_file_id)
         return drive_file_id
+
+    def download_file(self, drive_file_id: str, destination_path: Path | str) -> Path:
+        """Tải một file từ Google Drive về máy tính."""
+        from googleapiclient.http import MediaIoBaseDownload
+
+        dest = Path(destination_path).resolve()
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        service = self.get_service()
+        request = service.files().get_media(fileId=drive_file_id)
+
+        with open(dest, "wb") as fh:
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+                if status:
+                    logger.debug("Download %s: %d%%", dest.name, int(status.progress() * 100))
+
+        logger.info("Đã tải thành công file từ Drive về máy: '%s'", dest)
+        return dest
+
+    def list_files_in_folder(self, folder_id: str) -> List[Dict[str, Any]]:
+        """Lấy danh sách các file và subfolder trong một folder trên Drive."""
+        service = self.get_service()
+        query = f"'{folder_id}' in parents and trashed = false"
+        request = service.files().list(
+            q=query,
+            spaces="drive",
+            fields="files(id, name, mimeType, size, md5Checksum, modifiedTime)",
+            pageSize=100,
+        )
+        response = self._execute_with_retry(request)
+        return response.get("files", [])
+
+    def list_all_study_materials(self, root_name: str = "ThacSi_HTTT") -> List[Dict[str, Any]]:
+        """Duyệt toàn bộ cây thư mục ThacSi_HTTT trên Google Drive để tìm tài liệu học tập.
+
+        Cấu trúc:
+        ThacSi_HTTT / <Tên môn> / <Tên loại> / <File>
+        hoặc ThacSi_HTTT / <Tên môn> / <File>
+
+        Returns:
+            Danh sách dict gồm {file_id, name, subject, document_type, size}
+        """
+        root_id = self.root_folder_id or self.find_or_create_folder(root_name, parent_id=None)
+        items_under_root = self.list_files_in_folder(root_id)
+
+        materials: List[Dict[str, Any]] = []
+
+        for item in items_under_root:
+            if item.get("mimeType") == FOLDER_MIME_TYPE:
+                subject_name = item["name"]
+                subject_id = item["id"]
+                sub_items = self.list_files_in_folder(subject_id)
+
+                for sub in sub_items:
+                    if sub.get("mimeType") == FOLDER_MIME_TYPE:
+                        type_name = sub["name"]
+                        type_id = sub["id"]
+                        files_in_type = self.list_files_in_folder(type_id)
+                        for f in files_in_type:
+                            if f.get("mimeType") != FOLDER_MIME_TYPE:
+                                materials.append({
+                                    "file_id": f["id"],
+                                    "name": f["name"],
+                                    "subject": subject_name,
+                                    "document_type": type_name,
+                                    "size": int(f.get("size", 0)),
+                                })
+                    else:
+                        materials.append({
+                            "file_id": sub["id"],
+                            "name": sub["name"],
+                            "subject": subject_name,
+                            "document_type": "Tài liệu tham khảo",
+                            "size": int(sub.get("size", 0)),
+                        })
+
+        return materials

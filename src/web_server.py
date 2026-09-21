@@ -665,6 +665,7 @@ def get_html_dashboard() -> str:
       </div>
       <button class="btn btn-secondary" onclick="openSettingsModal()">⚙️ Cài đặt</button>
       <button class="btn btn-secondary" onclick="toggleLogsDrawer()">📜 Live Logs</button>
+      <button class="btn btn-secondary" onclick="triggerSyncDown()" id="btnSyncDown">📥 Kéo từ Drive về</button>
       <button class="btn btn-primary" onclick="triggerScan()" id="btnScan">⚡ Quét lại ngay</button>
     </div>
   </header>
@@ -1060,6 +1061,32 @@ def get_html_dashboard() -> str:
       }
     }
 
+    async function triggerSyncDown() {
+      const btn = document.getElementById('btnSyncDown');
+      btn.textContent = '⏳ Đang kiểm tra Drive...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/sync-down', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          if (data.count > 0) {
+            showToast('✅ Đã tải về thành công ' + data.count + ' tài liệu mới từ Drive!');
+          } else {
+            showToast('👌 Máy tính đã đồng bộ hoàn toàn với Drive (không có file mới)!');
+          }
+          loadStats();
+          loadFiles();
+        } else {
+          showToast('Lỗi đồng bộ: ' + (data.error || ''));
+        }
+      } catch (err) {
+        showToast('Lỗi kết nối khi đồng bộ: ' + err);
+      } finally {
+        btn.textContent = '📥 Kéo từ Drive về';
+        btn.disabled = false;
+      }
+    }
+
     async function openSettingsModal() {
       try {
         const res = await fetch('/api/config');
@@ -1372,6 +1399,27 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True, "count": count})
             return
 
+        if path == "/api/sync-down":
+            from src.sync import sync_from_drive_to_local
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                root_folder = Path(cfg["root_folder"])
+                classifier = getattr(DashboardRequestHandler, "classifier", None)
+
+                downloaded = sync_from_drive_to_local(
+                    drive_manager=DashboardRequestHandler.drive_manager,
+                    database=DashboardRequestHandler.database,
+                    root_folder=root_folder,
+                    classifier=classifier,
+                )
+                self._send_json({"ok": True, "count": len(downloaded), "files": downloaded})
+                return
+            except Exception as exc:
+                logger.error("Lỗi khi đồng bộ từ Drive về: %s", exc, exc_info=True)
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
+
         self.send_response(404)
         self.end_headers()
 
@@ -1388,12 +1436,14 @@ def start_web_server(
     drive_manager: Optional[DriveManager] = None,
     config_path: Path | str = "config.json",
     scan_callback: Optional[Any] = None,
+    classifier: Optional[Any] = None,
 ) -> ThreadedHTTPServer:
     """Khởi động Web Dashboard Server trong một luồng riêng biệt."""
     DashboardRequestHandler.database = database
     DashboardRequestHandler.drive_manager = drive_manager
     DashboardRequestHandler.config_path = Path(config_path).resolve()
     DashboardRequestHandler.scan_callback = scan_callback
+    DashboardRequestHandler.classifier = classifier
 
     server = ThreadedHTTPServer(("0.0.0.0", port), DashboardRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="WebDashboardServer")

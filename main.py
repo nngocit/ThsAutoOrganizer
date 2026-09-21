@@ -307,6 +307,7 @@ def main() -> None:
                 drive_manager=drive_manager,
                 config_path="config.json",
                 scan_callback=trigger_rescan,
+                classifier=classifier,
             )
             logger.info("👉 Mở trình duyệt truy cập Web Dashboard: http://localhost:%d", web_port)
         except Exception as exc:

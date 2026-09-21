@@ -116,6 +116,17 @@ class Database:
                 return dict(row)
             return None
 
+    def find_by_drive_file_id(self, drive_file_id: str) -> Optional[Dict[str, Any]]:
+        """Tìm bản ghi theo Google Drive File ID."""
+        sql = "SELECT * FROM files WHERE drive_file_id = ? ORDER BY id DESC LIMIT 1;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (str(drive_file_id),))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
     def insert_record(
         self,
         sha256: str,
