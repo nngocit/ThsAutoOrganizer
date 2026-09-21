@@ -3462,12 +3462,18 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 refresh_token = ""
 
                 if client_id and client_secret:
+                    host = self.headers.get("Host", "localhost:8080")
+                    proto = self.headers.get("X-Forwarded-Proto")
+                    if not proto:
+                        proto = "https" if ("trycloudflare.com" in host or not ("localhost" in host or "127.0.0.1" in host)) else "http"
+                    redirect_uri = f"{proto}://{host}/auth/google/callback"
+
                     token_url = "https://oauth2.googleapis.com/token"
                     post_fields = urllib.parse.urlencode({
                         "code": code,
                         "client_id": client_id,
                         "client_secret": client_secret,
-                        "redirect_uri": "http://localhost:8080/auth/google/callback",
+                        "redirect_uri": redirect_uri,
                         "grant_type": "authorization_code",
                     }).encode("utf-8")
                     req = urllib.request.Request(token_url, data=post_fields, headers={"Content-Type": "application/x-www-form-urlencoded"})
@@ -3525,7 +3531,11 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 except Exception:
                     pass
 
-            redirect_uri = "http://localhost:8080/auth/google/callback"
+            host = self.headers.get("Host", "localhost:8080")
+            proto = self.headers.get("X-Forwarded-Proto")
+            if not proto:
+                proto = "https" if ("trycloudflare.com" in host or not ("localhost" in host or "127.0.0.1" in host)) else "http"
+            redirect_uri = f"{proto}://{host}/auth/google/callback"
             if client_id:
                 oauth_url = (
                     f"https://accounts.google.com/o/oauth2/v2/auth?"

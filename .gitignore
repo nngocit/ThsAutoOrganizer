@@ -39,6 +39,9 @@ data/*.db-shm
 # Application Logs
 logs/*.log
 
+# Cloudflare Tunnel Binary
+cloudflared.exe
+
 # IDE & OS files
 .idea/
 .vscode/
