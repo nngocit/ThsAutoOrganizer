@@ -8,11 +8,16 @@
   "min_file_size_bytes": 1000,
   "stable_file_wait_seconds": 3,
   "log_level": "INFO",
+  "web_port": 8080,
+  "enable_web_ui": true,
   "supported_extensions": [
     ".pdf",
     ".docx",
     ".pptx",
     ".txt",
-    ".md"
+    ".md",
+    ".jpg",
+    ".jpeg",
+    ".png"
   ]
 }

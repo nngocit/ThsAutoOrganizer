@@ -177,6 +177,30 @@ class Database:
             cursor.execute(sql, params)
             conn.commit()
 
+    def update_classification(
+        self,
+        record_id: int,
+        subject: str,
+        document_type: str,
+        drive_file_id: Optional[str] = None,
+    ) -> None:
+        """Cập nhật phân loại môn học và loại tài liệu khi người dùng 'sửa tay' trên giao diện."""
+        now = current_iso_time()
+        updates = ["subject = ?", "document_type = ?", "updated_at = ?"]
+        params: List[Any] = [subject, document_type, now]
+
+        if drive_file_id is not None:
+            updates.append("drive_file_id = ?")
+            params.append(drive_file_id)
+
+        params.append(record_id)
+        sql = f"UPDATE files SET {', '.join(updates)} WHERE id = ?;"
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            conn.commit()
+
     def get_record(self, record_id: int) -> Optional[Dict[str, Any]]:
         """Lấy bản ghi theo ID."""
         sql = "SELECT * FROM files WHERE id = ?;"

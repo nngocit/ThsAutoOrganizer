@@ -104,6 +104,11 @@ def extract_text_from_pptx(path: Path) -> str:
         raise ExtractionError(f"Lỗi khi đọc file PPTX '{path}': {exc}") from exc
 
 
+def extract_text_from_image(path: Path) -> str:
+    """Đối với file ảnh trong MVP (chưa chạy OCR), trả về thông tin metadata cơ bản."""
+    return f"[Ảnh tài liệu/ghi chú: {path.name}]"
+
+
 # Bảng đăng ký extractor theo extension
 EXTRACTOR_REGISTRY: Dict[str, Callable[[Path], str]] = {
     ".txt": extract_text_from_txt,
@@ -111,6 +116,9 @@ EXTRACTOR_REGISTRY: Dict[str, Callable[[Path], str]] = {
     ".pdf": extract_text_from_pdf,
     ".docx": extract_text_from_docx,
     ".pptx": extract_text_from_pptx,
+    ".jpg": extract_text_from_image,
+    ".jpeg": extract_text_from_image,
+    ".png": extract_text_from_image,
 }
 
 

@@ -291,13 +291,39 @@ def main() -> None:
     else:
         logger.error("Thư mục root '%s' không thể theo dõi vì không tồn tại.", root_folder)
 
-    # 8. Xử lý tắt chương trình nhẹ nhàng (Graceful Shutdown)
+    # 8. Khởi động Web Dashboard Server
+    web_server = None
+    if config.get("enable_web_ui", True):
+        from src.web_server import start_web_server
+
+        def trigger_rescan() -> int:
+            return scan_existing_files(root_folder, processor, task_queue)
+
+        web_port = int(config.get("web_port", 8080))
+        try:
+            web_server = start_web_server(
+                port=web_port,
+                database=database,
+                drive_manager=drive_manager,
+                config_path="config.json",
+                scan_callback=trigger_rescan,
+            )
+            logger.info("👉 Mở trình duyệt truy cập Web Dashboard: http://localhost:%d", web_port)
+        except Exception as exc:
+            logger.warning("Không thể khởi động Web Dashboard trên port %d: %s", web_port, exc)
+
+    # 9. Xử lý tắt chương trình nhẹ nhàng (Graceful Shutdown)
     def shutdown_signal_handler(signum: int, frame: Any) -> None:
         logger.info("Nhận tín hiệu dừng chương trình. Đang đóng các tiến trình...")
         stop_event.set()
         if observer.is_alive():
             observer.stop()
         task_queue.put(None)
+        if web_server:
+            try:
+                web_server.shutdown()
+            except Exception:
+                pass
 
     signal.signal(signal.SIGINT, shutdown_signal_handler)
     signal.signal(signal.SIGTERM, shutdown_signal_handler)
