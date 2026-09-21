@@ -2198,6 +2198,7 @@ def get_html_dashboard() -> str:
 
     function renderLoggedOutState() {
       allFiles = [];
+      currentUser = null;
       document.getElementById('statTotalFiles').textContent = '0';
       document.getElementById('statUploaded').textContent = '0';
       document.getElementById('statNewCount').textContent = '0';
@@ -2206,28 +2207,29 @@ def get_html_dashboard() -> str:
       document.getElementById('countNew').textContent = '0';
       document.getElementById('countDrive').textContent = '0';
 
+      const statPath = document.getElementById('statStoragePath');
+      if (statPath) document.getElementById('statStoragePath').textContent = 'Chưa kết nối thư mục';
+
+      const statDrive = document.getElementById('statDriveFolder');
+      if (statDrive) document.getElementById('statDriveFolder').textContent = 'Chưa kết nối Google Drive';
+
+      const dispFolder = document.getElementById('displayUserFolder');
+      if (dispFolder) dispFolder.textContent = '--';
+
+      const dispEmail = document.getElementById('displayUserEmail');
+      if (dispEmail) dispEmail.textContent = '--';
+
+      const dispDrive = document.getElementById('displayUserDrive');
+      if (dispDrive) dispDrive.textContent = '--';
+
+      const fSub = document.getElementById('filterSubject');
+      if (fSub) fSub.innerHTML = '<option value="">Tất cả môn học</option>';
+
       const container = document.getElementById('cardsContainer');
-      if (container) {
-        container.innerHTML = `
-          <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 50px 20px; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
-            <div style="font-size: 2.5rem; margin-bottom: 12px;">🔒</div>
-            <div style="font-size: 1.15rem; font-weight: 700; color: #fff; margin-bottom: 6px;">Chưa đăng nhập tài khoản</div>
-            <div style="font-size: 0.85rem; color: var(--text-dim); max-width: 500px; margin: 0 auto 18px; line-height: 1.5;">
-              Hệ thống sẽ kết nối đúng thư mục trên máy tính và tài khoản Google Drive cá nhân của bạn ngay sau khi đăng nhập.
-            </div>
-            <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-              <button class="btn btn-google" onclick="openLoginModal()">
-                🔑 Đăng nhập Google
-              </button>
-              <button class="btn btn-secondary" onclick="openLoginModal()">
-                ⚡ Đăng nhập bằng Email sinh viên
-              </button>
-            </div>
-          </div>`;
-      }
+      if (container) container.innerHTML = '';
       const tbody = document.getElementById('filesTableBody');
       if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:36px; color:var(--text-dim);">Vui lòng đăng nhập để xem danh sách tài liệu của bạn.</td></tr>`;
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:36px; color:var(--text-dim);">Chưa có tài liệu nào.</td></tr>';
       }
     }
 

@@ -165,4 +165,16 @@ def test_workspace_subtabs_presence(web_test_env):
         assert "unauthenticatedState" in html
 
 
+def test_render_logged_out_state_clears_paths(web_test_env):
+    base_url, _, _ = web_test_env
+    req = urllib.request.Request(f"{base_url}/")
+    with urllib.request.urlopen(req) as resp:
+        html = resp.read().decode("utf-8")
+        assert "statStoragePath" in html
+        assert "statDriveFolder" in html
+        assert "document.getElementById('statStoragePath').textContent = 'Chưa kết nối thư mục';" in html
+        assert "document.getElementById('statDriveFolder').textContent = 'Chưa kết nối Google Drive';" in html
+
+
+
 
