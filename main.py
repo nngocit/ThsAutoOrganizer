@@ -223,7 +223,10 @@ def main() -> None:
     database.initialize()
 
     # 2. Khởi tạo Classifier
-    classifier = PathClassifier(root_folder=root_folder)
+    classifier = PathClassifier(
+        root_folder=root_folder,
+        allow_direct_subject_files=config.get("allow_direct_subject_files", True),
+    )
 
     # 3. Khởi tạo Google Drive Manager
     drive_manager = DriveManager(

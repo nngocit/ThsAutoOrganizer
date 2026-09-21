@@ -1,6 +1,9 @@
 """Module phân loại Môn học và Loại tài liệu dựa trên cấu trúc thư mục.
 
-Không suy đoán tự động nếu thư mục đã định rõ.
+Hỗ trợ cả cấu trúc chuẩn 3 cấp:
+    <root>/<Mon_Hoc>/<Loai_Tai_Lieu>/<File>
+và cấu trúc 2 cấp (khi người dùng để file trực tiếp trong thư mục môn):
+    <root>/<Mon_Hoc>/<File>
 """
 
 from dataclasses import dataclass
@@ -28,11 +31,20 @@ class UnknownDocumentTypeError(ClassifierError):
     pass
 
 
-# Mapping mặc định theo đặc tả
+# Mapping mặc định theo đặc tả + mở rộng tên thư mục có dấu cách
 DEFAULT_SUBJECT_MAP: Dict[str, str] = {
+    # Cấu trúc gạch dưới
     "Triet_Hoc": "Triết học",
     "Co_So_Du_Lieu": "Cơ sở dữ liệu",
     "Phuong_Phap_Nghien_Cuu": "Phương pháp nghiên cứu",
+    "Toan_Khoa_Hoc_Du_Lieu": "Toán khoa học dữ liệu",
+    "Phuong_Phap_Ghi_Chu": "Phương pháp ghi chú",
+    # Cấu trúc dấu cách thực tế trên Windows
+    "Triet Hoc": "Triết học",
+    "Co So Du Lieu": "Cơ sở dữ liệu",
+    "Phuong Phap Nghien Cuu": "Phương pháp nghiên cứu",
+    "Toan Khoa Hoc Du Lieu": "Toán khoa học dữ liệu",
+    "Phuong Phap Ghi Chu": "Phương pháp ghi chú",
 }
 
 DEFAULT_TYPE_MAP: Dict[str, str] = {
@@ -40,6 +52,15 @@ DEFAULT_TYPE_MAP: Dict[str, str] = {
     "02_Slide": "Slide",
     "03_Tai_Lieu_Tham_Khao": "Tài liệu tham khảo",
     "04_On_Thi": "Ôn thi",
+    "Giao_Trinh": "Giáo trình",
+    "Giao Trinh": "Giáo trình",
+    "Slide": "Slide",
+    "Tai_Lieu_Tham_Khao": "Tài liệu tham khảo",
+    "Tai Lieu Tham Khao": "Tài liệu tham khảo",
+    "On_Thi": "Ôn thi",
+    "On Thi": "Ôn thi",
+    "Tai_Lieu_Chung": "Tài liệu chung",
+    "Tai Lieu Chung": "Tài liệu chung",
 }
 
 
@@ -61,10 +82,12 @@ class PathClassifier:
         root_folder: Path | str,
         subject_map: Optional[Dict[str, str]] = None,
         type_map: Optional[Dict[str, str]] = None,
+        allow_direct_subject_files: bool = False,
     ) -> None:
         self.root_folder = Path(root_folder).resolve()
         self.subject_map = dict(DEFAULT_SUBJECT_MAP if subject_map is None else subject_map)
         self.type_map = dict(DEFAULT_TYPE_MAP if type_map is None else type_map)
+        self.allow_direct_subject_files = allow_direct_subject_files
 
     def register_subject(self, folder_key: str, display_name: str) -> None:
         """Đăng ký thêm môn học mới một cách dễ dàng."""
@@ -77,20 +100,11 @@ class PathClassifier:
     def classify(self, file_path: Path | str) -> ClassificationResult:
         """Phân loại môn học và loại tài liệu từ file_path.
 
-        Đường dẫn mong đợi có dạng:
-            <root_folder>/<subject_folder>/<type_folder>/<file_name>
-        hoặc sâu hơn trong subfolder của <type_folder>.
-
         Args:
             file_path: Đường dẫn đầy đủ hoặc tương đối của file cần phân loại.
 
         Returns:
             ClassificationResult chứa thông tin môn học và loại tài liệu.
-
-        Raises:
-            InvalidPathStructureError: Nếu file không nằm trong root hoặc thiếu cấp thư mục.
-            UnknownSubjectError: Nếu thư mục môn học không có trong subject_map.
-            UnknownDocumentTypeError: Nếu thư mục loại tài liệu không có trong type_map.
         """
         resolved_file = Path(file_path).resolve()
 
@@ -102,22 +116,54 @@ class PathClassifier:
             ) from exc
 
         parts = rel_path.parts
-        # parts tối thiểu phải là: (subject, document_type, filename)
-        if len(parts) < 3:
+
+        # Ít nhất phải nằm trong 1 thư mục môn
+        if len(parts) < 2:
             raise InvalidPathStructureError(
-                f"Đường dẫn '{rel_path}' không đủ cấp thư mục chuẩn: "
-                f"<Mon_Hoc>/<Loai_Tai_Lieu>/<File>. Số cấp hiện tại: {len(parts)}"
+                f"File '{rel_path}' nằm ngay tại thư mục gốc, không thuộc thư mục môn học nào."
             )
 
         subject_raw = parts[0]
-        type_raw = parts[1]
-
         if subject_raw not in self.subject_map:
             valid_subjects = ", ".join(self.subject_map.keys())
             raise UnknownSubjectError(
                 f"Thư mục môn '{subject_raw}' chưa được định nghĩa. Các môn hợp lệ: [{valid_subjects}]"
             )
 
+        subject = self.subject_map[subject_raw]
+
+        if len(parts) == 2:
+            # File nằm trực tiếp trong thư mục môn
+            if not self.allow_direct_subject_files:
+                raise InvalidPathStructureError(
+                    f"Đường dẫn '{rel_path}' không đủ cấp thư mục chuẩn: "
+                    f"<Mon_Hoc>/<Loai_Tai_Lieu>/<File>. Số cấp hiện tại: {len(parts)}"
+                )
+
+            filename_lower = parts[1].lower()
+            if any(k in filename_lower for k in ["giao-trinh", "giao_trinh", "giaotrinh", "textbook"]):
+                type_raw = "01_Giao_Trinh"
+                doc_type = "Giáo trình"
+            elif any(k in filename_lower for k in ["slide", "bai_giang", "baigiang", "lecture"]):
+                type_raw = "02_Slide"
+                doc_type = "Slide"
+            elif any(k in filename_lower for k in ["on", "de_cuong", "decuong", "thi", "exam", "thao luan"]):
+                type_raw = "04_On_Thi"
+                doc_type = "Ôn thi"
+            else:
+                type_raw = "03_Tai_Lieu_Tham_Khao"
+                doc_type = "Tài liệu tham khảo"
+
+            return ClassificationResult(
+                subject=subject,
+                document_type=doc_type,
+                subject_raw=subject_raw,
+                document_type_raw=type_raw,
+                relative_path=str(rel_path).replace("\\", "/"),
+            )
+
+        # len(parts) >= 3: có thư mục loại tài liệu
+        type_raw = parts[1]
         if type_raw not in self.type_map:
             valid_types = ", ".join(self.type_map.keys())
             raise UnknownDocumentTypeError(
@@ -125,7 +171,7 @@ class PathClassifier:
             )
 
         return ClassificationResult(
-            subject=self.subject_map[subject_raw],
+            subject=subject,
             document_type=self.type_map[type_raw],
             subject_raw=subject_raw,
             document_type_raw=type_raw,

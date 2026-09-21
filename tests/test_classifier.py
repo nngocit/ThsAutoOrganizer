@@ -97,3 +97,28 @@ def test_register_new_subject_and_type(classifier: PathClassifier) -> None:
     result = classifier.classify(file_path)
     assert result.subject == "Kiến trúc doanh nghiệp"
     assert result.document_type == "Bài tập lớn"
+
+
+def test_classify_direct_subject_files(tmp_path: Path) -> None:
+    root = tmp_path / "Mon_Hoc"
+    root.mkdir(parents=True, exist_ok=True)
+    flexible_classifier = PathClassifier(root_folder=root, allow_direct_subject_files=True)
+
+    # Test file trực tiếp trong Triet Hoc
+    f1 = root / "Triet Hoc" / "1. giao-trinh-triet-hoc.pdf"
+    res1 = flexible_classifier.classify(f1)
+    assert res1.subject == "Triết học"
+    assert res1.document_type == "Giáo trình"
+
+    # Test file trong Toan Khoa Hoc Du Lieu
+    f2 = root / "Toan Khoa Hoc Du Lieu" / "Machine_learning_co_ban.pdf"
+    res2 = flexible_classifier.classify(f2)
+    assert res2.subject == "Toán khoa học dữ liệu"
+    assert res2.document_type == "Tài liệu tham khảo"
+
+    # Test file ôn thi
+    f3 = root / "Toan Khoa Hoc Du Lieu" / "On DSTT_6_8_2023.pdf"
+    res3 = flexible_classifier.classify(f3)
+    assert res3.subject == "Toán khoa học dữ liệu"
+    assert res3.document_type == "Ôn thi"
+

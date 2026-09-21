@@ -1,9 +1,10 @@
 {
-  "root_folder": "D:\\ThacSi_HTTT",
+  "root_folder": "H:\\2026\\Thac Sy\\Mon_Hoc",
   "database": "data\\files.db",
   "google_drive_root_folder_id": "",
   "create_drive_subfolders": true,
   "process_existing_files_on_start": true,
+  "allow_direct_subject_files": true,
   "min_file_size_bytes": 1000,
   "stable_file_wait_seconds": 3,
   "log_level": "INFO",
