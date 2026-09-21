@@ -1201,12 +1201,19 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             records = self.database.get_all_records(limit=1000)
-            total = len(records)
-            uploaded = sum(1 for r in records if r.get("status") == "UPLOADED")
-            duplicate = sum(1 for r in records if r.get("status") == "DUPLICATE")
-            error = sum(1 for r in records if r.get("status") == "ERROR")
+            unique_files: Dict[str, Any] = {}
+            for r in records:
+                p = r["path"]
+                if p not in unique_files or r.get("status") == "UPLOADED":
+                    unique_files[p] = r
 
-            subjects = sorted(list({r["subject"] for r in records if r.get("subject")}))
+            file_list = list(unique_files.values())
+            total = len(file_list)
+            uploaded = sum(1 for r in file_list if r.get("status") == "UPLOADED")
+            duplicate = sum(1 for r in file_list if r.get("status") == "DUPLICATE")
+            error = sum(1 for r in file_list if r.get("status") == "ERROR")
+
+            subjects = sorted(list({r["subject"] for r in file_list if r.get("subject")}))
 
             self._send_json({
                 "total_files": total,
@@ -1224,7 +1231,12 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json([], 500)
                 return
             records = self.database.get_all_records(limit=1000)
-            self._send_json(records)
+            unique_files: Dict[str, Any] = {}
+            for r in records:
+                p = r["path"]
+                if p not in unique_files or r.get("status") == "UPLOADED":
+                    unique_files[p] = r
+            self._send_json(list(unique_files.values()))
             return
 
         if path == "/api/config":

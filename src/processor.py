@@ -211,26 +211,43 @@ class FileProcessor:
             )
 
         # 4. Kiểm tra trùng lặp trong SQLite
-        existing = self.database.find_by_sha256(file_sha256)
-        if existing and existing.get("status") == STATUS_UPLOADED:
-            logger.info("Duplicate detected by SHA256")
-            logger.info("Skip upload (Đã tồn tại trong database với Drive ID: %s)", existing.get("drive_file_id"))
-            # Ghi nhận bản ghi DUPLICATE trong SQLite để theo dõi lịch sử
-            self.database.insert_record(
-                sha256=file_sha256,
-                path=str(path),
-                subject=subject,
-                document_type=document_type,
-                status=STATUS_DUPLICATE,
-                drive_file_id=existing.get("drive_file_id"),
-            )
+        # 4a. Nếu chính file này (cùng đường dẫn) đã được xử lý và upload thành công trước đó:
+        existing_path_rec = self.database.find_by_path(str(path))
+        if existing_path_rec:
+            if existing_path_rec.get("sha256") == file_sha256 and existing_path_rec.get("status") == STATUS_UPLOADED:
+                logger.info("File '%s' đã tồn tại và đã upload Drive từ trước (SHA256: %s). Skip upload.", path.name, file_sha256[:10])
+                return ProcessingResult(
+                    file_path=str(path),
+                    sha256=file_sha256,
+                    subject=subject,
+                    document_type=document_type,
+                    status=STATUS_DUPLICATE,
+                    drive_file_id=existing_path_rec.get("drive_file_id"),
+                )
+
+        # 4b. Nếu file ở đường dẫn khác nhưng nội dung trùng SHA-256:
+        existing_sha = self.database.find_by_sha256(file_sha256)
+        if existing_sha and existing_sha.get("status") == STATUS_UPLOADED:
+            logger.info("Duplicate detected by SHA256 (trùng nội dung với: %s)", existing_sha.get("path"))
+            logger.info("Skip upload (Drive ID: %s)", existing_sha.get("drive_file_id"))
+            
+            # Chỉ ghi nhận 1 lần DUPLICATE cho đường dẫn này nếu chưa có
+            if not existing_path_rec:
+                self.database.insert_record(
+                    sha256=file_sha256,
+                    path=str(path),
+                    subject=subject,
+                    document_type=document_type,
+                    status=STATUS_DUPLICATE,
+                    drive_file_id=existing_sha.get("drive_file_id"),
+                )
             return ProcessingResult(
                 file_path=str(path),
                 sha256=file_sha256,
                 subject=subject,
                 document_type=document_type,
                 status=STATUS_DUPLICATE,
-                drive_file_id=existing.get("drive_file_id"),
+                drive_file_id=existing_sha.get("drive_file_id"),
             )
 
         # 5. Trích xuất văn bản (Extract text)

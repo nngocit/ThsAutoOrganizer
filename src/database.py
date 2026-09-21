@@ -100,6 +100,22 @@ class Database:
                 return dict(row)
             return None
 
+    def find_by_path(self, path: str) -> Optional[Dict[str, Any]]:
+        """Tìm bản ghi mới nhất theo đường dẫn file."""
+        sql = """
+        SELECT * FROM files
+        WHERE path = ?
+        ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
+        LIMIT 1;
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (str(path), STATUS_UPLOADED))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
     def insert_record(
         self,
         sha256: str,
