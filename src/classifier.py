@@ -141,15 +141,17 @@ class PathClassifier:
                 )
 
             filename_lower = parts[1].lower()
-            if any(k in filename_lower for k in ["giao-trinh", "giao_trinh", "giaotrinh", "textbook"]):
+            file_ext = Path(parts[1]).suffix.lower()
+
+            if any(k in filename_lower for k in ["giao-trinh", "giao_trinh", "giaotrinh", "giáo trình", "textbook"]):
                 type_raw = "01_Giao_Trinh"
                 doc_type = "Giáo trình"
-            elif any(k in filename_lower for k in ["slide", "bai_giang", "baigiang", "lecture"]):
-                type_raw = "02_Slide"
-                doc_type = "Slide"
-            elif any(k in filename_lower for k in ["on", "de_cuong", "decuong", "thi", "exam", "thao luan"]):
+            elif any(k in filename_lower for k in ["ôn", "on ", "on_", "on-", "đề cương", "de cuong", "decuong", "đề thi", "thi", "exam", "thảo luận", "thao luan", "câu hỏi", "cau hoi"]):
                 type_raw = "04_On_Thi"
                 doc_type = "Ôn thi"
+            elif file_ext in [".pptx", ".ppt"] or any(k in filename_lower for k in ["slide", "bài giảng", "bai giang", "baigiang", "lecture", "thuyết trình"]):
+                type_raw = "02_Slide"
+                doc_type = "Slide"
             else:
                 type_raw = "03_Tai_Lieu_Tham_Khao"
                 doc_type = "Tài liệu tham khảo"

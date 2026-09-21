@@ -59,6 +59,14 @@ def load_config(config_path: Path | str = "config.json") -> Dict[str, Any]:
 
 def setup_logging(log_file: Path | str = "logs/app.log", log_level: str = "INFO") -> None:
     """Thiết lập logging song song: console và file với định dạng chuẩn."""
+    # Đảm bảo Windows console in tiếng Việt không bị lỗi charmap UnicodeEncodeError
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     log_path = Path(log_file).resolve()
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
