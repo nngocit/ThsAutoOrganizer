@@ -17,6 +17,7 @@ from src.database import (
     STATUS_PENDING,
     STATUS_PROCESSING,
     STATUS_UPLOADED,
+    STATUS_SAVED_LOCAL,
     STATUS_DUPLICATE,
     STATUS_ERROR,
 )
@@ -118,6 +119,51 @@ class FileProcessor:
         ]
         self.extract_content = extract_content
 
+    def _get_drive_manager_for_user(self, user_email: str) -> Optional[DriveManager]:
+        """Lấy DriveManager phù hợp với tài khoản người dùng."""
+        clean_email = (user_email or "").strip().lower()
+        if clean_email in ["xuanngocit@gmail.com", "default@user"]:
+            if self.drive_manager:
+                if hasattr(self.drive_manager, "is_configured"):
+                    if self.drive_manager.is_configured():
+                        return self.drive_manager
+                else:
+                    return self.drive_manager
+            return None
+
+        # Kiểm tra xem user khác có access_token riêng trong database hay không
+        if self.database:
+            db_user = self.database.get_user_by_email(clean_email)
+            if db_user and db_user.get("access_token"):
+                try:
+                    client_id = None
+                    client_secret = None
+                    cred_file = Path("credentials.json")
+                    if cred_file.is_file():
+                        import json
+                        with open(cred_file, "r", encoding="utf-8") as f:
+                            cdata = json.load(f)
+                        cinfo = cdata.get("installed", {}) or cdata.get("web", {})
+                        client_id = cinfo.get("client_id")
+                        client_secret = cinfo.get("client_secret")
+
+                    token_dict = {
+                        "access_token": db_user["access_token"],
+                        "refresh_token": db_user.get("refresh_token"),
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                    return DriveManager.from_token_dict(
+                        token_info=token_dict,
+                        client_id=client_id,
+                        client_secret=client_secret,
+                        root_folder_id=db_user.get("drive_root_folder_id") or "",
+                    )
+                except Exception as exc:
+                    logger.warning("Không thể tạo DriveManager riêng cho %s: %s", user_email, exc)
+
+        # Tuyệt đối không dùng chung Google Drive của xuanngocit cho tài khoản khác
+        return None
+
     def should_process_file(self, file_path: Path | str) -> bool:
         """Kiểm tra sơ bộ file có đủ điều kiện xử lý hay không."""
         path = Path(file_path).resolve()
@@ -214,8 +260,8 @@ class FileProcessor:
         # 4a. Nếu chính file này (cùng đường dẫn) đã được xử lý và upload thành công trước đó:
         existing_path_rec = self.database.find_by_path(str(path), user_email=user_email)
         if existing_path_rec:
-            if existing_path_rec.get("sha256") == file_sha256 and existing_path_rec.get("status") == STATUS_UPLOADED:
-                logger.info("File '%s' đã tồn tại và đã upload Drive từ trước (SHA256: %s). Skip upload.", path.name, file_sha256[:10])
+            if existing_path_rec.get("sha256") == file_sha256 and existing_path_rec.get("status") in [STATUS_UPLOADED, STATUS_SAVED_LOCAL]:
+                logger.info("File '%s' đã tồn tại và đã xử lý từ trước (SHA256: %s). Skip upload.", path.name, file_sha256[:10])
                 return ProcessingResult(
                     file_path=str(path),
                     sha256=file_sha256,
@@ -227,7 +273,7 @@ class FileProcessor:
 
         # 4b. Nếu file ở đường dẫn khác nhưng nội dung trùng SHA-256:
         existing_sha = self.database.find_by_sha256(file_sha256, user_email=user_email)
-        if existing_sha and existing_sha.get("status") == STATUS_UPLOADED:
+        if existing_sha and existing_sha.get("status") in [STATUS_UPLOADED, STATUS_SAVED_LOCAL]:
             logger.info("Duplicate detected by SHA256 (trùng nội dung với: %s)", existing_sha.get("path"))
             logger.info("Skip upload (Drive ID: %s)", existing_sha.get("drive_file_id"))
             
@@ -289,36 +335,35 @@ class FileProcessor:
             user_email=user_email,
         )
 
-        # 7. Upload lên Google Drive
+        # 7. Upload lên Google Drive (theo tài khoản người dùng tương ứng)
         self.database.update_status(record_id, status=STATUS_PROCESSING)
 
-        if not self.drive_manager:
-            msg = "Drive manager chưa được cấu hình. File chỉ lưu tại SQLite."
-            logger.warning(msg)
-            self.database.update_status(record_id, status=STATUS_ERROR, error=msg)
+        user_dm = self._get_drive_manager_for_user(user_email)
+        if not user_dm:
+            msg = f"Tài khoản '{user_email}' chưa kết nối Google Drive riêng. File đã được lưu an toàn tại máy."
+            logger.info(msg)
+            self.database.update_status(record_id, status=STATUS_SAVED_LOCAL)
             return ProcessingResult(
                 file_path=str(path),
                 sha256=file_sha256,
                 subject=subject,
                 document_type=document_type,
-                status=STATUS_ERROR,
-                error=msg,
+                status=STATUS_SAVED_LOCAL,
+                drive_file_id=None,
                 extracted_text_len=extracted_text_len,
             )
 
         try:
-            logger.info("Uploading to Google Drive...")
-            target_folder_id = self.drive_manager.resolve_folder_hierarchy(
+            logger.info("Uploading to Google Drive cho user %s...", user_email)
+            target_folder_id = user_dm.resolve_folder_hierarchy(
                 subject=subject,
                 document_type=document_type,
             )
-            drive_file_id = self.drive_manager.upload_file(
+            drive_file_id = user_dm.upload_file(
                 file_path=path,
                 parent_folder_id=target_folder_id,
             )
-            logger.info("Upload successful")
-            logger.info("Drive file id: %s", drive_file_id)
-            logger.info("Completed")
+            logger.info("Upload successful (User: %s, Drive ID: %s)", user_email, drive_file_id)
 
             self.database.update_status(
                 record_id=record_id,

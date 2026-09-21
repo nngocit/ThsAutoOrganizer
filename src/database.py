@@ -15,6 +15,7 @@ logger = logging.getLogger("ThsAutoOrganizer.database")
 STATUS_PENDING = "PENDING"
 STATUS_PROCESSING = "PROCESSING"
 STATUS_UPLOADED = "UPLOADED"
+STATUS_SAVED_LOCAL = "SAVED_LOCAL"
 STATUS_DUPLICATE = "DUPLICATE"
 STATUS_ERROR = "ERROR"
 
@@ -22,6 +23,7 @@ VALID_STATUSES = {
     STATUS_PENDING,
     STATUS_PROCESSING,
     STATUS_UPLOADED,
+    STATUS_SAVED_LOCAL,
     STATUS_DUPLICATE,
     STATUS_ERROR,
 }
@@ -110,6 +112,16 @@ class Database:
             cursor.execute(create_index_sha256)
             cursor.execute(create_index_status)
             cursor.execute(create_index_user_email)
+
+            # Tự động chuyển các file của tài khoản gốc default@user về xuanngocit@gmail.com
+            try:
+                cursor.execute(
+                    "UPDATE files SET user_email = 'xuanngocit@gmail.com' "
+                    "WHERE user_email = 'default@user' OR user_email IS NULL;"
+                )
+            except Exception:
+                pass
+
             conn.commit()
 
         logger.debug("Database initialized tại '%s'", self.db_path)
@@ -120,21 +132,31 @@ class Database:
         Trả về bản ghi mới nhất hoặc bản ghi có trạng thái UPLOADED nếu có nhiều bản ghi trùng.
         """
         if user_email:
-            sql = """
-            SELECT * FROM files
-            WHERE sha256 = ? AND user_email = ?
-            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
-            LIMIT 1;
-            """
-            params = (sha256, user_email, STATUS_UPLOADED)
+            clean_email = user_email.strip().lower()
+            if clean_email == "xuanngocit@gmail.com":
+                sql = """
+                SELECT * FROM files
+                WHERE sha256 = ? AND (LOWER(user_email) = ? OR user_email = 'default@user')
+                ORDER BY CASE WHEN status IN (?, ?) THEN 0 ELSE 1 END, id DESC
+                LIMIT 1;
+                """
+                params = (sha256, clean_email, STATUS_UPLOADED, STATUS_SAVED_LOCAL)
+            else:
+                sql = """
+                SELECT * FROM files
+                WHERE sha256 = ? AND LOWER(user_email) = ?
+                ORDER BY CASE WHEN status IN (?, ?) THEN 0 ELSE 1 END, id DESC
+                LIMIT 1;
+                """
+                params = (sha256, clean_email, STATUS_UPLOADED, STATUS_SAVED_LOCAL)
         else:
             sql = """
             SELECT * FROM files
             WHERE sha256 = ?
-            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
+            ORDER BY CASE WHEN status IN (?, ?) THEN 0 ELSE 1 END, id DESC
             LIMIT 1;
             """
-            params = (sha256, STATUS_UPLOADED)
+            params = (sha256, STATUS_UPLOADED, STATUS_SAVED_LOCAL)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -147,21 +169,31 @@ class Database:
     def find_by_path(self, path: str, user_email: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Tìm bản ghi mới nhất theo đường dẫn file (có thể lọc theo user_email)."""
         if user_email:
-            sql = """
-            SELECT * FROM files
-            WHERE path = ? AND user_email = ?
-            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
-            LIMIT 1;
-            """
-            params = (str(path), user_email, STATUS_UPLOADED)
+            clean_email = user_email.strip().lower()
+            if clean_email == "xuanngocit@gmail.com":
+                sql = """
+                SELECT * FROM files
+                WHERE path = ? AND (LOWER(user_email) = ? OR user_email = 'default@user')
+                ORDER BY CASE WHEN status IN (?, ?) THEN 0 ELSE 1 END, id DESC
+                LIMIT 1;
+                """
+                params = (str(path), clean_email, STATUS_UPLOADED, STATUS_SAVED_LOCAL)
+            else:
+                sql = """
+                SELECT * FROM files
+                WHERE path = ? AND LOWER(user_email) = ?
+                ORDER BY CASE WHEN status IN (?, ?) THEN 0 ELSE 1 END, id DESC
+                LIMIT 1;
+                """
+                params = (str(path), clean_email, STATUS_UPLOADED, STATUS_SAVED_LOCAL)
         else:
             sql = """
             SELECT * FROM files
             WHERE path = ?
-            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
+            ORDER BY CASE WHEN status IN (?, ?) THEN 0 ELSE 1 END, id DESC
             LIMIT 1;
             """
-            params = (str(path), STATUS_UPLOADED)
+            params = (str(path), STATUS_UPLOADED, STATUS_SAVED_LOCAL)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -174,8 +206,12 @@ class Database:
     def find_by_drive_file_id(self, drive_file_id: str, user_email: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Tìm bản ghi theo Google Drive File ID."""
         if user_email:
-            sql = "SELECT * FROM files WHERE drive_file_id = ? AND user_email = ? ORDER BY id DESC LIMIT 1;"
-            params = (str(drive_file_id), user_email)
+            clean_email = user_email.strip().lower()
+            if clean_email == "xuanngocit@gmail.com":
+                sql = "SELECT * FROM files WHERE drive_file_id = ? AND (LOWER(user_email) = ? OR user_email = 'default@user') ORDER BY id DESC LIMIT 1;"
+            else:
+                sql = "SELECT * FROM files WHERE drive_file_id = ? AND LOWER(user_email) = ? ORDER BY id DESC LIMIT 1;"
+            params = (str(drive_file_id), clean_email)
         else:
             sql = "SELECT * FROM files WHERE drive_file_id = ? ORDER BY id DESC LIMIT 1;"
             params = (str(drive_file_id),)
@@ -305,8 +341,12 @@ class Database:
     def get_all_records(self, limit: int = 100, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lấy danh sách các bản ghi mới nhất (có thể lọc theo user_email)."""
         if user_email:
-            sql = "SELECT * FROM files WHERE user_email = ? ORDER BY id DESC LIMIT ?;"
-            params = (user_email, limit)
+            clean_email = user_email.strip().lower()
+            if clean_email == "xuanngocit@gmail.com":
+                sql = "SELECT * FROM files WHERE LOWER(user_email) = ? OR user_email = 'default@user' ORDER BY id DESC LIMIT ?;"
+            else:
+                sql = "SELECT * FROM files WHERE LOWER(user_email) = ? ORDER BY id DESC LIMIT ?;"
+            params = (clean_email, limit)
         else:
             sql = "SELECT * FROM files ORDER BY id DESC LIMIT ?;"
             params = (limit,)
@@ -339,7 +379,7 @@ class Database:
                             avatar_url = COALESCE(NULLIF(?, ''), avatar_url),
                             local_folder = COALESCE(NULLIF(?, ''), local_folder),
                             updated_at = ? 
-                        WHERE email = ?;
+                        WHERE LOWER(email) = LOWER(?);
                         """,
                         (name, avatar_url, local_folder, now, email),
                     )
@@ -350,14 +390,14 @@ class Database:
         with self._get_connection() as conn:
             conn.execute(
                 "INSERT INTO users (email, name, avatar_url, local_folder, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?);",
-                (email, name, avatar_url, local_folder, now, now),
+                (email.strip().lower(), name, avatar_url, local_folder, now, now),
             )
             conn.commit()
         return self.get_user_by_email(email) or {}
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        """Lấy thông tin người dùng theo email."""
-        sql = "SELECT * FROM users WHERE email = ? LIMIT 1;"
+        """Lấy thông tin người dùng theo email (không phân biệt hoa thường)."""
+        sql = "SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1;"
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql, (email,))

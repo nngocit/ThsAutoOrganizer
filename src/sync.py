@@ -36,8 +36,9 @@ def sync_from_drive_to_local(
     database: Database,
     root_folder: Path | str,
     classifier: Optional[PathClassifier] = None,
+    user_email: str = "xuanngocit@gmail.com",
 ) -> List[Dict[str, Any]]:
-    """Quét Google Drive và tải các file mới về máy tính.
+    """Quét Google Drive và tải các file mới về máy tính cho tài khoản user_email.
 
     Returns:
         Danh sách các file vừa được tải về thành công.
@@ -50,7 +51,7 @@ def sync_from_drive_to_local(
     if not root_path.is_dir():
         root_path.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Đang kiểm tra tài liệu mới trên Google Drive...")
+    logger.info("Đang kiểm tra tài liệu mới trên Google Drive cho tài khoản %s...", user_email)
     materials = drive_manager.list_all_study_materials()
     downloaded_files: List[Dict[str, Any]] = []
 
@@ -61,7 +62,7 @@ def sync_from_drive_to_local(
         doc_type = mat["document_type"]
 
         # Kiểm tra xem file đã có trong database chưa
-        db_rec = database.find_by_drive_file_id(drive_file_id)
+        db_rec = database.find_by_drive_file_id(drive_file_id, user_email=user_email)
 
         # Xác định đường dẫn cục bộ dự kiến
         subject_dir = find_or_create_local_subject_dir(root_path, subject, classifier)
@@ -79,6 +80,7 @@ def sync_from_drive_to_local(
                     document_type=doc_type,
                     status=STATUS_UPLOADED,
                     drive_file_id=drive_file_id,
+                    user_email=user_email,
                 )
             continue
 
@@ -96,6 +98,7 @@ def sync_from_drive_to_local(
                 document_type=doc_type,
                 status=STATUS_UPLOADED,
                 drive_file_id=drive_file_id,
+                user_email=user_email,
             )
 
             downloaded_files.append({
@@ -128,6 +131,7 @@ class AutoDriveSyncWorker:
         classifier: Optional[PathClassifier] = None,
         interval_seconds: int = 180,
         enabled: bool = True,
+        user_email: str = "xuanngocit@gmail.com",
     ) -> None:
         self.drive_manager = drive_manager
         self.database = database
@@ -135,6 +139,7 @@ class AutoDriveSyncWorker:
         self.classifier = classifier
         self.interval_seconds = max(30, int(interval_seconds))
         self.enabled = enabled
+        self.user_email = user_email
 
         import threading
         self._stop_event = threading.Event()
@@ -204,6 +209,7 @@ class AutoDriveSyncWorker:
                 database=self.database,
                 root_folder=self.root_folder,
                 classifier=self.classifier,
+                user_email=self.user_email,
             )
             self.last_sync_time = time.time()
             if downloaded:

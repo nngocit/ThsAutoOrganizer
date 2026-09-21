@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.classifier import PathClassifier
-from src.database import Database, STATUS_UPLOADED, STATUS_DUPLICATE, STATUS_ERROR
+from src.database import Database, STATUS_UPLOADED, STATUS_SAVED_LOCAL, STATUS_DUPLICATE, STATUS_ERROR
 from src.drive import DriveManager
 from src.processor import calculate_sha256
 
@@ -715,8 +715,10 @@ def get_html_dashboard() -> str:
             <span style="font-weight: 700; font-size: 0.92rem; color: #fff;">Thư mục máy tính của bạn:</span>
             <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
           </div>
-          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px;">
-            Tài khoản: <b id="displayUserEmail" style="color: #60a5fa;">--</b> (Quét và đồng bộ riêng biệt cho tài khoản này)
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span>Tài khoản: <b id="displayUserEmail" style="color: #60a5fa;">--</b></span>
+            <span>|</span>
+            <span id="displayUserDrive" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">--</span>
           </div>
         </div>
       </div>
@@ -896,7 +898,18 @@ def get_html_dashboard() -> str:
             </div>
           </div>
 
-          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- HOẶC ĐĂNG NHẬP NHANH BẰNG EMAIL SINH VIÊN -</div>
+          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- CHỌN NHANH TÀI KHOẢN ĐỂ SỬ DỤNG / KIỂM TRA -</div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button type="button" class="btn btn-secondary" style="font-size: 0.76rem; text-align: left; padding: 9px 10px; border-color: rgba(26, 115, 232, 0.4);" onclick="quickLoginAs('xuanngocit@gmail.com', 'Admin XuanNgoc')">
+              👑 <b>xuanngocit@gmail.com</b><br><span style="font-size:0.68rem; color:var(--accent-cyan);">(Tài khoản gốc & Drive)</span>
+            </button>
+            <button type="button" class="btn btn-secondary" style="font-size: 0.76rem; text-align: left; padding: 9px 10px; border-color: rgba(16, 185, 129, 0.4);" onclick="quickLoginAs('mongxuancomestic@gmail.com', 'Mộng Xuân')">
+              👤 <b>mongxuancomestic@gmail.com</b><br><span style="font-size:0.68rem; color:#a7f3d0);">(Tài khoản SV riêng)</span>
+            </button>
+          </div>
+
+          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- HOẶC NHẬP EMAIL BẤT KỲ -</div>
 
           <div style="display: flex; flex-direction: column; gap: 6px;">
             <input type="email" id="testEmailInput" class="form-control" placeholder="Nhập email (vd: mongxuancomestic@gmail.com)">
@@ -1072,6 +1085,18 @@ def get_html_dashboard() -> str:
             folderBar.style.display = 'flex';
             document.getElementById('displayUserFolder').textContent = currentUser.local_folder || defaultRootFolder || 'Chưa đặt';
             document.getElementById('displayUserEmail').textContent = currentUser.email;
+            const driveEl = document.getElementById('displayUserDrive');
+            if (driveEl) {
+              if (data.drive_connected) {
+                driveEl.style.background = 'rgba(16, 185, 129, 0.2)';
+                driveEl.style.color = '#34d399';
+                driveEl.textContent = `● ${data.drive_account}`;
+              } else {
+                driveEl.style.background = 'rgba(234, 179, 8, 0.2)';
+                driveEl.style.color = '#facc15';
+                driveEl.textContent = '● Lưu máy local (Chưa liên kết Drive)';
+              }
+            }
           }
           const initial = (currentUser.name || currentUser.email || 'U')[0].toUpperCase();
           userSec.innerHTML = `
@@ -1111,6 +1136,10 @@ def get_html_dashboard() -> str:
       document.getElementById('countAll').textContent = '0';
       document.getElementById('countNew').textContent = '0';
       document.getElementById('countDrive').textContent = '0';
+      const drv = document.getElementById('statDriveFolder');
+      if (drv) drv.textContent = 'Chưa đăng nhập';
+      const stp = document.getElementById('statStoragePath');
+      if (stp) stp.textContent = 'Vui lòng đăng nhập';
 
       const container = document.getElementById('cardsContainer');
       if (container) {
@@ -1144,6 +1173,15 @@ def get_html_dashboard() -> str:
         document.getElementById('statTotalFiles').textContent = data.total_files || 0;
         document.getElementById('statUploaded').textContent = data.uploaded_files || 0;
         document.getElementById('statSubjectsCount').textContent = data.subjects_count || 0;
+
+        if (data.drive_account) {
+          const el = document.getElementById('statDriveFolder');
+          if (el) el.textContent = data.drive_account;
+        }
+        if (data.local_folder) {
+          const el = document.getElementById('statStoragePath');
+          if (el) el.textContent = data.local_folder;
+        }
 
         if (data.subjects && data.subjects.length > 0) {
           document.getElementById('statSubjectsList').textContent = data.subjects.join(', ');
@@ -1222,7 +1260,7 @@ def get_html_dashboard() -> str:
         const newBadge = f.is_new ? `<span class="badge-new">✨ MỚI</span>` : '';
         const driveBadge = f.drive_file_id 
           ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon" style="color:#60a5fa;" title="Mở Drive">🔗 Drive</a>` 
-          : '';
+          : `<span class="btn-icon" style="color:#00f2fe; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.3); font-size:0.7rem;" title="File lưu an toàn tại máy tính">💻 Máy local</span>`;
 
         html += `
           <div class="file-card ${f.is_new ? 'is-new-card' : ''}">
@@ -1269,6 +1307,9 @@ def get_html_dashboard() -> str:
         const driveBtn = f.drive_file_id 
           ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon" style="color:#60a5fa;">🔗 Drive</a>` 
           : '';
+        const statusBadge = f.drive_file_id
+          ? `<span style="color:var(--accent-green); font-size:0.75rem; font-weight:600;">● ĐÃ LÊN DRIVE</span>`
+          : `<span style="color:var(--accent-cyan); font-size:0.75rem; font-weight:600;">💻 LƯU MÁY LOCAL</span>`;
 
         html += `
           <tr>
@@ -1285,7 +1326,7 @@ def get_html_dashboard() -> str:
             <td><span class="tag-type">${f.document_type || 'Tài liệu'}</span></td>
             <td style="font-family: monospace;">${f.size_formatted || '--'}</td>
             <td style="font-size: 0.75rem; color: var(--text-muted);">⏱️ ${relTime}</td>
-            <td><span style="color:var(--accent-green); font-size:0.75rem; font-weight:600;">● ĐÃ ĐỒNG BỘ</span></td>
+            <td>${statusBadge}</td>
             <td style="text-align: right;">
               <div style="display:flex; justify-content:flex-end; gap:6px;">
                 ${driveBtn}
@@ -1376,6 +1417,14 @@ def get_html_dashboard() -> str:
     /* Modals & Auth */
     function openLoginModal() { document.getElementById('loginModal').style.display = 'flex'; }
     function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
+
+    function quickLoginAs(email, name) {
+      const emailInput = document.getElementById('testEmailInput');
+      const nameInput = document.getElementById('testNameInput');
+      if (emailInput) emailInput.value = email;
+      if (nameInput) nameInput.value = name;
+      submitTestLogin();
+    }
 
     async function submitTestLogin() {
       const email = document.getElementById('testEmailInput').value.trim();
@@ -1541,6 +1590,70 @@ def get_html_dashboard() -> str:
 """
 
 
+def get_user_storage_folder(user: Optional[Dict[str, Any]], config_root_folder: Path | str) -> Path:
+    """Trả về đường dẫn thư mục lưu trữ cục bộ riêng biệt cho từng người dùng."""
+    root_path = Path(config_root_folder).resolve()
+    if not user:
+        return root_path
+
+    email = user.get("email", "").strip().lower()
+    custom = user.get("local_folder", "").strip()
+    if custom:
+        return Path(custom).resolve()
+
+    # Tài khoản gốc sở hữu thư mục root_folder
+    if email in ["xuanngocit@gmail.com", "default@user"]:
+        return root_path
+
+    # Người dùng khác chưa cài đặt thư mục riêng:
+    # Tạo thư mục riêng biệt tại Users_Storage/<safe_email> để không lẫn vào thư mục gốc của xuanngocit
+    safe_name = email.replace("@", "_at_").replace(".", "_")
+    user_dir = root_path.parent / "Users_Storage" / safe_name
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return user_dir
+
+
+def get_user_drive_manager(
+    user: Optional[Dict[str, Any]],
+    root_dm: Optional[DriveManager],
+    db: Optional[Database],
+    credentials_path: Path | str = "credentials.json",
+) -> Tuple[Optional[DriveManager], bool, str]:
+    """Trả về (DriveManager, is_connected, account_display) tương ứng với tài khoản người dùng."""
+    if not user:
+        return None, False, "Chưa đăng nhập"
+
+    email = user.get("email", "").strip().lower()
+
+    # 1. Nếu là tài khoản gốc xuanngocit@gmail.com -> Dùng root_dm (kết nối token.json của xuanngocit)
+    if email in ["xuanngocit@gmail.com", "default@user"]:
+        if root_dm and root_dm.is_configured():
+            return root_dm, True, "Google Drive: xuanngocit@gmail.com"
+        return None, False, "Chưa cấu hình Google Drive"
+
+    # 2. Nếu là user khác, kiểm tra xem user đó có token OAuth riêng trong database hay không
+    if db:
+        db_user = db.get_user_by_email(email)
+        if db_user and db_user.get("access_token"):
+            try:
+                token_dict = {
+                    "access_token": db_user["access_token"],
+                    "refresh_token": db_user.get("refresh_token"),
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+                user_dm = DriveManager.from_token_dict(
+                    token_info=token_dict,
+                    credentials_file=str(credentials_path),
+                    root_folder_id=db_user.get("drive_root_folder_id") or "",
+                )
+                return user_dm, True, f"Google Drive: {email}"
+            except Exception as exc:
+                logger.warning("Không thể khởi tạo DriveManager cho %s: %s", email, exc)
+
+    # 3. User khác chưa kết nối Google Drive riêng -> TUYỆT ĐỐI KHÔNG DÙNG DRIVE CỦA XUANNGOCTIT!
+    return None, False, "Chưa kết nối Drive riêng (Lưu tại máy)"
+
+
 class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
     """Handler xử lý API và giao diện Web Dashboard Multi-User."""
 
@@ -1599,27 +1712,25 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/me":
-            drive_connected = False
-            if self.drive_manager and self.drive_manager.is_configured():
-                drive_connected = True
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            config_root = cfg.get("root_folder", "")
 
-            default_folder = ""
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                default_folder = cfg.get("root_folder", "")
-            except Exception:
-                pass
+            user_dm, drive_connected, drive_account = get_user_drive_manager(
+                current_user, self.drive_manager, self.database
+            )
 
             user_data = dict(current_user) if current_user else None
-            if user_data and not user_data.get("local_folder"):
-                user_data["local_folder"] = default_folder
+            if user_data:
+                user_folder_path = get_user_storage_folder(user_data, config_root)
+                user_data["local_folder"] = str(user_folder_path)
 
             self._send_json({
                 "authenticated": bool(current_user),
                 "user": user_data,
                 "drive_connected": drive_connected,
-                "default_folder": default_folder,
+                "drive_account": drive_account,
+                "default_folder": config_root,
             })
             return
 
@@ -1633,19 +1744,59 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             try:
-                # Đổi authorization code lấy token từ Google
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                client_id = cfg.get("google_oauth_client_id")
-                client_secret = cfg.get("google_oauth_client_secret")
+                client_id = ""
+                client_secret = ""
+                if Path("credentials.json").is_file():
+                    with open("credentials.json", "r", encoding="utf-8") as f:
+                        cdata = json.load(f)
+                    cinfo = cdata.get("installed", {}) or cdata.get("web", {})
+                    client_id = cinfo.get("client_id", "")
+                    client_secret = cinfo.get("client_secret", "")
 
-                # Giả lập hoặc xử lý thực
+                email = ""
+                name = ""
+                avatar_url = ""
+                access_token = ""
+                refresh_token = ""
+
+                if client_id and client_secret:
+                    token_url = "https://oauth2.googleapis.com/token"
+                    post_fields = urllib.parse.urlencode({
+                        "code": code,
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "redirect_uri": "http://localhost:8080/auth/google/callback",
+                        "grant_type": "authorization_code",
+                    }).encode("utf-8")
+                    req = urllib.request.Request(token_url, data=post_fields, headers={"Content-Type": "application/x-www-form-urlencoded"})
+                    try:
+                        with urllib.request.urlopen(req, timeout=10) as resp:
+                            token_resp = json.loads(resp.read().decode("utf-8"))
+                            access_token = token_resp.get("access_token", "")
+                            refresh_token = token_resp.get("refresh_token", "")
+
+                        if access_token:
+                            uinfo_req = urllib.request.Request("https://www.googleapis.com/oauth2/v2/userinfo", headers={"Authorization": f"Bearer {access_token}"})
+                            with urllib.request.urlopen(uinfo_req, timeout=10) as resp:
+                                uinfo = json.loads(resp.read().decode("utf-8"))
+                                email = uinfo.get("email", "").strip().lower()
+                                name = uinfo.get("name", "")
+                                avatar_url = uinfo.get("picture", "")
+                    except Exception as exc:
+                        logger.warning("Không thể trao đổi Google token tự động: %s", exc)
+
+                if not email:
+                    email = "xuanngocit@gmail.com"
+
                 session_id = secrets.token_hex(24)
-                email = "student@gmail.com"
-                name = "Google Student"
                 if self.database:
-                    user = self.database.get_or_create_user(email=email, name=name)
+                    user = self.database.get_or_create_user(email=email, name=name, avatar_url=avatar_url)
+                    if access_token:
+                        self.database.update_user_tokens(email=email, access_token=access_token, refresh_token=refresh_token)
+                        user = self.database.get_user_by_email(email) or user
                     SESSION_STORE[session_id] = user
+                else:
+                    SESSION_STORE[session_id] = {"email": email, "name": name, "avatar_url": avatar_url}
 
                 # Redirect về trang chủ kèm Cookie
                 cookie_str = f"ths_session={session_id}; Path=/; HttpOnly; SameSite=Lax"
@@ -1695,20 +1846,29 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             user_email = current_user.get("email") if current_user else None
+            user_dm, drive_connected, drive_account = get_user_drive_manager(
+                current_user, self.drive_manager, self.database
+            )
+
             records = self.database.get_all_records(limit=1000, user_email=user_email)
             unique_files: Dict[str, Any] = {}
             for r in records:
                 p = r["path"]
-                if p not in unique_files or r.get("status") == "UPLOADED":
+                if p not in unique_files or r.get("status") in ["UPLOADED", "SAVED_LOCAL"]:
                     unique_files[p] = r
 
             file_list = list(unique_files.values())
             total = len(file_list)
-            uploaded = sum(1 for r in file_list if r.get("status") == "UPLOADED")
+            uploaded = sum(1 for r in file_list if r.get("status") in ["UPLOADED", "SAVED_LOCAL"])
             duplicate = sum(1 for r in file_list if r.get("status") == "DUPLICATE")
             error = sum(1 for r in file_list if r.get("status") == "ERROR")
 
             subjects = sorted(list({r["subject"] for r in file_list if r.get("subject")}))
+
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            config_root = cfg.get("root_folder", "")
+            user_folder_path = str(get_user_storage_folder(current_user, config_root))
 
             self._send_json({
                 "total_files": total,
@@ -1717,7 +1877,9 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 "error_files": error,
                 "subjects_count": len(subjects),
                 "subjects": subjects,
-                "drive_connected": self.drive_manager.is_configured() if self.drive_manager else False,
+                "drive_connected": drive_connected,
+                "drive_account": drive_account,
+                "local_folder": user_folder_path,
             })
             return
 
@@ -1733,7 +1895,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 p = r["path"]
                 if p not in unique_files:
                     unique_files[p] = r
-                elif r.get("status") == "UPLOADED" and unique_files[p].get("status") != "UPLOADED":
+                elif r.get("status") in ["UPLOADED", "SAVED_LOCAL"] and unique_files[p].get("status") not in ["UPLOADED", "SAVED_LOCAL"]:
                     unique_files[p] = r
 
             file_list = list(unique_files.values())
@@ -1852,6 +2014,10 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
         # Multi-Platform Upload API (Desktop, iPad, Phone)
         if path == "/api/upload":
+            if not current_user:
+                self._send_json({"ok": False, "error": "Vui lòng đăng nhập tài khoản trước khi nạp tài liệu"}, 401)
+                return
+
             filename = body.get("filename", "").strip()
             content_base64 = body.get("content_base64", "")
             if not filename or not content_base64 or not self.database:
@@ -1865,17 +2031,16 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 user_email = current_user.get("email", "default@user")
 
-                # Kiểm tra trùng lặp
+                # Kiểm tra trùng lặp cho tài khoản này
                 existing = self.database.find_by_sha256(sha256_hash, user_email=user_email)
-                if existing and existing.get("status") == STATUS_UPLOADED:
-                    self._send_json({"ok": True, "duplicate": True, "message": "File đã tồn tại và đã upload Drive."})
+                if existing and existing.get("status") in [STATUS_UPLOADED, STATUS_SAVED_LOCAL]:
+                    self._send_json({"ok": True, "duplicate": True, "message": "File đã tồn tại trong kho tài liệu của bạn."})
                     return
 
                 # Phân loại
                 subject = body.get("subject")
                 doc_type = body.get("document_type")
                 if not subject or not doc_type:
-                    # Dùng classifier tự động
                     if DashboardRequestHandler.classifier:
                         info = DashboardRequestHandler.classifier.classify_path(Path(filename))
                         subject = subject or info.get("subject", "Tài liệu chung")
@@ -1884,34 +2049,42 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                         subject = subject or "Tài liệu chung"
                         doc_type = doc_type or "Tài liệu tham khảo"
 
-                # Lưu file vào thư mục lưu trữ của user
+                # Lưu file vào thư mục lưu trữ CỦA TỪNG USER (Cách ly hoàn toàn)
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
-                root_folder = Path(cfg["root_folder"])
-                dest_dir = root_folder / subject
+                config_root = cfg.get("root_folder", "")
+                user_folder = get_user_storage_folder(current_user, config_root)
+                dest_dir = user_folder / subject
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 dest_path = dest_dir / filename
                 with open(dest_path, "wb") as f_out:
                     f_out.write(raw_bytes)
 
+                # Lấy DriveManager riêng của user này
+                user_dm, drive_connected, _ = get_user_drive_manager(
+                    current_user, self.drive_manager, self.database
+                )
                 drive_file_id = None
-                # Đồng bộ lên Drive nếu DriveManager sẵn sàng
-                if self.drive_manager and self.drive_manager.is_configured():
+                file_status = STATUS_SAVED_LOCAL
+
+                if user_dm and user_dm.is_configured():
                     try:
-                        drive_file_id = self.drive_manager.upload_file(
+                        drive_file_id = user_dm.upload_file(
                             file_path=dest_path,
                             subject=subject,
                             document_type=doc_type,
                         )
+                        if drive_file_id:
+                            file_status = STATUS_UPLOADED
                     except Exception as exc:
-                        logger.warning("Lỗi upload Drive khi user nạp file: %s", exc)
+                        logger.warning("Lỗi upload Drive khi user %s nạp file: %s", user_email, exc)
 
                 rec_id = self.database.insert_record(
                     sha256=sha256_hash,
                     path=str(dest_path),
                     subject=subject,
                     document_type=doc_type,
-                    status=STATUS_UPLOADED if drive_file_id else "PENDING",
+                    status=file_status,
                     drive_file_id=drive_file_id,
                     user_email=user_email,
                 )
@@ -1922,6 +2095,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     "filename": filename,
                     "subject": subject,
                     "document_type": doc_type,
+                    "status": file_status,
                     "drive_file_id": drive_file_id,
                 })
                 return
@@ -2006,6 +2180,10 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             folder_path = body.get("folder_path") if isinstance(body, dict) else None
             user_email = current_user.get("email") if current_user else "default@user"
 
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            config_root = cfg.get("root_folder", "")
+
             if current_user and folder_path and self.database:
                 try:
                     self.database.update_user_folder(current_user["email"], folder_path)
@@ -2013,16 +2191,9 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 except Exception as exc:
                     logger.warning("Không thể lưu folder user: %s", exc)
 
-            target_folder = folder_path
-            if not target_folder and current_user:
-                target_folder = current_user.get("local_folder")
+            target_folder = folder_path or (current_user.get("local_folder") if current_user else None)
             if not target_folder:
-                try:
-                    with open(self.config_path, "r", encoding="utf-8") as f:
-                        cfg = json.load(f)
-                    target_folder = cfg.get("root_folder")
-                except Exception:
-                    pass
+                target_folder = str(get_user_storage_folder(current_user, config_root))
 
             count = 0
             cb = DashboardRequestHandler.scan_callback

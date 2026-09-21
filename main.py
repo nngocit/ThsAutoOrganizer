@@ -167,7 +167,7 @@ def worker_loop(
         if isinstance(item, tuple):
             file_path, user_email = item
         else:
-            file_path, user_email = item, "default@user"
+            file_path, user_email = item, "xuanngocit@gmail.com"
 
         file_path = Path(file_path)
         try:
