@@ -3870,10 +3870,13 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 if user_dm and user_dm.is_configured():
                     try:
-                        drive_file_id = user_dm.upload_file(
-                            file_path=dest_path,
+                        target_folder_id = user_dm.resolve_folder_hierarchy(
                             subject=subject,
                             document_type=doc_type,
+                        )
+                        drive_file_id = user_dm.upload_file(
+                            file_path=dest_path,
+                            parent_folder_id=target_folder_id,
                         )
                         if drive_file_id:
                             file_status = STATUS_UPLOADED
