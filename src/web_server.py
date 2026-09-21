@@ -39,28 +39,30 @@ SESSION_STORE: Dict[str, Dict[str, Any]] = {}
 
 
 def get_html_dashboard() -> str:
-    """Trả về giao diện Web Studio Responsive đa thiết bị (Desktop, iPad, Mobile)."""
+    """Trả về giao diện Web AkiTao Studio Responsive đa thiết bị (Desktop, iPad, Mobile)."""
     return """<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ThsAutoOrganizer Cloud Studio – Hệ Thống Quản Lý Tài Liệu Đa Thiết Bị</title>
+  <title>AkiTao – Hệ Thống Hóa Học Tập & Tài Liệu Số | ThsAutoOrganizer Studio Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-base: #080a12;
-      --bg-surface: rgba(16, 20, 32, 0.85);
-      --bg-card: rgba(22, 28, 46, 0.7);
-      --bg-card-hover: rgba(30, 38, 62, 0.9);
+      --bg-base: #060913;
+      --bg-sidebar: #050814;
+      --bg-main: #070b16;
+      --bg-surface: rgba(13, 19, 36, 0.85);
+      --bg-card: rgba(16, 23, 42, 0.72);
+      --bg-card-hover: rgba(26, 36, 64, 0.9);
       --border-color: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(0, 242, 254, 0.45);
+      --border-focus: rgba(0, 242, 254, 0.5);
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --text-dim: #64748b;
-      
+
       --accent-blue: #1a73e8;
       --accent-cyan: #00f2fe;
       --accent-purple: #8b5cf6;
@@ -70,26 +72,28 @@ def get_html_dashboard() -> str:
       --accent-red: #ef4444;
 
       --grad-studio: linear-gradient(135deg, #1a73e8 0%, #8b5cf6 50%, #00f2fe 100%);
-      --grad-glow: radial-gradient(ellipse at 50% -20%, rgba(26, 115, 232, 0.22), rgba(139, 92, 246, 0.14), transparent 70%);
+      --grad-hero-text: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+      --grad-akitao-cyan: linear-gradient(135deg, rgba(0, 242, 254, 0.25) 0%, rgba(26, 115, 232, 0.12) 100%);
+      --grad-akitao-purple: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(236, 72, 153, 0.12) 100%);
+      --grad-glow: radial-gradient(ellipse at 50% -20%, rgba(26, 115, 232, 0.25), rgba(139, 92, 246, 0.15), transparent 70%);
       --grad-new: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      
+
       --radius-sm: 8px;
       --radius-md: 12px;
       --radius-lg: 18px;
+      --radius-xl: 24px;
       --radius-full: 9999px;
-      --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+      --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+      --shadow-glow-cyan: 0 0 25px rgba(0, 242, 254, 0.35);
+      --shadow-glow-purple: 0 0 25px rgba(139, 92, 246, 0.35);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: var(--bg-base);
-      background-image: var(--grad-glow);
-      background-attachment: fixed;
       color: var(--text-main);
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
       overflow-x: hidden;
     }
 
@@ -98,99 +102,271 @@ def get_html_dashboard() -> str:
     ::-webkit-scrollbar-track { background: var(--bg-base); }
     ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: var(--radius-full); }
 
-    /* Header */
-    header {
+    /* Layout: Fixed Left Sidebar + Main Content */
+    .app-layout {
+      display: flex;
+      min-height: 100vh;
+      width: 100vw;
+      position: relative;
+    }
+
+    /* ==================== LEFT SIDEBAR (AKITAO STYLE) ==================== */
+    .akitao-sidebar {
+      width: 240px;
+      min-width: 240px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      z-index: 200;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+
+    .akitao-sidebar.collapsed {
+      width: 72px;
+      min-width: 72px;
+    }
+
+    .sidebar-brand {
+      padding: 20px 18px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .brand-logo-circle {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1, #a855f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.5);
+      flex-shrink: 0;
+    }
+    .brand-logo-circle svg { width: 22px; height: 22px; fill: white; }
+    .brand-title-group {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .brand-title-text {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+    .brand-lang-badge {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-full);
+      padding: 2px 6px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #94a3b8;
+      gap: 4px;
+      margin-left: auto;
+    }
+    .brand-lang-badge span.active { color: var(--accent-cyan); }
+
+    .akitao-sidebar.collapsed .brand-title-group,
+    .akitao-sidebar.collapsed .brand-lang-badge {
+      display: none;
+    }
+
+    /* Navigation */
+    .sidebar-nav {
+      padding: 16px 10px;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #ffffff;
+    }
+    .nav-item.active {
+      background: rgba(0, 242, 254, 0.1);
+      color: var(--accent-cyan);
+      border-left: 3px solid var(--accent-cyan);
+    }
+    .nav-item .nav-icon {
+      font-size: 1.15rem;
+      width: 22px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .nav-badge-ver {
+      margin-left: auto;
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .nav-section-title {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
+      color: var(--text-dim);
+      padding: 18px 14px 6px;
+    }
+
+    .akitao-sidebar.collapsed .nav-label,
+    .akitao-sidebar.collapsed .nav-badge-ver,
+    .akitao-sidebar.collapsed .nav-section-title {
+      display: none;
+    }
+    .akitao-sidebar.collapsed .nav-item {
+      justify-content: center;
+      padding: 12px;
+    }
+
+    /* Sidebar Footer */
+    .sidebar-footer {
+      padding: 12px 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sidebar-collapse-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+      align-self: flex-start;
+    }
+    .sidebar-collapse-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+    .akitao-sidebar.collapsed .sidebar-collapse-btn {
+      align-self: center;
+      transform: rotate(180deg);
+    }
+
+    .btn-sidebar-auth {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: var(--radius-md);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      background: rgba(0, 242, 254, 0.08);
+      border: 1px solid rgba(0, 242, 254, 0.25);
+      cursor: pointer;
+      width: 100%;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .btn-sidebar-auth:hover {
+      background: rgba(0, 242, 254, 0.16);
+      border-color: var(--accent-cyan);
+    }
+    .akitao-sidebar.collapsed .btn-sidebar-auth span.text { display: none; }
+
+    /* ==================== MAIN CONTENT AREA ==================== */
+    .akitao-main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg-main);
+      background-image: var(--grad-glow);
+      background-attachment: fixed;
+      min-height: 100vh;
+      overflow-y: auto;
+    }
+
+    /* Top Bar */
+    .akitao-topbar {
       position: sticky;
       top: 0;
       z-index: 100;
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(7, 11, 22, 0.8);
       border-bottom: 1px solid var(--border-color);
-      padding: 12px 24px;
+      padding: 12px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
     }
-    .brand {
+    .topbar-left {
       display: flex;
       align-items: center;
-      gap: 12px;
-      text-decoration: none;
-      color: inherit;
+      gap: 14px;
     }
-    .brand-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: var(--radius-md);
-      background: var(--grad-studio);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 16px rgba(0, 242, 254, 0.4);
+    .mobile-menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.4rem;
+      cursor: pointer;
     }
-    .brand-icon svg { width: 20px; height: 20px; fill: white; }
-    .brand-title {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-weight: 800;
-      font-size: 1.1rem;
+    .topbar-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-muted);
       display: flex;
       align-items: center;
       gap: 8px;
     }
-    .badge-studio {
+    .badge-edition {
       font-size: 0.65rem;
       font-weight: 700;
-      text-transform: uppercase;
       padding: 2px 8px;
       border-radius: var(--radius-full);
       background: rgba(0, 242, 254, 0.15);
       color: var(--accent-cyan);
       border: 1px solid rgba(0, 242, 254, 0.3);
+      text-transform: uppercase;
     }
 
-    .header-right {
+    .topbar-right {
       display: flex;
       align-items: center;
-      gap: 10px;
-    }
-
-    /* User Profile Chip in Header */
-    .user-profile-chip {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 12px 4px 4px;
-      border-radius: var(--radius-full);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-color);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .user-profile-chip:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(0, 242, 254, 0.3);
-    }
-    .user-avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--grad-studio);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 0.78rem;
-      color: #fff;
-    }
-    .user-name-text {
-      font-size: 0.8rem;
-      font-weight: 600;
-      max-width: 140px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      gap: 12px;
     }
 
     /* Buttons */
@@ -198,10 +374,10 @@ def get_html_dashboard() -> str:
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      padding: 8px 14px;
+      gap: 8px;
+      padding: 8px 16px;
       border-radius: var(--radius-md);
-      font-size: 0.82rem;
+      font-size: 0.84rem;
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
@@ -213,11 +389,11 @@ def get_html_dashboard() -> str:
     .btn-primary {
       background: var(--grad-studio);
       color: #ffffff;
-      box-shadow: 0 2px 12px rgba(0, 242, 254, 0.25);
+      box-shadow: 0 2px 14px rgba(0, 242, 254, 0.25);
     }
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 18px rgba(0, 242, 254, 0.4);
+      box-shadow: 0 4px 20px rgba(0, 242, 254, 0.45);
     }
     .btn-secondary {
       background: rgba(255, 255, 255, 0.05);
@@ -239,6 +415,487 @@ def get_html_dashboard() -> str:
       transform: translateY(-1px);
     }
 
+    /* User Profile Chip */
+    .user-profile-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px 4px 4px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .user-profile-chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(0, 242, 254, 0.4);
+    }
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--grad-studio);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: #fff;
+    }
+    .user-name-text {
+      font-size: 0.82rem;
+      font-weight: 600;
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Google One-Tap Quick Widget */
+    .google-onetap-widget {
+      position: absolute;
+      top: 64px;
+      right: 28px;
+      width: 320px;
+      background: #1e2433;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: var(--radius-md);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      padding: 14px;
+      z-index: 150;
+      animation: fadeInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .onetap-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 8px;
+    }
+    .onetap-user-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .onetap-user-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .onetap-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #fff;
+    }
+    .onetap-info {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .onetap-name { font-size: 0.82rem; font-weight: 600; color: #fff; }
+    .onetap-email { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ==================== VIEW 1: HOMEPAGE VIEW (AKITAO STYLE) ==================== */
+    .view-content {
+      padding: 32px 36px 60px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Hero Section */
+    .akitao-hero-section {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 40px;
+      align-items: center;
+      padding: 20px 0 50px;
+      position: relative;
+    }
+
+    .hero-content-left {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 2;
+    }
+    .hero-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.2;
+      color: #ffffff;
+      letter-spacing: -1px;
+    }
+    .gradient-text-hero {
+      background: var(--grad-hero-text);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-subtitle-en {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-top: -6px;
+    }
+    .hero-description {
+      font-size: 0.92rem;
+      line-height: 1.65;
+      color: var(--text-muted);
+      max-width: 580px;
+    }
+
+    /* Dual Action Cards */
+    .dual-action-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .action-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .action-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .action-card.card-cyan:hover {
+      border-color: rgba(0, 242, 254, 0.45);
+      box-shadow: var(--shadow-glow-cyan);
+    }
+    .action-card.card-purple:hover {
+      border-color: rgba(139, 92, 246, 0.45);
+      box-shadow: var(--shadow-glow-purple);
+    }
+
+    .action-card-badge-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+    .badge-icon-cyan {
+      background: rgba(0, 242, 254, 0.12);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.25);
+    }
+    .badge-icon-purple {
+      background: rgba(139, 92, 246, 0.12);
+      color: var(--accent-purple);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+    }
+
+    .action-card-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .action-card-desc {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      line-height: 1.45;
+    }
+    .action-card-arrow {
+      margin-top: 6px;
+      align-self: flex-end;
+      font-size: 1.2rem;
+      transition: transform 0.2s;
+    }
+    .action-card:hover .action-card-arrow {
+      transform: translateX(4px);
+    }
+    .arrow-cyan { color: var(--accent-cyan); }
+    .arrow-purple { color: var(--accent-purple); }
+
+    /* Cosmic Rocket Artwork (Hero Right) */
+    .hero-content-right {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 360px;
+    }
+    .cosmic-artwork-container {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      height: 380px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .art-glow-nebula {
+      position: absolute;
+      width: 340px;
+      height: 340px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(14, 165, 233, 0.2) 50%, transparent 70%);
+      border-radius: 50%;
+      filter: blur(40px);
+      animation: pulseGlow 8s infinite alternate ease-in-out;
+    }
+    @keyframes pulseGlow {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      100% { transform: scale(1.15); opacity: 0.9; }
+    }
+
+    .art-orbit-ring {
+      position: absolute;
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      border-radius: 50%;
+      transform: rotate(-30deg);
+    }
+    .ring-1 { width: 320px; height: 180px; border-color: rgba(14, 165, 233, 0.35); }
+    .ring-2 { width: 420px; height: 240px; border-color: rgba(139, 92, 246, 0.25); }
+
+    .rocket-svg {
+      width: 260px;
+      height: 260px;
+      z-index: 2;
+      filter: drop-shadow(0 0 30px rgba(139, 92, 246, 0.6));
+      animation: rocketHover 6s infinite ease-in-out;
+    }
+    @keyframes rocketHover {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(1.5deg); }
+    }
+
+    /* THỬ NGAY Interactive Section */
+    .akitao-tester-section {
+      background: linear-gradient(180deg, rgba(16, 23, 42, 0.6) 0%, rgba(10, 15, 28, 0.8) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-xl);
+      padding: 36px 40px;
+      margin-top: 30px;
+      position: relative;
+      overflow: hidden;
+    }
+    .akitao-tester-section::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--grad-studio);
+    }
+
+    .tester-tag-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent-cyan);
+      margin-bottom: 6px;
+    }
+    .tester-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+    .tester-sub-en {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .tester-desc {
+      font-size: 0.86rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      max-width: 760px;
+      margin-bottom: 22px;
+    }
+
+    .tester-input-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(4, 7, 16, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-md);
+      padding: 6px 6px 6px 16px;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+      transition: border-color 0.2s;
+    }
+    .tester-input-bar:focus-within {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(0, 242, 254, 0.25);
+    }
+    .tester-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .tester-btn {
+      background: var(--grad-studio);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 10px 20px;
+      font-weight: 700;
+      font-size: 0.84rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tester-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 242, 254, 0.4);
+    }
+
+    /* Samples chips */
+    .tester-samples {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .tester-samples-label {
+      font-size: 0.74rem;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+    .sample-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-full);
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sample-chip:hover {
+      background: rgba(0, 242, 254, 0.12);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+
+    /* AI Live Result Preview Card */
+    .tester-result-box {
+      margin-top: 20px;
+      background: rgba(8, 12, 24, 0.9);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      animation: fadeInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .result-info-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .result-subject-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .result-path-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+    }
+    .result-tags-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Feature Grid */
+    .akitao-features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin-top: 36px;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s;
+    }
+    .feature-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+    }
+    .feature-icon-wrapper {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+    }
+    .feature-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .feature-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ==================== VIEW 2: WORKSPACE VIEW ==================== */
     /* Cross-Platform Quick Upload Bar */
     .upload-action-banner {
       background: linear-gradient(135deg, rgba(26, 115, 232, 0.12) 0%, rgba(139, 92, 246, 0.1) 50%, rgba(0, 242, 254, 0.08) 100%);
@@ -250,93 +907,77 @@ def get_html_dashboard() -> str:
       justify-content: space-between;
       gap: 16px;
       flex-wrap: wrap;
+      margin-bottom: 24px;
     }
-    .upload-banner-text {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
+    .upload-banner-text { display: flex; flex-direction: column; gap: 2px; }
     .upload-banner-title {
       font-family: 'Plus Jakarta Sans', sans-serif;
       font-weight: 700;
-      font-size: 0.95rem;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .upload-banner-sub {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
-    .upload-btn-group {
+      font-size: 0.98rem;
+      color: #fff;
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
     }
+    .upload-banner-sub { font-size: 0.78rem; color: var(--text-muted); }
+    .upload-btn-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-    /* Main Container */
-    main {
-      flex: 1;
-      max-width: 1440px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 20px 24px 48px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-
-    /* Stats Grid */
+    /* Stats Row */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 14px;
+      gap: 16px;
+      margin-bottom: 24px;
     }
     .stat-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
-      padding: 16px 20px;
+      padding: 18px 20px;
       backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
       transition: all 0.2s;
     }
-    .stat-card:hover {
-      border-color: rgba(255, 255, 255, 0.15);
-      background: var(--bg-card-hover);
-    }
+    .stat-card:hover { border-color: rgba(255, 255, 255, 0.2); }
     .stat-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       color: var(--text-muted);
-      font-size: 0.76rem;
+      font-size: 0.78rem;
       font-weight: 600;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .stat-value {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 1.9rem;
+      font-size: 1.85rem;
       font-weight: 800;
-      margin: 8px 0 2px;
+      color: #ffffff;
+      line-height: 1.1;
     }
     .stat-subtitle {
-      font-size: 0.72rem;
+      font-size: 0.74rem;
       color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* Toolbar */
     .toolbar-container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
       padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .toolbar-row-top {
+    .toolbar-row-top, .toolbar-row-bottom {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -345,35 +986,33 @@ def get_html_dashboard() -> str:
     }
     .search-box {
       flex: 1;
-      min-width: 240px;
+      min-width: 220px;
+      position: relative;
       display: flex;
       align-items: center;
-      gap: 8px;
+    }
+    .search-box svg { position: absolute; left: 12px; color: var(--text-dim); }
+    .search-box input {
+      width: 100%;
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-color);
+      padding: 8px 12px 8px 36px;
       border-radius: var(--radius-md);
-      padding: 8px 12px;
-    }
-    .search-box:focus-within {
-      border-color: var(--border-focus);
-    }
-    .search-box input {
-      background: transparent;
-      border: none;
-      color: var(--text-main);
-      font-size: 0.85rem;
+      color: #fff;
+      font-size: 0.84rem;
       outline: none;
-      width: 100%;
+      transition: all 0.2s;
     }
-
-    .filter-chips {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+    .search-box input:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.25);
     }
+    .filter-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .chip {
-      padding: 5px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
       border-radius: var(--radius-full);
       font-size: 0.76rem;
       font-weight: 600;
@@ -381,126 +1020,55 @@ def get_html_dashboard() -> str:
       border: 1px solid var(--border-color);
       color: var(--text-muted);
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+      transition: all 0.2s;
     }
+    .chip:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
     .chip.active {
       background: rgba(0, 242, 254, 0.15);
       border-color: var(--accent-cyan);
       color: var(--accent-cyan);
     }
     .chip-badge {
-      background: rgba(0, 0, 0, 0.35);
-      padding: 1px 5px;
+      padding: 1px 6px;
       border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.1);
       font-size: 0.68rem;
     }
 
-    .toolbar-row-bottom {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-      padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-    }
     .filter-select {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-color);
-      color: var(--text-muted);
-      padding: 6px 10px;
+      color: var(--text-main);
+      padding: 7px 12px;
       border-radius: var(--radius-md);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       outline: none;
+      cursor: pointer;
     }
-
     .view-switcher {
       display: flex;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 2px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 3px;
       border-radius: var(--radius-md);
       border: 1px solid var(--border-color);
     }
     .view-btn {
-      padding: 5px 10px;
+      padding: 5px 12px;
       border-radius: var(--radius-sm);
       border: none;
       background: transparent;
       color: var(--text-muted);
-      font-size: 0.76rem;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
+      transition: all 0.2s;
     }
     .view-btn.active {
       background: rgba(255, 255, 255, 0.12);
       color: #ffffff;
     }
 
-    /* BADGES */
-    .badge-new {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 2px 7px;
-      border-radius: var(--radius-full);
-      font-size: 0.65rem;
-      font-weight: 800;
-      background: var(--grad-new);
-      color: #031326;
-      box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
-    }
-    .badge-drive-sync {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 2px 7px;
-      border-radius: var(--radius-full);
-      font-size: 0.65rem;
-      font-weight: 700;
-      background: rgba(16, 185, 129, 0.18);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    .ext-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem;
-      font-weight: 700;
-      padding: 3px 7px;
-      border-radius: var(--radius-sm);
-      text-transform: uppercase;
-    }
-    .ext-pdf { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .ext-docx { background: rgba(26, 115, 232, 0.15); color: #60a5fa; border: 1px solid rgba(26, 115, 232, 0.3); }
-    .ext-pptx { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-    .ext-img { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .ext-txt { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
-
-    .tag-subject {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: var(--radius-full);
-      font-size: 0.72rem;
-      font-weight: 600;
-      background: rgba(139, 92, 246, 0.14);
-      color: #c084fc;
-      border: 1px solid rgba(139, 92, 246, 0.3);
-    }
-    .tag-type {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: var(--radius-full);
-      font-size: 0.72rem;
-      font-weight: 500;
-      background: rgba(0, 242, 254, 0.08);
-      color: #38bdf8;
-      border: 1px solid rgba(0, 242, 254, 0.25);
-    }
-
-    /* CARDS GRID */
+    /* Cards Grid */
     .cards-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -555,7 +1123,54 @@ def get_html_dashboard() -> str:
       gap: 8px;
     }
 
-    /* TABLE */
+    /* Badges */
+    .badge-new {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      font-size: 0.65rem;
+      font-weight: 800;
+      background: var(--grad-new);
+      color: #031326;
+      box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+    }
+    .ext-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+    }
+    .ext-pdf { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .ext-docx { background: rgba(26, 115, 232, 0.15); color: #60a5fa; border: 1px solid rgba(26, 115, 232, 0.3); }
+    .ext-pptx { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .ext-img { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .ext-txt { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+    .tag-subject {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(139, 92, 246, 0.14);
+      color: #c084fc;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+    .tag-type {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-size: 0.72rem;
+      font-weight: 500;
+      background: rgba(0, 242, 254, 0.08);
+      color: #38bdf8;
+      border: 1px solid rgba(0, 242, 254, 0.25);
+    }
+
+    /* Table View */
     .table-container {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
@@ -596,7 +1211,7 @@ def get_html_dashboard() -> str:
     .modal-backdrop {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.75);
+      background: rgba(0, 0, 0, 0.8);
       backdrop-filter: blur(12px);
       z-index: 1000;
       display: none;
@@ -605,12 +1220,13 @@ def get_html_dashboard() -> str:
       padding: 16px;
     }
     .modal-box {
-      background: #111522;
+      background: #0f1422;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: var(--radius-lg);
       width: 100%;
       max-width: 480px;
       overflow: hidden;
+      box-shadow: var(--shadow-glass);
     }
     .modal-header {
       padding: 16px 20px;
@@ -635,9 +1251,9 @@ def get_html_dashboard() -> str:
     /* Toast */
     .toast {
       position: fixed;
-      bottom: 20px; right: 20px;
+      bottom: 24px; right: 24px;
       padding: 12px 18px;
-      background: #141828;
+      background: #101626;
       border: 1px solid rgba(0, 242, 254, 0.4);
       color: #ffffff;
       border-radius: var(--radius-md);
@@ -647,230 +1263,522 @@ def get_html_dashboard() -> str:
       box-shadow: var(--shadow-glass);
     }
 
-    /* Mobile Responsive Optimizations */
+    /* Mobile Responsive */
+    @media (max-width: 900px) {
+      .akitao-hero-section {
+        grid-template-columns: 1fr;
+        padding: 10px 0 30px;
+      }
+      .hero-content-right {
+        order: -1;
+        min-height: 240px;
+      }
+      .cosmic-artwork-container { height: 260px; }
+      .rocket-svg { width: 180px; height: 180px; }
+      .art-orbit-ring.ring-2 { display: none; }
+      .hero-title { font-size: 2.1rem; }
+      .google-onetap-widget {
+        display: none;
+      }
+    }
+
     @media (max-width: 768px) {
-      header { padding: 10px 14px; }
-      main { padding: 14px 14px 40px; }
-      .brand-title span.badge-studio { display: none; }
+      .akitao-sidebar {
+        position: fixed;
+        left: -240px;
+      }
+      .akitao-sidebar.mobile-open {
+        left: 0;
+      }
+      .mobile-menu-toggle { display: block; }
+      .view-content { padding: 18px 16px 40px; }
+      .dual-action-cards { grid-template-columns: 1fr; }
       .upload-action-banner { flex-direction: column; align-items: stretch; }
       .upload-btn-group { justify-content: stretch; }
       .upload-btn-group button { flex: 1; }
       .cards-grid { grid-template-columns: 1fr; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
+      .tester-input-bar { flex-direction: column; padding: 10px; }
+      .tester-btn { width: 100%; justify-content: center; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation -->
-  <header>
-    <a href="#" class="brand">
-      <div class="brand-icon">
-        <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.84L19.53 19H4.47L12 5.84zM11 10h2v4h-2zm0 6h2v2h-2z"/></svg>
-      </div>
-      <div class="brand-title">
-        ThsAutoOrganizer
-        <span class="badge-studio">Studio Edition</span>
-      </div>
-    </a>
-
-    <div class="header-right">
-      <!-- User Profile or Sign-in button -->
-      <div id="userSection">
-        <button class="btn btn-google" onclick="openLoginModal()" id="btnLoginGoogle">
-          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
-          Đăng nhập Google
-        </button>
+  <div class="app-layout">
+    <!-- ==================== LEFT SIDEBAR ==================== -->
+    <aside class="akitao-sidebar" id="akitaoSidebar">
+      <!-- Brand Logo & Lang -->
+      <div class="sidebar-brand">
+        <div class="brand-logo-circle" title="AkiTao / ThsAutoOrganizer">
+          <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.84L19.53 19H4.47L12 5.84zM11 10h2v4h-2zm0 6h2v2h-2z"/></svg>
+        </div>
+        <div class="brand-title-group">
+          <span class="brand-title-text">AkiTao</span>
+        </div>
+        <div class="brand-lang-badge">
+          <span class="active">VI</span>
+          <span>EN</span>
+        </div>
       </div>
 
-      <button class="btn btn-secondary" onclick="openSettingsModal()" title="Cài đặt">⚙️</button>
-    </div>
-  </header>
+      <!-- Navigation Links -->
+      <nav class="sidebar-nav">
+        <a href="javascript:void(0)" class="nav-item active" id="navHome" onclick="showView('home')">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Trang chủ</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" id="navWorkspace" onclick="showView('workspace')">
+          <span class="nav-icon">📁</span>
+          <span class="nav-label">Kho tài liệu</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="triggerNavUpload()">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-label">Nạp đa thiết bị</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="openDriveNav()">
+          <span class="nav-icon">☁️</span>
+          <span class="nav-label">Google Drive</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="scrollToTester()">
+          <span class="nav-icon">🤖</span>
+          <span class="nav-label">AI Phân loại</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="openAboutModal()">
+          <span class="nav-icon">ℹ️</span>
+          <span class="nav-label">Giới thiệu</span>
+        </a>
+        <div class="nav-item" style="opacity: 0.7; cursor: default;">
+          <span class="nav-icon">📜</span>
+          <span class="nav-label">Ghi chú phát hành</span>
+          <span class="nav-badge-ver">0.29.0</span>
+        </div>
 
-  <!-- Main Content -->
-  <main>
-    <!-- Login Prompt Banner (Hiển thị khi chưa đăng nhập) -->
-    <div id="loginPromptBanner" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.18) 0%, rgba(139, 92, 246, 0.18) 100%); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: var(--radius-md); padding: 18px 22px; color: #f8fafc; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
-      <div style="display: flex; align-items: center; gap: 14px;">
-        <span style="font-size: 2rem;">🔒</span>
-        <div>
-          <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Chưa kết nối tài khoản & thư mục máy</div>
-          <div style="font-size: 0.82rem; color: #cbd5e1; margin-top: 3px; max-width: 620px; line-height: 1.45;">
-            Hệ thống chỉ quét và đồng bộ khi bạn đã đăng nhập đúng tài khoản Gmail và thư mục máy tính của mình. Hãy đăng nhập để bắt đầu!
+        <div class="nav-section-title">NỘI DUNG</div>
+        <a href="javascript:void(0)" class="nav-item" onclick="focusSearch()">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-label">Tìm kiếm</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="filterBySubjectNav()">
+          <span class="nav-icon">🏷️</span>
+          <span class="nav-label">Môn học</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="showToast('💡 Kiến thức: Kho tài liệu giáo trình & đề cương ThS HTTT')">
+          <span class="nav-icon">💡</span>
+          <span class="nav-label">Kiến thức</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="showToast('📰 Tin tức: Lịch học, thông báo bảo vệ đề cương')">
+          <span class="nav-icon">📰</span>
+          <span class="nav-label">Tin tức</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="showToast('📝 Bài viết: Nghiên cứu khoa học & hướng dẫn phương pháp')">
+          <span class="nav-icon">📝</span>
+          <span class="nav-label">Bài viết</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Bottom -->
+      <div class="sidebar-footer">
+        <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Thu gọn">&lt;</button>
+        <div id="sidebarUserBox">
+          <button class="btn-sidebar-auth" onclick="openLoginModal()" id="btnSidebarLogin">
+            🔑 <span class="text">Đăng nhập</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN AREA ==================== -->
+    <div class="akitao-main-area">
+      <!-- Topbar Header -->
+      <header class="akitao-topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+          <div class="topbar-subtitle">
+            <span style="font-weight:700; color:#fff;">ThsAutoOrganizer</span>
+            <span>•</span>
+            <span class="badge-edition">Studio Edition</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- User Profile or Sign-in button -->
+          <div id="userSection">
+            <button class="btn btn-google" onclick="openLoginModal()" id="btnLoginGoogle">
+              <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
+              Đăng nhập Google
+            </button>
+          </div>
+
+          <button class="btn btn-secondary" onclick="openSettingsModal()" title="Cài đặt">⚙️</button>
+        </div>
+      </header>
+
+      <!-- VIEW 1: HOMEPAGE VIEW (AKITAO STYLE LANDING PAGE) -->
+      <div id="homepageView" class="view-content">
+        <!-- Floating Google One-Tap Widget -->
+        <div class="google-onetap-widget" id="oneTapWidget">
+          <div class="onetap-header">
+            <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
+            <span>Đăng nhập vào akitao bằng tài khoản google</span>
+            <button onclick="document.getElementById('oneTapWidget').style.display='none'" style="background:none; border:none; color:#94a3b8; cursor:pointer; margin-left:auto;">✕</button>
+          </div>
+          <div class="onetap-user-item" onclick="quickLoginAs('xuanngocit@gmail.com', 'Nguyen XuanNgoc')">
+            <div class="onetap-avatar" style="background:#e11d48;">N</div>
+            <div class="onetap-info">
+              <span class="onetap-name">Nguyenx (Admin)</span>
+              <span class="onetap-email">xuanngocit@gmail.com</span>
+            </div>
+          </div>
+          <div class="onetap-user-item" onclick="quickLoginAs('mongxuancomestic@gmail.com', 'Mộng Xuân')">
+            <div class="onetap-avatar" style="background:#0284c7;">C</div>
+            <div class="onetap-info">
+              <span class="onetap-name">Comestic Store Mộng Xuân</span>
+              <span class="onetap-email">mongxuancomestic@gmail.com</span>
+            </div>
+          </div>
+          <div class="onetap-user-item" onclick="quickLoginAs('it.xuanngoc@gmail.com', 'it xuanngoc')">
+            <div class="onetap-avatar" style="background:#6366f1;">I</div>
+            <div class="onetap-info">
+              <span class="onetap-name">it xuanngoc</span>
+              <span class="onetap-email">it.xuanngoc@gmail.com</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Section -->
+        <section class="akitao-hero-section">
+          <div class="hero-content-left">
+            <h1 class="hero-title">
+              Hệ thống hóa <span class="gradient-text-hero">học tập & brand số.</span>
+            </h1>
+            <div class="hero-subtitle-en">Systemize your digital academic & research workspace.</div>
+            <p class="hero-description">
+              Xây dựng nền tảng dữ liệu đồng nhất cho học tập và nghiên cứu. Đảm bảo thông điệp và tài liệu nhất quán trên mọi kênh, giúp sinh viên và hệ thống AI luôn thấu hiểu và tự động sắp xếp khoa học.
+            </p>
+
+            <!-- Dual Action Cards -->
+            <div class="dual-action-cards">
+              <!-- Card 1: Local Folder -->
+              <div class="action-card card-cyan" onclick="handleHeroCardClick('folder')">
+                <div class="action-card-badge-icon badge-icon-cyan">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                </div>
+                <div>
+                  <div class="action-card-title">Đã có thư mục máy tính</div>
+                  <div class="action-card-desc">Quét & tự động phân loại cấu trúc môn học</div>
+                </div>
+                <div class="action-card-arrow arrow-cyan">➔</div>
+              </div>
+
+              <!-- Card 2: Upload & Drive -->
+              <div class="action-card card-purple" onclick="handleHeroCardClick('upload')">
+                <div class="action-card-badge-icon badge-icon-purple">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2zm1 5h-2v5H6l6 6 6-6h-5V7z"/></svg>
+                </div>
+                <div>
+                  <div class="action-card-title">Nạp bài giảng & Đồng bộ Drive</div>
+                  <div class="action-card-desc">Chụp ảnh điện thoại, iPad hoặc tải tệp lên đám mây</div>
+                </div>
+                <div class="action-card-arrow arrow-purple">➔</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hero Right Graphic: Cosmic Rocket Artwork -->
+          <div class="hero-content-right">
+            <div class="cosmic-artwork-container">
+              <div class="art-glow-nebula"></div>
+              <div class="art-orbit-ring ring-1"></div>
+              <div class="art-orbit-ring ring-2"></div>
+
+              <!-- Futuristic Rocket Vector Graphic -->
+              <svg class="rocket-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Rocket Flame / Trail -->
+                <path d="M72 138 C60 155 45 175 35 185 C48 172 65 155 82 144 Z" fill="url(#flameGrad)" opacity="0.9"/>
+                <path d="M78 142 C70 155 60 170 52 180 C60 168 72 154 84 144 Z" fill="#00f2fe" opacity="0.8"/>
+                <!-- Rocket Wings -->
+                <path d="M68 115 L50 148 L75 142 Z" fill="#3b82f6" opacity="0.9"/>
+                <path d="M115 68 L148 50 L142 75 Z" fill="#8b5cf6" opacity="0.9"/>
+                <!-- Rocket Main Body -->
+                <path d="M145 55 C120 70 85 105 70 135 L90 145 C115 125 145 90 155 70 C156 64 151 54 145 55 Z" fill="url(#rocketBodyGrad)"/>
+                <!-- Rocket Nose Cone -->
+                <path d="M145 55 C150 48 160 38 168 32 C162 40 152 50 145 55 Z" fill="#00f2fe"/>
+                <!-- Circular Window -->
+                <circle cx="120" cy="80" r="10" fill="#0b1329" stroke="#00f2fe" stroke-width="2.5"/>
+                <circle cx="118" cy="78" r="3" fill="#ffffff" opacity="0.8"/>
+                <!-- Thruster Base -->
+                <polygon points="68,132 80,144 74,150 62,138" fill="#1e293b"/>
+                
+                <!-- Gradients Defs -->
+                <defs>
+                  <linearGradient id="rocketBodyGrad" x1="160" y1="40" x2="70" y2="140" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffffff"/>
+                    <stop offset="0.4" stop-color="#cbd5e1"/>
+                    <stop offset="1" stop-color="#475569"/>
+                  </linearGradient>
+                  <linearGradient id="flameGrad" x1="82" y1="140" x2="35" y2="185" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#a855f7"/>
+                    <stop offset="0.5" stop-color="#00f2fe"/>
+                    <stop offset="1" stop-color="transparent"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        <!-- THỬ NGAY: Interactive AI Document Classifier -->
+        <section class="akitao-tester-section" id="sectionTester">
+          <div class="tester-tag-label">THỬ NGAY</div>
+          <h2 class="tester-title">Thử ngay: AI đang nói gì về tài liệu của bạn?</h2>
+          <div class="tester-sub-en">Build your AI document classification health check.</div>
+          <p class="tester-desc">
+            Chỉ cần nhập tên tệp bài giảng hoặc đồ án của bạn. Hệ thống sẽ tự động phân tích từ khóa, cấu trúc môn học và gợi ý vị trí lưu trữ tối ưu theo chuẩn Thạc sĩ HTTT. Bạn sẽ nhanh chóng nhận ra tài liệu được tổ chức khoa học tức thì.
+          </p>
+
+          <div class="tester-input-bar">
+            <input type="text" id="demoInputFile" class="tester-input" placeholder="Nhập tên tệp bài giảng của bạn..." value="BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong1.pdf">
+            <button class="tester-btn" onclick="runDemoClassifier()">
+              <span>🪄</span> Tạo câu hỏi kiểm tra
+            </button>
+          </div>
+
+          <!-- Quick Samples -->
+          <div class="tester-samples">
+            <span class="tester-samples-label">Gợi ý thử nhanh:</span>
+            <span class="sample-chip" onclick="setDemoInput('BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong2.pdf')">Toán KH Dữ liệu (Slide)</span>
+            <span class="sample-chip" onclick="setDemoInput('De_Cuong_On_Thi_Triet_Hoc_Mac_Lenin.docx')">Triết học (Ôn thi)</span>
+            <span class="sample-chip" onclick="setDemoInput('Slide_Co_So_Du_Lieu_Nang_Cao.pptx')">Cơ sở dữ liệu (Slide)</span>
+            <span class="sample-chip" onclick="setDemoInput('Giao_Trinh_Phuong_Phap_Nghien_Cuu.pdf')">PP Nghiên cứu (Giáo trình)</span>
+          </div>
+
+          <!-- Live AI Output Card -->
+          <div id="testerResultCard" class="tester-result-box" style="display: flex;">
+            <div class="result-info-left">
+              <div class="result-subject-title">
+                <span>🤖 Dự đoán AI:</span>
+                <span id="resSubject" style="color:var(--accent-cyan);">Toán khoa học dữ liệu</span>
+                <span style="font-size:0.75rem; color:var(--text-dim);">(Độ tin cậy: 99.4%)</span>
+              </div>
+              <div class="result-path-text" id="resPath">📁 Thư mục đề xuất: /Toan_Khoa_Hoc_Du_Lieu/02_Slide/BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong1.pdf</div>
+            </div>
+            <div class="result-tags-right" id="resTags">
+              <span class="tag-subject">Toán khoa học dữ liệu</span>
+              <span class="tag-type">Slide</span>
+              <span class="ext-badge ext-pdf">PDF</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4 Feature Highlights Grid -->
+        <div class="akitao-features-grid">
+          <div class="feature-card">
+            <div class="feature-icon-wrapper" style="color:var(--accent-cyan);">🤖</div>
+            <div class="feature-title">AI Tự động Phân loại</div>
+            <div class="feature-desc">Nhận diện môn học và loại tài liệu (Giáo trình, Slide, Ôn thi) dựa trên cấu trúc tên file thông minh.</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper" style="color:var(--accent-green);">🔒</div>
+            <div class="feature-title">Băm SHA-256 Chống Trùng</div>
+            <div class="feature-desc">Mỗi file được băm mã hóa SHA-256, tự động loại bỏ trùng lặp tuyệt đối, tiết kiệm dung lượng ổ cứng & Drive.</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper" style="color:var(--accent-purple);">☁️</div>
+            <div class="feature-title">Đồng bộ Google Drive Riêng</div>
+            <div class="feature-desc">Mỗi sinh viên được cô lập dữ liệu riêng biệt. Tệp tự động đẩy lên thư mục Google Drive của chính tài khoản đó.</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper" style="color:var(--accent-amber);">📱</div>
+            <div class="feature-title">Nạp Tài liệu Đa Thiết bị</div>
+            <div class="feature-desc">Chụp ảnh bài giảng bằng Camera điện thoại, kéo thả trên iPad hoặc chọn cả thư mục lớn trên Máy tính.</div>
           </div>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="btn btn-google" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">🔑 Đăng nhập Google</button>
-        <button class="btn btn-secondary" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">⚡ Đăng nhập nhanh</button>
-      </div>
-    </div>
 
-    <!-- User Machine Folder Bar (Chỉ hiển thị khi đã đăng nhập) -->
-    <div id="userFolderBar" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.15) 0%, rgba(0, 242, 254, 0.08) 100%); border: 1px solid rgba(0, 242, 254, 0.35); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <span style="font-size: 1.6rem;">📁</span>
-        <div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span style="font-weight: 700; font-size: 0.92rem; color: #fff;">Thư mục máy tính của bạn:</span>
-            <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
+      <!-- VIEW 2: WORKSPACE VIEW (PERSONAL ORGANIZER & CLOUD STORAGE) -->
+      <div id="workspaceView" class="view-content" style="display: none;">
+        <!-- Login Prompt Banner (Hiển thị khi chưa đăng nhập) -->
+        <div id="loginPromptBanner" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.18) 0%, rgba(139, 92, 246, 0.18) 100%); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: var(--radius-md); padding: 18px 22px; color: #f8fafc; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <span style="font-size: 2rem;">🔒</span>
+            <div>
+              <div style="font-weight: 800; font-size: 1.05rem; color: #fff;">Chưa kết nối tài khoản sinh viên</div>
+              <div style="font-size: 0.82rem; color: #cbd5e1; margin-top: 3px; max-width: 620px; line-height: 1.45;">
+                Hệ thống chỉ quét và đồng bộ khi bạn đã đăng nhập đúng tài khoản Gmail và thư mục máy tính của mình. Hãy đăng nhập để bắt đầu!
+              </div>
+            </div>
           </div>
-          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span>Tài khoản: <b id="displayUserEmail" style="color: #60a5fa;">--</b></span>
-            <span>|</span>
-            <span id="displayUserDrive" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">--</span>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-google" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">🔑 Đăng nhập Google</button>
+            <button class="btn btn-secondary" onclick="openLoginModal()" style="padding: 9px 18px; font-size: 0.86rem;">⚡ Đăng nhập nhanh</button>
           </div>
         </div>
-      </div>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-        <button class="btn btn-secondary" onclick="openChangeFolderModal()" style="font-size: 0.8rem; padding: 7px 12px;">
-          ✏️ Đổi thư mục máy
-        </button>
-        <button class="btn btn-primary" onclick="triggerServerScan()" id="btnServerScan" style="font-size: 0.8rem; padding: 7px 16px; background: linear-gradient(135deg, #1a73e8, #00f2fe);">
-          🔍 Quét & Đồng bộ thư mục ngay
-        </button>
-      </div>
-    </div>
 
-    <!-- Cross-Platform Upload Banner -->
-    <div class="upload-action-banner">
-      <div class="upload-banner-text">
-        <div class="upload-banner-title">
-          <span>⚡ Nạp tài liệu đa thiết bị</span>
-          <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: normal;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
-        </div>
-        <div class="upload-banner-sub">
-          Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
-        </div>
-      </div>
-
-      <div class="upload-btn-group">
-        <!-- 1. Mobile Camera Trigger -->
-        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
-        <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()">
-          📸 Chụp bài giảng
-        </button>
-
-        <!-- 2. Multi-File Picker -->
-        <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
-        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
-          📤 Nạp tệp (PDF/Word/Ảnh)
-        </button>
-
-        <!-- 3. Desktop HTML5 File System API -->
-        <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
-          📁 Chọn thư mục máy tính
-        </button>
-      </div>
-    </div>
-
-    <!-- Stats Row -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Kho tài liệu của bạn</span>
-          <span>📁</span>
-        </div>
-        <div class="stat-value" id="statTotalFiles">0</div>
-        <div class="stat-subtitle" id="statStoragePath">Tự động phân loại theo môn</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Google Drive cá nhân</span>
-          <span style="color: var(--accent-green);">☁️</span>
-        </div>
-        <div class="stat-value" id="statUploaded" style="color: var(--accent-green);">0</div>
-        <div class="stat-subtitle" id="statDriveFolder">Thư mục: ThacSi_HTTT</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Tài liệu mới (<24h)</span>
-          <span style="color: var(--accent-cyan);">✨</span>
-        </div>
-        <div class="stat-value" id="statNewCount" style="color: var(--accent-cyan);">0</div>
-        <div class="stat-subtitle">Nhận diện theo thời gian nạp</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Môn học theo dõi</span>
-          <span style="color: var(--accent-purple);">🎓</span>
-        </div>
-        <div class="stat-value" id="statSubjectsCount" style="color: var(--accent-purple);">0</div>
-        <div class="stat-subtitle" id="statSubjectsList">Toán KH Dữ liệu, Triết học...</div>
-      </div>
-    </div>
-
-    <!-- Toolbar -->
-    <div class="toolbar-container">
-      <div class="toolbar-row-top">
-        <div class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, môn học..." oninput="applyFilters()">
-        </div>
-
-        <div class="filter-chips">
-          <div class="chip active" id="chipAll" onclick="setQuickFilter('ALL')">
-            🔥 Tất cả <span class="chip-badge" id="countAll">0</span>
+        <!-- User Machine Folder Bar (Chỉ hiển thị khi đã đăng nhập) -->
+        <div id="userFolderBar" style="display:none; background: linear-gradient(135deg, rgba(26, 115, 232, 0.15) 0%, rgba(0, 242, 254, 0.08) 100%); border: 1px solid rgba(0, 242, 254, 0.35); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.6rem;">📁</span>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-weight: 700; font-size: 0.92rem; color: #fff;">Thư mục máy tính của bạn:</span>
+                <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
+              </div>
+              <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span>Tài khoản: <b id="displayUserEmail" style="color: #60a5fa;">--</b></span>
+                <span>|</span>
+                <span id="displayUserDrive" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">--</span>
+              </div>
+            </div>
           </div>
-          <div class="chip" id="chipNew" onclick="setQuickFilter('NEW')">
-            ✨ Mới (<24h) <span class="chip-badge" id="countNew">0</span>
-          </div>
-          <div class="chip" id="chipDrive" onclick="setQuickFilter('DRIVE')">
-            ☁️ Trên Drive <span class="chip-badge" id="countDrive">0</span>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <button class="btn btn-secondary" onclick="openChangeFolderModal()" style="font-size: 0.8rem; padding: 7px 12px;">
+              ✏️ Đổi thư mục máy
+            </button>
+            <button class="btn btn-primary" onclick="triggerServerScan()" id="btnServerScan" style="font-size: 0.8rem; padding: 7px 16px;">
+              🔍 Quét & Đồng bộ thư mục ngay
+            </button>
           </div>
         </div>
-      </div>
 
-      <div class="toolbar-row-bottom">
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <select class="filter-select" id="filterSubject" onchange="applyFilters()">
-            <option value="">Tất cả môn học</option>
-          </select>
-          <select class="filter-select" id="filterType" onchange="applyFilters()">
-            <option value="">Tất cả loại tài liệu</option>
-            <option value="Giáo trình">Giáo trình</option>
-            <option value="Slide">Slide</option>
-            <option value="Ôn thi">Ôn thi</option>
-            <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
-          </select>
-          <select class="filter-select" id="filterSort" onchange="applyFilters()">
-            <option value="NEWEST">⏱️ Mới nhất trước</option>
-            <option value="NAME">🔤 Tên file A-Z</option>
-            <option value="SIZE">💾 Dung lượng</option>
-          </select>
+        <!-- Cross-Platform Upload Banner -->
+        <div class="upload-action-banner">
+          <div class="upload-banner-text">
+            <div class="upload-banner-title">
+              <span>⚡ Nạp tài liệu đa thiết bị</span>
+              <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: normal;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
+            </div>
+            <div class="upload-banner-sub">
+              Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
+            </div>
+          </div>
+
+          <div class="upload-btn-group">
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
+            <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()">
+              📸 Chụp bài giảng
+            </button>
+
+            <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
+            <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+              📤 Nạp tệp (PDF/Word/Ảnh)
+            </button>
+
+            <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
+              📁 Chọn thư mục máy tính
+            </button>
+          </div>
         </div>
 
-        <div class="view-switcher">
-          <button class="view-btn active" id="btnViewCards" onclick="setViewMode('cards')">🎴 Thẻ</button>
-          <button class="view-btn" id="btnViewTable" onclick="setViewMode('table')">📑 Bảng</button>
+        <!-- Stats Row -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Kho tài liệu của bạn</span>
+              <span>📁</span>
+            </div>
+            <div class="stat-value" id="statTotalFiles">0</div>
+            <div class="stat-subtitle" id="statStoragePath">Tự động phân loại theo môn</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Google Drive cá nhân</span>
+              <span style="color: var(--accent-green);">☁️</span>
+            </div>
+            <div class="stat-value" id="statUploaded" style="color: var(--accent-green);">0</div>
+            <div class="stat-subtitle" id="statDriveFolder">Thư mục: ThacSi_HTTT</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Tài liệu mới (<24h)</span>
+              <span style="color: var(--accent-cyan);">✨</span>
+            </div>
+            <div class="stat-value" id="statNewCount" style="color: var(--accent-cyan);">0</div>
+            <div class="stat-subtitle">Nhận diện theo thời gian nạp</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Môn học theo dõi</span>
+              <span style="color: var(--accent-purple);">🎓</span>
+            </div>
+            <div class="stat-value" id="statSubjectsCount" style="color: var(--accent-purple);">0</div>
+            <div class="stat-subtitle" id="statSubjectsList">Toán KH Dữ liệu, Triết học...</div>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar-container">
+          <div class="toolbar-row-top">
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, môn học..." oninput="applyFilters()">
+            </div>
+
+            <div class="filter-chips">
+              <div class="chip active" id="chipAll" onclick="setQuickFilter('ALL')">
+                🔥 Tất cả <span class="chip-badge" id="countAll">0</span>
+              </div>
+              <div class="chip" id="chipNew" onclick="setQuickFilter('NEW')">
+                ✨ Mới (<24h) <span class="chip-badge" id="countNew">0</span>
+              </div>
+              <div class="chip" id="chipDrive" onclick="setQuickFilter('DRIVE')">
+                ☁️ Trên Drive <span class="chip-badge" id="countDrive">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar-row-bottom">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <select class="filter-select" id="filterSubject" onchange="applyFilters()">
+                <option value="">Tất cả môn học</option>
+              </select>
+              <select class="filter-select" id="filterType" onchange="applyFilters()">
+                <option value="">Tất cả loại tài liệu</option>
+                <option value="Giáo trình">Giáo trình</option>
+                <option value="Slide">Slide</option>
+                <option value="Ôn thi">Ôn thi</option>
+                <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
+              </select>
+              <select class="filter-select" id="filterSort" onchange="applyFilters()">
+                <option value="NEWEST">⏱️ Mới nhất trước</option>
+                <option value="NAME">🔤 Tên file A-Z</option>
+                <option value="SIZE">💾 Dung lượng</option>
+              </select>
+            </div>
+
+            <div class="view-switcher">
+              <button class="view-btn active" id="btnViewCards" onclick="setViewMode('cards')">🎴 Thẻ</button>
+              <button class="view-btn" id="btnViewTable" onclick="setViewMode('table')">📑 Bảng</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cards Grid -->
+        <div class="cards-grid" id="cardsContainer"></div>
+
+        <!-- Table View -->
+        <div class="table-container" id="tableContainer">
+          <table>
+            <thead>
+              <tr>
+                <th>Tập tin</th>
+                <th>Môn học</th>
+                <th>Phân loại</th>
+                <th>Dung lượng</th>
+                <th>Thời gian nạp</th>
+                <th>Trạng thái</th>
+                <th style="text-align: right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="filesTableBody"></tbody>
+          </table>
         </div>
       </div>
     </div>
-
-    <!-- Cards Grid -->
-    <div class="cards-grid" id="cardsContainer"></div>
-
-    <!-- Table View -->
-    <div class="table-container" id="tableContainer">
-      <table>
-        <thead>
-          <tr>
-            <th>Tập tin</th>
-            <th>Môn học</th>
-            <th>Phân loại</th>
-            <th>Dung lượng</th>
-            <th>Thời gian nạp</th>
-            <th>Trạng thái</th>
-            <th style="text-align: right;">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody id="filesTableBody"></tbody>
-      </table>
-    </div>
-  </main>
+  </div>
 
   <!-- Modal Đăng nhập / Chọn tài khoản sinh viên -->
   <div class="modal-backdrop" id="loginModal">
@@ -894,11 +1802,11 @@ def get_html_dashboard() -> str:
           <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 10px 12px; margin-top: 4px; font-size: 0.76rem; line-height: 1.45;">
             <div style="color: #f87171; font-weight: 700; margin-bottom: 3px;">⚠️ Gặp lỗi 403 "access_denied" từ Google?</div>
             <div style="color: #cbd5e1;">
-              Ứng dụng Google Cloud đang ở chế độ <b>Testing</b>. Bạn hãy thêm email vào mục <b>Test users</b> trên Google Cloud Console, HOẶC nhập email vào ô dưới để <b>Đăng nhập nhanh</b> ngay lập tức (không lo Google chặn)!
+              Ứng dụng Google Cloud đang ở chế độ <b>Testing</b>. Bạn hãy chọn nhanh tài khoản thử nghiệm bên dưới để đăng nhập ngay mà không bị Google chặn!
             </div>
           </div>
 
-          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- CHỌN NHANH TÀI KHOẢN ĐỂ SỬ DỤNG / KIỂM TRA -</div>
+          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- CHỌN NHANH TÀI KHOẢN ĐỂ SỬ DỤNG -</div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <button type="button" class="btn btn-secondary" style="font-size: 0.76rem; text-align: left; padding: 9px 10px; border-color: rgba(26, 115, 232, 0.4);" onclick="quickLoginAs('xuanngocit@gmail.com', 'Admin XuanNgoc')">
@@ -912,9 +1820,9 @@ def get_html_dashboard() -> str:
           <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- HOẶC NHẬP EMAIL BẤT KỲ -</div>
 
           <div style="display: flex; flex-direction: column; gap: 6px;">
-            <input type="email" id="testEmailInput" class="form-control" placeholder="Nhập email (vd: mongxuancomestic@gmail.com)">
+            <input type="email" id="testEmailInput" class="form-control" placeholder="Nhập email (vd: sv_httt@gmail.com)">
             <input type="text" id="testNameInput" class="form-control" placeholder="Họ và tên của bạn">
-            <button class="btn btn-primary" onclick="submitTestLogin()" style="margin-top: 4px; background: linear-gradient(135deg, #10b981, #00f2fe);">🚀 Vào kho tài liệu của tôi</button>
+            <button class="btn btn-primary" onclick="submitTestLogin()" style="margin-top: 4px;">🚀 Vào kho tài liệu của tôi</button>
           </div>
         </div>
       </div>
@@ -933,7 +1841,7 @@ def get_html_dashboard() -> str:
       </div>
       <div class="modal-body">
         <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-          Nhập đường dẫn thư mục chứa tài liệu học tập trên máy tính của bạn (Windows/Mac/Linux). Hệ thống sẽ quét các tài liệu trong thư mục này và liên kết riêng cho tài khoản của bạn.
+          Nhập đường dẫn thư mục chứa tài liệu học tập trên máy tính của bạn. Hệ thống sẽ quét các tài liệu trong thư mục này và liên kết riêng cho tài khoản của bạn.
         </div>
         <div>
           <label style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; display: block;">Đường dẫn thư mục máy:</label>
@@ -985,6 +1893,27 @@ def get_html_dashboard() -> str:
     </div>
   </div>
 
+  <!-- Modal Giới thiệu (About) -->
+  <div class="modal-backdrop" id="aboutModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="font-weight: 700; font-size: 1rem;">ℹ️ Giới thiệu AkiTao Cloud Studio</div>
+        <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;" onclick="closeAboutModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="font-size: 0.84rem; line-height: 1.6; color: var(--text-muted);">
+        <p><b>AkiTao Cloud Studio</b> là nền tảng quản lý và tự động phân loại tài liệu học tập, nghiên cứu Thạc sĩ Hệ thống Thông tin đa thiết bị (PC, iPad, Điện thoại).</p>
+        <div style="background:rgba(255,255,255,0.04); padding:12px; border-radius:8px; border:1px solid var(--border-color); margin-top:8px;">
+          <div>⚡ <b>Phiên bản:</b> 0.29.0 Studio Edition</div>
+          <div>☁️ <b>Kiến trúc:</b> Multi-User SaaS với Google Drive & Local Storage riêng biệt</div>
+          <div>🔒 <b>Bảo mật:</b> Băm mã hóa SHA-256 chống trùng lặp dữ liệu</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeAboutModal()">Đã hiểu</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Cài đặt -->
   <div class="modal-backdrop" id="settingsModal">
     <div class="modal-box">
@@ -1018,12 +1947,161 @@ def get_html_dashboard() -> str:
     let allFiles = [];
     let currentViewMode = 'cards';
     let currentQuickFilter = 'ALL';
+    let currentActiveView = 'home';
+    let defaultRootFolder = '';
 
     function showToast(msg) {
       const t = document.getElementById('toastMsg');
       t.textContent = msg;
       t.style.display = 'block';
       setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    /* View Navigation (AkiTao Homepage vs Workspace) */
+    function showView(viewName) {
+      currentActiveView = viewName;
+      const homeEl = document.getElementById('homepageView');
+      const workEl = document.getElementById('workspaceView');
+      const navH = document.getElementById('navHome');
+      const navW = document.getElementById('navWorkspace');
+
+      if (viewName === 'home') {
+        homeEl.style.display = 'block';
+        workEl.style.display = 'none';
+        if (navH) navH.classList.add('active');
+        if (navW) navW.classList.remove('active');
+      } else {
+        homeEl.style.display = 'none';
+        workEl.style.display = 'block';
+        if (navH) navH.classList.remove('active');
+        if (navW) navW.classList.add('active');
+        
+        if (!currentUser) {
+          document.getElementById('loginPromptBanner').style.display = 'flex';
+        } else {
+          document.getElementById('loginPromptBanner').style.display = 'none';
+          loadStats();
+          loadFiles();
+        }
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function handleHeroCardClick(type) {
+      if (type === 'folder') {
+        if (!currentUser) {
+          showToast('💡 Vui lòng đăng nhập để kết nối thư mục máy tính của bạn!');
+          openLoginModal();
+        } else {
+          showView('workspace');
+          openChangeFolderModal();
+        }
+      } else {
+        if (!currentUser) {
+          showToast('💡 Vui lòng đăng nhập để nạp tệp & đồng bộ Drive!');
+          openLoginModal();
+        } else {
+          showView('workspace');
+          document.getElementById('fileInput').click();
+        }
+      }
+    }
+
+    function triggerNavUpload() {
+      showView('workspace');
+      document.getElementById('fileInput').click();
+    }
+
+    function openDriveNav() {
+      if (currentUser && currentUser.drive_account) {
+        showToast(`☁️ Google Drive kết nối: ${currentUser.drive_account}`);
+      } else {
+        showToast('☁️ Tài liệu được lưu trữ máy tính cục bộ & đồng bộ Drive cá nhân khi liên kết.');
+      }
+      showView('workspace');
+    }
+
+    function scrollToTester() {
+      showView('home');
+      const sec = document.getElementById('sectionTester');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function openAboutModal() { document.getElementById('aboutModal').style.display = 'flex'; }
+    function closeAboutModal() { document.getElementById('aboutModal').style.display = 'none'; }
+
+    function focusSearch() {
+      showView('workspace');
+      const s = document.getElementById('searchInput');
+      if (s) { s.focus(); s.scrollIntoView({ behavior: 'smooth' }); }
+    }
+
+    function filterBySubjectNav() {
+      showView('workspace');
+      const fs = document.getElementById('filterSubject');
+      if (fs) { fs.focus(); }
+    }
+
+    function toggleSidebarCollapse() {
+      const sb = document.getElementById('akitaoSidebar');
+      sb.classList.toggle('collapsed');
+    }
+
+    function toggleMobileMenu() {
+      const sb = document.getElementById('akitaoSidebar');
+      sb.classList.toggle('mobile-open');
+    }
+
+    /* Interactive AI Tester */
+    function setDemoInput(filename) {
+      document.getElementById('demoInputFile').value = filename;
+      runDemoClassifier();
+    }
+
+    async function runDemoClassifier() {
+      const input = document.getElementById('demoInputFile').value.trim();
+      if (!input) return;
+
+      const resBox = document.getElementById('testerResultCard');
+      const resSub = document.getElementById('resSubject');
+      const resPath = document.getElementById('resPath');
+      const resTags = document.getElementById('resTags');
+
+      let subject = 'Toán khoa học dữ liệu';
+      let docType = 'Slide';
+      const fnLower = input.toLowerCase();
+
+      if (fnLower.includes('triet')) subject = 'Triết học';
+      else if (fnLower.includes('toan') || fnLower.includes('du_lieu') || fnLower.includes('data')) subject = 'Toán khoa học dữ liệu';
+      else if (fnLower.includes('csdl') || fnLower.includes('du lieu') || fnLower.includes('database')) subject = 'Cơ sở dữ liệu';
+      else if (fnLower.includes('nghien_cuu') || fnLower.includes('phuong_phap')) subject = 'Phương pháp nghiên cứu';
+      else if (fnLower.includes('ghi_chu') || fnLower.includes('note')) subject = 'Phương pháp ghi chú';
+
+      const ext = input.split('.').pop().toLowerCase();
+      if (fnLower.includes('slide') || fnLower.includes('bai_giang') || fnLower.includes('baigiang') || ext === 'pptx') {
+        docType = 'Slide';
+      } else if (fnLower.includes('on_thi') || fnLower.includes('de_cuong') || fnLower.includes('onthi')) {
+        docType = 'Ôn thi';
+      } else if (fnLower.includes('giao_trinh') || fnLower.includes('giaotrinh') || fnLower.includes('book')) {
+        docType = 'Giáo trình';
+      } else {
+        docType = 'Tài liệu tham khảo';
+      }
+
+      const safeSub = subject.replace(/\\s+/g, '_');
+      const safeType = docType.replace(/\\s+/g, '_');
+      const folderName = (docType === 'Giáo trình') ? '01_Giao_Trinh' : (docType === 'Slide') ? '02_Slide' : (docType === 'Ôn thi') ? '04_On_Thi' : '03_Tai_Lieu_Tham_Khao';
+
+      resSub.textContent = subject;
+      resPath.textContent = `📁 Thư mục đề xuất: /${safeSub}/${folderName}/${input}`;
+      resTags.innerHTML = `
+        <span class="tag-subject">${subject}</span>
+        <span class="tag-type">${docType}</span>
+        ${getExtBadge(input)}
+      `;
+
+      resBox.style.display = 'flex';
+      showToast(`✨ Đã phân loại: ${subject} (${docType})`);
     }
 
     function setViewMode(mode) {
@@ -1067,19 +2145,20 @@ def get_html_dashboard() -> str:
       }
     }
 
-    let defaultRootFolder = '';
-
     async function checkCurrentUser() {
       try {
         const res = await fetch('/api/me');
         const data = await res.json();
         defaultRootFolder = data.default_folder || '';
         const userSec = document.getElementById('userSection');
-        const banner = document.getElementById('loginPromptBanner');
+        const sidebarUserBox = document.getElementById('sidebarUserBox');
+        const oneTap = document.getElementById('oneTapWidget');
         const folderBar = document.getElementById('userFolderBar');
+        const banner = document.getElementById('loginPromptBanner');
 
         if (data.authenticated && data.user) {
           currentUser = data.user;
+          if (oneTap) oneTap.style.display = 'none';
           if (banner) banner.style.display = 'none';
           if (folderBar) {
             folderBar.style.display = 'flex';
@@ -1098,13 +2177,23 @@ def get_html_dashboard() -> str:
               }
             }
           }
+
           const initial = (currentUser.name || currentUser.email || 'U')[0].toUpperCase();
-          userSec.innerHTML = `
+          const userHtml = `
             <div class="user-profile-chip" onclick="openSettingsModal()" title="${currentUser.email}">
               <div class="user-avatar">${initial}</div>
               <span class="user-name-text">${currentUser.name || currentUser.email}</span>
             </div>
           `;
+          if (userSec) userSec.innerHTML = userHtml;
+          if (sidebarUserBox) {
+            sidebarUserBox.innerHTML = `
+              <button class="btn-sidebar-auth" onclick="logoutUser()" style="color:var(--accent-red); border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.08);">
+                🚪 <span class="text">Đăng xuất</span>
+              </button>
+            `;
+          }
+
           document.getElementById('settingsUserEmail').textContent = currentUser.email;
           const cfgInput = document.getElementById('cfgRootFolder');
           if (cfgInput) cfgInput.value = currentUser.local_folder || defaultRootFolder;
@@ -1115,11 +2204,20 @@ def get_html_dashboard() -> str:
           currentUser = null;
           if (banner) banner.style.display = 'flex';
           if (folderBar) folderBar.style.display = 'none';
-          userSec.innerHTML = `
-            <button class="btn btn-google" onclick="openLoginModal()">
-              🔑 Đăng nhập Google
-            </button>
-          `;
+          if (userSec) {
+            userSec.innerHTML = `
+              <button class="btn btn-google" onclick="openLoginModal()">
+                🔑 Đăng nhập Google
+              </button>
+            `;
+          }
+          if (sidebarUserBox) {
+            sidebarUserBox.innerHTML = `
+              <button class="btn-sidebar-auth" onclick="openLoginModal()">
+                🔑 <span class="text">Đăng nhập</span>
+              </button>
+            `;
+          }
           renderLoggedOutState();
         }
       } catch (e) {
@@ -1136,10 +2234,6 @@ def get_html_dashboard() -> str:
       document.getElementById('countAll').textContent = '0';
       document.getElementById('countNew').textContent = '0';
       document.getElementById('countDrive').textContent = '0';
-      const drv = document.getElementById('statDriveFolder');
-      if (drv) drv.textContent = 'Chưa đăng nhập';
-      const stp = document.getElementById('statStoragePath');
-      if (stp) stp.textContent = 'Vui lòng đăng nhập';
 
       const container = document.getElementById('cardsContainer');
       if (container) {
@@ -1151,10 +2245,10 @@ def get_html_dashboard() -> str:
               Hệ thống sẽ kết nối đúng thư mục trên máy tính và tài khoản Google Drive cá nhân của bạn ngay sau khi đăng nhập.
             </div>
             <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-              <button class="btn btn-google" onclick="openLoginModal()" style="display: inline-flex;">
+              <button class="btn btn-google" onclick="openLoginModal()">
                 🔑 Đăng nhập Google
               </button>
-              <button class="btn btn-secondary" onclick="openLoginModal()" style="display: inline-flex;">
+              <button class="btn btn-secondary" onclick="openLoginModal()">
                 ⚡ Đăng nhập bằng Email sinh viên
               </button>
             </div>
@@ -1167,6 +2261,7 @@ def get_html_dashboard() -> str:
     }
 
     async function loadStats() {
+      if (!currentUser) return;
       try {
         const res = await fetch('/api/stats');
         const data = await res.json();
@@ -1199,6 +2294,7 @@ def get_html_dashboard() -> str:
     }
 
     async function loadFiles() {
+      if (!currentUser) return;
       try {
         const res = await fetch('/api/files');
         allFiles = await res.json();
@@ -1248,42 +2344,41 @@ def get_html_dashboard() -> str:
       if (!files || files.length === 0) {
         container.innerHTML = `
           <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 40px; background: var(--bg-card); border-radius: var(--radius-lg);">
-            Không có tài liệu nào. Hãy bấm nút phía trên để chụp bài giảng hoặc nạp tệp!
+            Không tìm thấy tài liệu phù hợp.
           </div>`;
         return;
       }
-
       let html = '';
       files.forEach(f => {
         const fileName = f.path.split(/[\\\\/]/).pop();
         const relTime = formatRelativeTime(f.updated_at || f.created_at);
         const newBadge = f.is_new ? `<span class="badge-new">✨ MỚI</span>` : '';
-        const driveBadge = f.drive_file_id 
-          ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon" style="color:#60a5fa;" title="Mở Drive">🔗 Drive</a>` 
-          : `<span class="btn-icon" style="color:#00f2fe; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.3); font-size:0.7rem;" title="File lưu an toàn tại máy tính">💻 Máy local</span>`;
+        const driveBtn = f.drive_file_id 
+          ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon" style="color:#60a5fa;">🔗 Drive</a>` 
+          : '';
+        const statusBadge = f.drive_file_id
+          ? `<span style="color:var(--accent-green); font-size:0.75rem; font-weight:600;">● ĐÃ LÊN DRIVE</span>`
+          : `<span style="color:var(--accent-cyan); font-size:0.75rem; font-weight:600;">💻 LƯU MÁY LOCAL</span>`;
 
         html += `
           <div class="file-card ${f.is_new ? 'is-new-card' : ''}">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <div style="display: flex; gap: 6px; align-items: center;">
-                ${getExtBadge(fileName)}
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+              ${getExtBadge(fileName)}
+              <div style="display:flex; align-items:center; gap:6px;">
                 ${newBadge}
+                ${statusBadge}
               </div>
-              <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #cbd5e1;">${f.size_formatted || '--'}</span>
             </div>
-
-            <div class="card-title" title="${fileName}">${fileName}</div>
-            <div class="card-path" title="${f.path}">${f.path}</div>
-
-            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;">
-              <span class="tag-subject">${f.subject || 'Chưa phân loại'}</span>
+            <div class="card-title">${fileName}</div>
+            <div class="card-path">${f.path}</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:2px;">
+              <span class="tag-subject">${f.subject || 'Chung'}</span>
               <span class="tag-type">${f.document_type || 'Tài liệu'}</span>
             </div>
-
             <div class="card-footer">
-              <span style="font-size: 0.72rem; color: var(--text-dim);">⏱️ ${relTime}</span>
-              <div style="display: flex; gap: 6px;">
-                ${driveBadge}
+              <span style="font-size:0.72rem; color:var(--text-muted);">⏱️ ${relTime}</span>
+              <div style="display:flex; gap:6px;">
+                ${driveBtn}
                 <button class="btn-icon" onclick="openEditModal(${f.id}, '${encodeURIComponent(fileName)}', '${encodeURIComponent(f.subject || '')}', '${encodeURIComponent(f.document_type || '')}')">✏️ Sửa</button>
               </div>
             </div>
@@ -1296,7 +2391,7 @@ def get_html_dashboard() -> str:
     function renderTable(files) {
       const tbody = document.getElementById('filesTableBody');
       if (!files || files.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:32px; color:var(--text-dim);">Chưa có tài liệu.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:36px; color:var(--text-dim);">Không có dữ liệu.</td></tr>`;
         return;
       }
       let html = '';
@@ -1339,7 +2434,6 @@ def get_html_dashboard() -> str:
       tbody.innerHTML = html;
     }
 
-    /* Cross-Platform Upload Functions */
     async function handleFileInput(fileList) {
       if (!fileList || fileList.length === 0) return;
       if (!currentUser) {
@@ -1367,7 +2461,7 @@ def get_html_dashboard() -> str:
             });
             const data = await res.json();
             if (data.ok) {
-              showToast(`✅ Đã nạp & lưu Drive: ${file.name}`);
+              showToast(`✅ Đã nạp thành công: ${file.name}`);
               loadStats();
               loadFiles();
             } else {
@@ -1381,7 +2475,6 @@ def get_html_dashboard() -> str:
       }
     }
 
-    /* HTML5 File System Access API cho Desktop */
     async function pickDirectoryOnDesktop() {
       if (!currentUser) {
         showToast('⚠️ Vui lòng đăng nhập tài khoản trước khi chọn thư mục máy tính!');
@@ -1414,7 +2507,6 @@ def get_html_dashboard() -> str:
       }
     }
 
-    /* Modals & Auth */
     function openLoginModal() { document.getElementById('loginModal').style.display = 'flex'; }
     function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
 
@@ -1441,23 +2533,24 @@ def get_html_dashboard() -> str:
         if (data.ok) {
           showToast(`👋 Chào mừng sinh viên: ${name}!`);
           closeLoginModal();
-          checkCurrentUser();
-          loadStats();
-          loadFiles();
+          await checkCurrentUser();
+          showView('workspace');
         }
       } catch (e) {
         alert('Lỗi đăng nhập: ' + e);
       }
     }
 
+    /* ĐĂNG XUẤT: HỦY SESSION VÀ ĐÁ VỀ HOMEPAGE AKITAO */
     async function logoutUser() {
       try {
         await fetch('/auth/logout', { method: 'POST' });
-        showToast('Đã đăng xuất.');
+        showToast('🚪 Đã đăng xuất thành công.');
         closeSettingsModal();
-        checkCurrentUser();
-        loadStats();
-        loadFiles();
+        currentUser = null;
+        allFiles = [];
+        showView('home');
+        await checkCurrentUser();
       } catch (e) {
         console.error(e);
       }
