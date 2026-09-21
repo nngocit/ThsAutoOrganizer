@@ -1278,13 +1278,58 @@ def get_html_dashboard() -> str:
       }
     }
 
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 195;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      cursor: pointer;
+    }
+    .btn-close-sidebar {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px 8px;
+      margin-left: auto;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .btn-close-sidebar:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
     @media (max-width: 768px) {
+      .sidebar-backdrop.active {
+        display: block;
+        opacity: 1;
+      }
+      .btn-close-sidebar {
+        display: block;
+      }
       .ths-sidebar {
         position: fixed;
-        left: -240px;
+        left: -280px;
+        width: 260px;
+        min-width: 260px;
+        box-shadow: none;
+        transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
       }
       .ths-sidebar.mobile-open {
         left: 0;
+        box-shadow: 12px 0 35px rgba(0, 0, 0, 0.75);
       }
       .mobile-menu-toggle { display: block; }
       .view-content { padding: 18px 16px 40px; }
@@ -1302,6 +1347,9 @@ def get_html_dashboard() -> str:
 <body>
 
   <div class="app-layout">
+    <!-- Backdrop che mờ màn hình khi mở Menu trên Mobile -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
     <!-- ==================== LEFT SIDEBAR ==================== -->
     <aside class="ths-sidebar" id="thsSidebar">
       <!-- Brand Logo & Lang -->
@@ -1316,6 +1364,7 @@ def get_html_dashboard() -> str:
           <span class="active">VI</span>
           <span>EN</span>
         </div>
+        <button type="button" class="btn-close-sidebar" onclick="closeMobileSidebar()" title="Đóng menu">&times;</button>
       </div>
 
       <!-- Navigation Links -->
@@ -2085,6 +2134,7 @@ def get_html_dashboard() -> str:
 
     /* View Navigation (Homepage vs Workspace vs Admin) */
     function showView(viewName) {
+      closeMobileSidebar();
       currentActiveView = viewName;
       const homeEl = document.getElementById('homepageView');
       const workEl = document.getElementById('workspaceView');
@@ -2191,16 +2241,21 @@ def get_html_dashboard() -> str:
       if (sec) sec.scrollIntoView({ behavior: 'smooth' });
     }
 
-    function openAboutModal() { document.getElementById('aboutModal').style.display = 'flex'; }
+    function openAboutModal() {
+      closeMobileSidebar();
+      document.getElementById('aboutModal').style.display = 'flex';
+    }
     function closeAboutModal() { document.getElementById('aboutModal').style.display = 'none'; }
 
     function focusSearch() {
+      closeMobileSidebar();
       showView('workspace');
       const s = document.getElementById('searchInput');
       if (s) { s.focus(); s.scrollIntoView({ behavior: 'smooth' }); }
     }
 
     function filterBySubjectNav() {
+      closeMobileSidebar();
       showView('workspace');
       const fs = document.getElementById('filterSubject');
       if (fs) { fs.focus(); }
@@ -2211,10 +2266,39 @@ def get_html_dashboard() -> str:
       sb.classList.toggle('collapsed');
     }
 
+    function openMobileSidebar() {
+      const sb = document.getElementById('thsSidebar');
+      const bd = document.getElementById('sidebarBackdrop');
+      if (sb) sb.classList.add('mobile-open');
+      if (bd) bd.classList.add('active');
+    }
+
+    function closeMobileSidebar() {
+      const sb = document.getElementById('thsSidebar');
+      const bd = document.getElementById('sidebarBackdrop');
+      if (sb) sb.classList.remove('mobile-open');
+      if (bd) bd.classList.remove('active');
+    }
+
     function toggleMobileMenu() {
       const sb = document.getElementById('thsSidebar');
-      sb.classList.toggle('mobile-open');
+      if (sb && sb.classList.contains('mobile-open')) {
+        closeMobileSidebar();
+      } else {
+        openMobileSidebar();
+      }
     }
+
+    // Đóng sidebar khi chạm ra ngoài màn hình trên Mobile
+    document.addEventListener('click', function(e) {
+      const sb = document.getElementById('thsSidebar');
+      const toggleBtn = document.querySelector('.mobile-menu-toggle');
+      if (sb && sb.classList.contains('mobile-open')) {
+        if (!sb.contains(e.target) && (!toggleBtn || !toggleBtn.contains(e.target))) {
+          closeMobileSidebar();
+        }
+      }
+    });
 
     /* Interactive AI Tester */
     function onDemoMajorChange() {
