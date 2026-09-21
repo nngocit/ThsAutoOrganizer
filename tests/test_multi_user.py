@@ -405,3 +405,70 @@ def test_multi_user_isolated_folder_with_heuristic_classification(tmp_path: Path
     assert records[0]["user_email"] == user_email
 
 
+def test_multi_user_end_to_end_logout_leak_prevention(tmp_path: Path):
+    """Kiểm tra toàn diện quy trình Đăng nhập -> Kiểm tra thông tin cá nhân -> Đăng xuất -> Không còn vết dữ liệu."""
+    import random
+    db_path = tmp_path / "leak_test.db"
+    db = Database(db_path)
+    db.initialize()
+
+    cfg_path = tmp_path / "cfg.json"
+    root_folder = tmp_path / "Mon_Hoc"
+    root_folder.mkdir(parents=True, exist_ok=True)
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(root_folder)}, f)
+
+    port = random.randint(18800, 19800)
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # 1. Đăng nhập tài khoản sinh viên Mộng Xuân
+        login_payload = json.dumps({
+            "email": "mongxuancomestic@gmail.com",
+            "name": "Mộng Xuân"
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base_url}/auth/test-login",
+            data=login_payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            cookie = resp.headers.get("Set-Cookie")
+            assert "ths_session" in cookie
+
+        # 2. Kiểm tra /api/me trả về đúng thông tin cá nhân của Mộng Xuân
+        req_me = urllib.request.Request(f"{base_url}/api/me", headers={"Cookie": cookie})
+        with urllib.request.urlopen(req_me) as resp:
+            me_data = json.loads(resp.read().decode("utf-8"))
+            assert me_data["authenticated"] is True
+            assert me_data["user"]["email"] == "mongxuancomestic@gmail.com"
+            assert "mongxuancomestic" in me_data["user"]["local_folder"]
+
+        # 3. Thực hiện Đăng xuất (Logout)
+        req_logout = urllib.request.Request(
+            f"{base_url}/auth/logout",
+            data=b"{}",
+            headers={"Cookie": cookie},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_logout) as resp:
+            assert resp.status == 200
+            logout_cookie = resp.headers.get("Set-Cookie")
+            assert "Max-Age=0" in logout_cookie or "expires=" in logout_cookie.lower() or "ths_session=;" in logout_cookie
+
+        # 4. Kiểm tra /api/me sau khi logout (kể cả khi gửi cookie cũ): authenticated = False, không rò rỉ user
+        req_me_after = urllib.request.Request(f"{base_url}/api/me", headers={"Cookie": cookie})
+        with urllib.request.urlopen(req_me_after) as resp:
+            after_data = json.loads(resp.read().decode("utf-8"))
+            assert after_data["authenticated"] is False
+            assert after_data["user"] is None
+            assert after_data["drive_connected"] is False
+            assert "mongxuan" not in json.dumps(after_data)
+    finally:
+        server.shutdown()
+
+
+
+
