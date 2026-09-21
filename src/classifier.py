@@ -97,22 +97,28 @@ class PathClassifier:
         """Đăng ký thêm loại tài liệu mới một cách dễ dàng."""
         self.type_map[folder_key] = display_name
 
-    def classify(self, file_path: Path | str) -> ClassificationResult:
+    def classify(
+        self,
+        file_path: Path | str,
+        root_folder: Optional[Path | str] = None,
+    ) -> ClassificationResult:
         """Phân loại môn học và loại tài liệu từ file_path.
 
         Args:
             file_path: Đường dẫn đầy đủ hoặc tương đối của file cần phân loại.
+            root_folder: Thư mục gốc tùy chọn (mặc định là self.root_folder).
 
         Returns:
             ClassificationResult chứa thông tin môn học và loại tài liệu.
         """
+        resolved_root = Path(root_folder).resolve() if root_folder else self.root_folder
         resolved_file = Path(file_path).resolve()
 
         try:
-            rel_path = resolved_file.relative_to(self.root_folder)
+            rel_path = resolved_file.relative_to(resolved_root)
         except ValueError as exc:
             raise InvalidPathStructureError(
-                f"File '{resolved_file}' không nằm trong root_folder '{self.root_folder}'."
+                f"File '{resolved_file}' không nằm trong root_folder '{resolved_root}'."
             ) from exc
 
         parts = rel_path.parts

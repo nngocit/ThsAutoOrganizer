@@ -61,8 +61,22 @@ class DriveManager:
         client_id: Optional[str] = None,
         client_secret: Optional[str] = None,
         root_folder_id: Optional[str] = None,
+        credentials_file: Optional[Path | str] = None,
     ) -> "DriveManager":
         """Khởi tạo DriveManager từ token dictionary lưu trong database của user."""
+        if (not client_id or not client_secret) and credentials_file:
+            cf = Path(credentials_file)
+            if cf.is_file():
+                try:
+                    import json
+                    with open(cf, "r", encoding="utf-8") as f:
+                        cdata = json.load(f)
+                    cinfo = cdata.get("installed", {}) or cdata.get("web", {})
+                    client_id = client_id or cinfo.get("client_id")
+                    client_secret = client_secret or cinfo.get("client_secret")
+                except Exception:
+                    pass
+
         from google.oauth2.credentials import Credentials
         creds = Credentials(
             token=token_info.get("access_token"),

@@ -134,7 +134,33 @@ class WatchdogHandler(FileSystemEventHandler):
                 return  # Tránh enqueue lặp liên tục khi file đang được ghi
             self._recently_queued[resolved_str] = now
 
-        self.task_queue.put(path)
+        # Xác định user_email từ thư mục nếu thuộc Users_Storage
+        user_email = "xuanngocit@gmail.com"
+        parts = path.resolve().parts
+        if "Users_Storage" in parts:
+            idx = parts.index("Users_Storage")
+            if idx + 1 < len(parts):
+                folder_user = parts[idx + 1]
+                matched = False
+                if self.processor and self.processor.database:
+                    try:
+                        for u in self.processor.database.get_all_users():
+                            u_email = (u.get("email") or "").strip().lower()
+                            safe_u = u_email.replace("@", "_at_").replace(".", "_")
+                            if safe_u == folder_user.lower():
+                                user_email = u_email
+                                matched = True
+                                break
+                    except Exception:
+                        pass
+                if not matched:
+                    if "_at_" in folder_user:
+                        prefix, domain_part = folder_user.split("_at_", 1)
+                        user_email = f"{prefix}@{domain_part.replace('_', '.')}"
+                    else:
+                        user_email = folder_user
+
+        self.task_queue.put((path, user_email))
 
     def on_created(self, event: FileSystemEvent) -> None:
         if not event.is_directory:
@@ -295,8 +321,11 @@ def main() -> None:
 
     if root_folder.is_dir():
         observer.schedule(event_handler, str(root_folder), recursive=True)
+        users_storage_dir = root_folder.parent / "Users_Storage"
+        users_storage_dir.mkdir(parents=True, exist_ok=True)
+        observer.schedule(event_handler, str(users_storage_dir), recursive=True)
         observer.start()
-        logger.info("Watchdog đã bắt đầu theo dõi đệ quy tại: %s", root_folder)
+        logger.info("Watchdog đã bắt đầu theo dõi đệ quy tại: %s và %s", root_folder, users_storage_dir)
     else:
         logger.error("Thư mục root '%s' không thể theo dõi vì không tồn tại.", root_folder)
 

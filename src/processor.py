@@ -9,7 +9,7 @@ import hashlib
 import logging
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.classifier import PathClassifier, ClassifierError
 from src.database import (
@@ -164,6 +164,59 @@ class FileProcessor:
         # Tuyệt đối không dùng chung Google Drive của xuanngocit cho tài khoản khác
         return None
 
+    def _get_user_storage_folder(self, user_email: str) -> Path:
+        """Trả về thư mục lưu trữ tương ứng với user."""
+        clean_email = (user_email or "").strip().lower()
+        root_path = Path(self.classifier.root_folder).resolve()
+        if not clean_email or clean_email in ["xuanngocit@gmail.com", "default@user"]:
+            return root_path
+
+        if self.database:
+            db_user = self.database.get_user_by_email(clean_email)
+            if db_user and db_user.get("local_folder"):
+                return Path(db_user["local_folder"]).resolve()
+
+        safe_name = clean_email.replace("@", "_at_").replace(".", "_")
+        user_dir = root_path.parent / "Users_Storage" / safe_name
+        user_dir.mkdir(parents=True, exist_ok=True)
+        return user_dir
+
+    def _infer_classification_from_filename(self, path: Path) -> Tuple[str, str]:
+        """Tự động suy luận Môn học và Loại tài liệu thông minh khi file không nằm trong cấu trúc thư mục chuẩn."""
+        fn_lower = path.name.lower()
+        parent_name = path.parent.name.lower()
+        combined = f"{parent_name} {fn_lower}"
+
+        # 1. Nhận diện Môn học
+        subject = "Tài liệu chung"
+        if any(k in combined for k in ["triết", "triet", "mac", "lenin"]):
+            subject = "Triết học"
+        elif any(k in combined for k in ["toán", "toan", "dữ liệu", "du_lieu", "data"]):
+            subject = "Toán khoa học dữ liệu"
+        elif any(k in combined for k in ["cơ sở dữ liệu", "co_so_du_lieu", "csdl", "database", "sql"]):
+            subject = "Cơ sở dữ liệu"
+        elif any(k in combined for k in ["nghiên cứu", "nghien_cuu", "phương pháp nghiên cứu", "ppnc"]):
+            subject = "Phương pháp nghiên cứu"
+        elif any(k in combined for k in ["ghi chú", "ghi_chu", "note", "phuong_phap_ghi_chu"]):
+            subject = "Phương pháp ghi chú"
+        elif parent_name not in ["new folder", "thư mục mới", "downloads", "desktop", "", "users_storage"]:
+            # Dùng tên thư mục nếu có ý nghĩa
+            subject = path.parent.name
+
+        # 2. Nhận diện Loại tài liệu
+        doc_type = "Tài liệu tham khảo"
+        ext = path.suffix.lower()
+        if any(k in fn_lower for k in ["giao-trinh", "giao_trinh", "giaotrinh", "giáo trình", "textbook", "sach", "book"]):
+            doc_type = "Giáo trình"
+        elif any(k in fn_lower for k in ["ôn", "on ", "on_", "on-", "đề cương", "de cuong", "decuong", "đề thi", "thi", "exam"]):
+            doc_type = "Ôn thi"
+        elif ext in [".pptx", ".ppt"] or any(k in fn_lower for k in ["slide", "bài giảng", "bai giang", "baigiang", "lecture"]):
+            doc_type = "Slide"
+        elif ext in [".png", ".jpg", ".jpeg", ".webp"]:
+            doc_type = "Tài liệu tham khảo"
+
+        return subject, doc_type
+
     def should_process_file(self, file_path: Path | str) -> bool:
         """Kiểm tra sơ bộ file có đủ điều kiện xử lý hay không."""
         path = Path(file_path).resolve()
@@ -222,23 +275,23 @@ class FileProcessor:
             )
 
         # 2. Phân loại Môn học & Loại tài liệu
+        user_root = self._get_user_storage_folder(user_email)
+        subject = None
+        document_type = None
         try:
-            classification = self.classifier.classify(path)
+            classification = self.classifier.classify(path, root_folder=user_root)
             subject = classification.subject
             document_type = classification.document_type
-            logger.info("Subject: %s", subject)
-            logger.info("Type: %s", document_type)
         except ClassifierError as exc:
-            err_msg = f"Lỗi phân loại thư mục: {exc}"
-            logger.error(err_msg)
-            return ProcessingResult(
-                file_path=str(path),
-                sha256=None,
-                subject=None,
-                document_type=None,
-                status=STATUS_ERROR,
-                error=err_msg,
+            logger.info(
+                "Thư mục file '%s' không theo cấu trúc chuẩn môn học (%s). Tự động phân loại thông minh theo tên file.",
+                path.name,
+                exc,
             )
+            subject, document_type = self._infer_classification_from_filename(path)
+
+        logger.info("Subject: %s", subject)
+        logger.info("Type: %s", document_type)
 
         # 3. Tính hash SHA-256
         try:

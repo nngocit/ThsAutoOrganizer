@@ -6,7 +6,10 @@ from pathlib import Path
 import urllib.request
 import pytest
 
-from src.database import Database
+from src.database import Database, STATUS_SAVED_LOCAL
+from src.drive import DriveManager
+from src.classifier import PathClassifier
+from src.processor import FileProcessor
 from src.web_server import start_web_server
 
 
@@ -320,4 +323,85 @@ def test_multi_user_upload_and_drive_isolation(tmp_path: Path):
 
     finally:
         server.shutdown()
+
+
+def test_drive_manager_from_token_dict_credentials_file(tmp_path: Path):
+    """Kiểm tra DriveManager.from_token_dict chấp nhận tham số credentials_file và đọc client_id."""
+    fake_creds = tmp_path / "fake_creds.json"
+    fake_creds.write_text(
+        json.dumps({
+            "installed": {
+                "client_id": "test_client_id.apps.googleusercontent.com",
+                "client_secret": "test_secret_123",
+            }
+        }),
+        encoding="utf-8",
+    )
+
+    token_dict = {
+        "access_token": "fake_access_token",
+        "refresh_token": "fake_refresh_token",
+    }
+
+    dm = DriveManager.from_token_dict(
+        token_info=token_dict,
+        credentials_file=str(fake_creds),
+        root_folder_id="custom_drive_id_456",
+    )
+    assert dm is not None
+    assert dm._credentials is not None
+    assert dm._credentials.client_id == "test_client_id.apps.googleusercontent.com"
+    assert dm._credentials.client_secret == "test_secret_123"
+    assert dm.root_folder_id == "custom_drive_id_456"
+
+
+def test_multi_user_isolated_folder_with_heuristic_classification(tmp_path: Path):
+    """Kiểm tra file đặt trong thư mục riêng của user (Users_Storage/<user>/New folder/...)
+    vẫn được phân loại thông minh và xử lý an toàn thay vì báo lỗi cấu trúc."""
+    db_path = tmp_path / "test_iso.db"
+    db = Database(db_path)
+    db.initialize()
+
+    # Tạo tài khoản sinh viên Mộng Xuân
+    user_email = "mongxuancomestic@gmail.com"
+    db.get_or_create_user(email=user_email, name="Mộng Xuân")
+
+    root_folder = tmp_path / "Mon_Hoc"
+    root_folder.mkdir(parents=True, exist_ok=True)
+
+    # Thư mục Users_Storage cho sinh viên
+    user_storage = tmp_path / "Users_Storage" / "mongxuancomestic_at_gmail_com"
+    ad_hoc_folder = user_storage / "New folder"
+    ad_hoc_folder.mkdir(parents=True, exist_ok=True)
+
+    # Tạo file mẫu (ảnh hoặc tài liệu) trong New folder
+    test_img = ad_hoc_folder / "Gemini_Generated_Image_gk1m29gk1m29gk1m.png"
+    test_img.write_bytes(b"dummy image data" * 100)  # > 1000 bytes
+
+    classifier = PathClassifier(root_folder=root_folder, allow_direct_subject_files=True)
+    processor = FileProcessor(
+        classifier=classifier,
+        database=db,
+        drive_manager=None,
+        min_file_size_bytes=100,
+        supported_extensions=[".png", ".pdf", ".txt"],
+        extract_content=True,
+    )
+
+    # Xử lý file cho user_email mongxuancomestic@gmail.com
+    result = processor.process_file(test_img, user_email=user_email)
+
+    assert result.status == STATUS_SAVED_LOCAL
+    assert result.subject == "Tài liệu chung"
+    assert result.document_type == "Tài liệu tham khảo"
+    assert result.sha256 is not None
+
+    # Kiểm tra trong Database
+    records = db.get_all_records(user_email=user_email)
+    assert len(records) == 1
+    assert records[0]["status"] == STATUS_SAVED_LOCAL
+    assert records[0]["subject"] == "Tài liệu chung"
+    assert records[0]["document_type"] == "Tài liệu tham khảo"
+    assert records[0]["user_email"] == user_email
+
 
