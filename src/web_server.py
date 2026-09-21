@@ -1676,58 +1676,75 @@ def get_html_dashboard() -> str:
 
         <!-- SUBTAB 2: NẠP & KẾT NỐI (Ingestion & Sync Hub) -->
         <div id="subtabSync" class="subtab-content" style="display: none;">
-          <!-- User Machine Folder Bar (Chỉ hiển thị khi đã đăng nhập) -->
-          <div id="userFolderBar" style="display:none; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <span style="font-size: 1.6rem;">📁</span>
-              <div>
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">Thư mục máy tính của bạn:</span>
-                  <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-purple); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
-                </div>
-                <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span>Tài khoản: <b id="displayUserEmail" style="color: #93c5fd;">--</b></span>
-                  <span>|</span>
-                  <span id="displayUserDrive" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">--</span>
-                </div>
-              </div>
+          <!-- Lock Card khi chưa đăng nhập -->
+          <div id="syncLockCard" style="display:block; text-align: center; padding: 48px 24px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 20px;">
+            <div style="font-size: 2.4rem; margin-bottom: 12px;">🔒</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">
+              Tính năng yêu cầu định danh tài khoản
             </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-              <button class="btn btn-secondary" onclick="openChangeFolderModal()" style="font-size: 0.8rem; padding: 7px 12px; border: 1px solid var(--border-subtle);">
-                ✏️ Đổi thư mục máy
-              </button>
-              <button class="btn btn-primary" onclick="triggerServerScan()" id="btnServerScan" style="font-size: 0.8rem; padding: 7px 16px;">
-                🔍 Quét & Đồng bộ thư mục ngay
-              </button>
+            <div style="font-size: 0.88rem; color: var(--text-secondary); max-width: 460px; margin: 0 auto 20px; line-height: 1.6;">
+              Vui lòng đăng nhập để sử dụng tính năng nạp tài liệu đa thiết bị, đồng bộ thư mục máy tính và lưu trữ vào Google Drive cá nhân của bạn.
             </div>
+            <button class="btn btn-primary" onclick="openLoginModal()" style="padding: 10px 24px; font-size: 0.9rem;">
+              🔑 Đăng nhập để nạp tài liệu
+            </button>
           </div>
 
-          <!-- Cross-Platform Upload Banner -->
-          <div class="upload-action-banner" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 20px;">
-            <div class="upload-banner-text">
-              <div class="upload-banner-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">
-                <span>⚡ Nạp tài liệu đa thiết bị</span>
-                <span style="font-size: 0.76rem; color: var(--accent-purple); font-weight: normal; margin-left: 6px;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
+          <!-- Nội dung Nạp & Kết nối khi đã đăng nhập -->
+          <div id="syncUploadContent" style="display:none;">
+            <!-- User Machine Folder Bar (Chỉ hiển thị khi đã đăng nhập) -->
+            <div id="userFolderBar" style="display:none; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 1.6rem;">📁</span>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">Thư mục máy tính của bạn:</span>
+                    <span id="displayUserFolder" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-purple); font-weight: 600; background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 4px; font-size: 0.82rem;">--</span>
+                  </div>
+                  <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span>Tài khoản: <b id="displayUserEmail" style="color: #93c5fd;">--</b></span>
+                    <span>|</span>
+                    <span id="displayUserDrive" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">--</span>
+                  </div>
+                </div>
               </div>
-              <div class="upload-banner-sub" style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 4px;">
-                Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <button class="btn btn-secondary" onclick="openChangeFolderModal()" style="font-size: 0.8rem; padding: 7px 12px; border: 1px solid var(--border-subtle);">
+                  ✏️ Đổi thư mục máy
+                </button>
+                <button class="btn btn-primary" onclick="triggerServerScan()" id="btnServerScan" style="font-size: 0.8rem; padding: 7px 16px;">
+                  🔍 Quét & Đồng bộ thư mục ngay
+                </button>
               </div>
             </div>
 
-            <div class="upload-btn-group" style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
-              <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
-              <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()" style="border: 1px solid var(--border-subtle);">
-                📸 Chụp bài giảng
-              </button>
+            <!-- Cross-Platform Upload Banner -->
+            <div class="upload-action-banner" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 20px;">
+              <div class="upload-banner-text">
+                <div class="upload-banner-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">
+                  <span>⚡ Nạp tài liệu đa thiết bị</span>
+                  <span style="font-size: 0.76rem; color: var(--accent-purple); font-weight: normal; margin-left: 6px;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
+                </div>
+                <div class="upload-banner-sub" style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 4px;">
+                  Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
+                </div>
+              </div>
 
-              <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
-              <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="border: 1px solid var(--border-subtle);">
-                📤 Nạp tệp (PDF/Word/Ảnh)
-              </button>
+              <div class="upload-btn-group" style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
+                <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()" style="border: 1px solid var(--border-subtle);">
+                  📸 Chụp bài giảng
+                </button>
 
-              <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
-                📁 Chọn thư mục máy tính
-              </button>
+                <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
+                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="border: 1px solid var(--border-subtle);">
+                  📤 Nạp tệp (PDF/Word/Ảnh)
+                </button>
+
+                <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
+                  📁 Chọn thư mục máy tính
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2199,6 +2216,11 @@ def get_html_dashboard() -> str:
             sidebarUserBox.innerHTML = '';
           }
 
+          const lockCard = document.getElementById('syncLockCard');
+          const syncContent = document.getElementById('syncUploadContent');
+          if (lockCard) lockCard.style.display = 'none';
+          if (syncContent) syncContent.style.display = 'block';
+
           document.getElementById('settingsUserEmail').textContent = currentUser.email;
           const cfgInput = document.getElementById('cfgRootFolder');
           if (cfgInput) cfgInput.value = currentUser.local_folder || defaultRootFolder;
@@ -2240,6 +2262,11 @@ def get_html_dashboard() -> str:
       document.getElementById('countAll').textContent = '0';
       document.getElementById('countNew').textContent = '0';
       document.getElementById('countDrive').textContent = '0';
+
+      const lockCard = document.getElementById('syncLockCard');
+      const syncContent = document.getElementById('syncUploadContent');
+      if (lockCard) lockCard.style.display = 'block';
+      if (syncContent) syncContent.style.display = 'none';
 
       const statPath = document.getElementById('statStoragePath');
       if (statPath) document.getElementById('statStoragePath').textContent = 'Chưa kết nối thư mục';

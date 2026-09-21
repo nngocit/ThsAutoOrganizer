@@ -224,5 +224,48 @@ def test_admin_majors_api_access_control(tmp_path: Path):
         server.shutdown()
 
 
+def test_upload_strictly_requires_auth(tmp_path: Path):
+    from src.database import Database
+    from src.web_server import start_web_server
+    import urllib.request
+    import json
+
+    db = Database(tmp_path / "upload_sec.db")
+    db.initialize()
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(tmp_path / "Mon_Hoc")}, f)
+
+    port = 19203
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # Gửi request upload không có cookie phiên làm việc
+        upload_payload = json.dumps({
+            "filename": "Slide_BaiGiang.pdf",
+            "content_base64": "JVBERi0xLjQK..."
+        }).encode("utf-8")
+        req = urllib.request.Request(f"{base_url}/api/upload", data=upload_payload, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            urllib.request.urlopen(req)
+            assert False, "Upload không có xác thực phải bị từ chối"
+        except urllib.error.HTTPError as e:
+            assert e.code == 401
+            resp_body = json.loads(e.read().decode("utf-8"))
+            assert resp_body["ok"] is False
+            assert "đăng nhập" in resp_body["error"].lower()
+
+        # Kiểm tra HTML trang web có Lock Card bảo vệ
+        req_page = urllib.request.Request(f"{base_url}/")
+        with urllib.request.urlopen(req_page) as page_resp:
+            html = page_resp.read().decode("utf-8")
+            assert "syncLockCard" in html
+            assert "Tính năng yêu cầu định danh tài khoản" in html
+    finally:
+        server.shutdown()
+
+
+
 
 
