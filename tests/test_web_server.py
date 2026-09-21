@@ -362,6 +362,43 @@ def test_dashboard_javascript_syntax_validity():
         os.unlink(tmp_path)
 
 
+def test_google_oauth_login_uses_select_account_prompt(tmp_path: Path):
+    from src.database import Database
+    from src.web_server import start_web_server
+    import urllib.request
+    import urllib.error
+    import json
+
+    db = Database(tmp_path / "oauth_test.db")
+    db.initialize()
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(tmp_path)}, f)
+
+    port = 19205
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    base_url = f"http://127.0.0.1:{port}"
+
+    class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    opener = urllib.request.build_opener(NoRedirectHandler)
+
+    try:
+        try:
+            opener.open(f"{base_url}/auth/google/login")
+        except urllib.error.HTTPError as e:
+            if e.code == 302:
+                loc = e.headers.get("Location", "")
+                if "accounts.google.com" in loc:
+                    assert "prompt=select_account" in loc
+                    assert "drive.file" in loc
+    finally:
+        server.shutdown()
+
+
+
 
 
 
