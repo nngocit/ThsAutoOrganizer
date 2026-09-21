@@ -38,16 +38,46 @@ class DriveManager:
         credentials_file: Path | str = "credentials.json",
         token_file: Path | str = "token.json",
         root_folder_id: Optional[str] = None,
+        credentials: Optional[Any] = None,
     ) -> None:
         self.credentials_file = Path(credentials_file).resolve()
         self.token_file = Path(token_file).resolve()
         self.root_folder_id = root_folder_id.strip() if root_folder_id else None
+        self._credentials = credentials
         self._service: Optional[Any] = None
         # Cache bộ nhớ: (folder_name, parent_id) -> folder_id
         self._folder_cache: Dict[Tuple[str, Optional[str]], str] = {}
 
+    @classmethod
+    def from_credentials(cls, credentials: Any, root_folder_id: Optional[str] = None) -> "DriveManager":
+        """Khởi tạo DriveManager trực tiếp từ đối tượng Google Credentials của user."""
+        manager = cls(root_folder_id=root_folder_id, credentials=credentials)
+        return manager
+
+    @classmethod
+    def from_token_dict(
+        cls,
+        token_info: Dict[str, Any],
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
+        root_folder_id: Optional[str] = None,
+    ) -> "DriveManager":
+        """Khởi tạo DriveManager từ token dictionary lưu trong database của user."""
+        from google.oauth2.credentials import Credentials
+        creds = Credentials(
+            token=token_info.get("access_token"),
+            refresh_token=token_info.get("refresh_token"),
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=SCOPES,
+        )
+        return cls.from_credentials(creds, root_folder_id=root_folder_id)
+
     def is_configured(self) -> bool:
-        """Kiểm tra xem credentials.json hoặc token.json đã tồn tại chưa."""
+        """Kiểm tra xem credentials.json, token.json hoặc user credentials đã sẵn sàng chưa."""
+        if self._credentials is not None:
+            return True
         return self.credentials_file.is_file() or self.token_file.is_file()
 
     def get_service(self) -> Any:
@@ -59,6 +89,15 @@ class DriveManager:
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
         from googleapiclient.discovery import build
+
+        if self._credentials is not None:
+            if self._credentials.expired and self._credentials.refresh_token:
+                try:
+                    self._credentials.refresh(Request())
+                except Exception as exc:
+                    logger.warning("Lỗi khi refresh token của user: %s", exc)
+            self._service = build("drive", "v3", credentials=self._credentials, cache_discovery=False)
+            return self._service
 
         creds = None
 

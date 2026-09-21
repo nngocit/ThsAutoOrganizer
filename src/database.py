@@ -50,10 +50,26 @@ class Database:
         return conn
 
     def initialize(self) -> None:
-        """Khởi tạo bảng files và các index nếu chưa tồn tại."""
-        create_table_sql = """
+        """Khởi tạo bảng users, files và các index nếu chưa tồn tại."""
+        create_table_users = """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT,
+            avatar_url TEXT,
+            drive_root_folder_id TEXT,
+            access_token TEXT,
+            refresh_token TEXT,
+            token_expiry TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+
+        create_table_files = """
         CREATE TABLE IF NOT EXISTS files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT DEFAULT 'default@user',
             sha256 TEXT NOT NULL,
             path TEXT NOT NULL,
             subject TEXT NOT NULL,
@@ -71,57 +87,96 @@ class Database:
         create_index_status = """
         CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
         """
+        create_index_user_email = """
+        CREATE INDEX IF NOT EXISTS idx_files_user_email ON files(user_email);
+        """
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(create_table_sql)
+            cursor.execute(create_table_users)
+            cursor.execute(create_table_files)
+            # Migration an toàn nếu bảng files cũ chưa có cột user_email
+            try:
+                cursor.execute("ALTER TABLE files ADD COLUMN user_email TEXT DEFAULT 'default@user';")
+            except Exception:
+                pass  # Cột đã tồn tại
+
             cursor.execute(create_index_sha256)
             cursor.execute(create_index_status)
+            cursor.execute(create_index_user_email)
             conn.commit()
 
         logger.debug("Database initialized tại '%s'", self.db_path)
 
-    def find_by_sha256(self, sha256: str) -> Optional[Dict[str, Any]]:
-        """Tìm bản ghi theo SHA-256.
+    def find_by_sha256(self, sha256: str, user_email: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Tìm bản ghi theo SHA-256 (có thể lọc theo user_email).
 
         Trả về bản ghi mới nhất hoặc bản ghi có trạng thái UPLOADED nếu có nhiều bản ghi trùng.
         """
-        sql = """
-        SELECT * FROM files
-        WHERE sha256 = ?
-        ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
-        LIMIT 1;
-        """
+        if user_email:
+            sql = """
+            SELECT * FROM files
+            WHERE sha256 = ? AND user_email = ?
+            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
+            LIMIT 1;
+            """
+            params = (sha256, user_email, STATUS_UPLOADED)
+        else:
+            sql = """
+            SELECT * FROM files
+            WHERE sha256 = ?
+            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
+            LIMIT 1;
+            """
+            params = (sha256, STATUS_UPLOADED)
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (sha256, STATUS_UPLOADED))
+            cursor.execute(sql, params)
             row = cursor.fetchone()
             if row:
                 return dict(row)
             return None
 
-    def find_by_path(self, path: str) -> Optional[Dict[str, Any]]:
-        """Tìm bản ghi mới nhất theo đường dẫn file."""
-        sql = """
-        SELECT * FROM files
-        WHERE path = ?
-        ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
-        LIMIT 1;
-        """
+    def find_by_path(self, path: str, user_email: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Tìm bản ghi mới nhất theo đường dẫn file (có thể lọc theo user_email)."""
+        if user_email:
+            sql = """
+            SELECT * FROM files
+            WHERE path = ? AND user_email = ?
+            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
+            LIMIT 1;
+            """
+            params = (str(path), user_email, STATUS_UPLOADED)
+        else:
+            sql = """
+            SELECT * FROM files
+            WHERE path = ?
+            ORDER BY CASE WHEN status = ? THEN 0 ELSE 1 END, id DESC
+            LIMIT 1;
+            """
+            params = (str(path), STATUS_UPLOADED)
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (str(path), STATUS_UPLOADED))
+            cursor.execute(sql, params)
             row = cursor.fetchone()
             if row:
                 return dict(row)
             return None
 
-    def find_by_drive_file_id(self, drive_file_id: str) -> Optional[Dict[str, Any]]:
+    def find_by_drive_file_id(self, drive_file_id: str, user_email: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Tìm bản ghi theo Google Drive File ID."""
-        sql = "SELECT * FROM files WHERE drive_file_id = ? ORDER BY id DESC LIMIT 1;"
+        if user_email:
+            sql = "SELECT * FROM files WHERE drive_file_id = ? AND user_email = ? ORDER BY id DESC LIMIT 1;"
+            params = (str(drive_file_id), user_email)
+        else:
+            sql = "SELECT * FROM files WHERE drive_file_id = ? ORDER BY id DESC LIMIT 1;"
+            params = (str(drive_file_id),)
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (str(drive_file_id),))
+            cursor.execute(sql, params)
             row = cursor.fetchone()
             if row:
                 return dict(row)
@@ -136,6 +191,7 @@ class Database:
         status: str = STATUS_PENDING,
         drive_file_id: Optional[str] = None,
         error: Optional[str] = None,
+        user_email: str = "default@user",
     ) -> int:
         """Thêm bản ghi mới vào database.
 
@@ -147,14 +203,15 @@ class Database:
 
         now = current_iso_time()
         sql = """
-        INSERT INTO files (sha256, path, subject, document_type, drive_file_id, status, error, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO files (user_email, sha256, path, subject, document_type, drive_file_id, status, error, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 sql,
                 (
+                    user_email,
                     sha256,
                     str(path),
                     subject,
@@ -239,11 +296,97 @@ class Database:
                 return dict(row)
             return None
 
-    def get_all_records(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Lấy danh sách các bản ghi mới nhất."""
-        sql = "SELECT * FROM files ORDER BY id DESC LIMIT ?;"
+    def get_all_records(self, limit: int = 100, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lấy danh sách các bản ghi mới nhất (có thể lọc theo user_email)."""
+        if user_email:
+            sql = "SELECT * FROM files WHERE user_email = ? ORDER BY id DESC LIMIT ?;"
+            params = (user_email, limit)
+        else:
+            sql = "SELECT * FROM files ORDER BY id DESC LIMIT ?;"
+            params = (limit,)
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (limit,))
+            cursor.execute(sql, params)
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
+
+    # ==================== User Management (Multi-Tenant) ====================
+
+    def get_or_create_user(
+        self,
+        email: str,
+        name: str = "",
+        avatar_url: str = "",
+    ) -> Dict[str, Any]:
+        """Lấy thông tin người dùng theo email hoặc tạo mới nếu chưa có."""
+        user = self.get_user_by_email(email)
+        if user:
+            if name or avatar_url:
+                now = current_iso_time()
+                with self._get_connection() as conn:
+                    conn.execute(
+                        "UPDATE users SET name = COALESCE(NULLIF(?, ''), name), avatar_url = COALESCE(NULLIF(?, ''), avatar_url), updated_at = ? WHERE email = ?;",
+                        (name, avatar_url, now, email),
+                    )
+                    conn.commit()
+            return self.get_user_by_email(email) or {}
+
+        now = current_iso_time()
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO users (email, name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?);",
+                (email, name, avatar_url, now, now),
+            )
+            conn.commit()
+        return self.get_user_by_email(email) or {}
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin người dùng theo email."""
+        sql = "SELECT * FROM users WHERE email = ? LIMIT 1;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (email,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def update_user_tokens(
+        self,
+        email: str,
+        access_token: str,
+        refresh_token: Optional[str] = None,
+        token_expiry: Optional[str] = None,
+        drive_root_folder_id: Optional[str] = None,
+    ) -> None:
+        """Cập nhật OAuth tokens và Google Drive folder cho user."""
+        now = current_iso_time()
+        updates = ["access_token = ?", "updated_at = ?"]
+        params: List[Any] = [access_token, now]
+
+        if refresh_token:
+            updates.append("refresh_token = ?")
+            params.append(refresh_token)
+        if token_expiry:
+            updates.append("token_expiry = ?")
+            params.append(token_expiry)
+        if drive_root_folder_id:
+            updates.append("drive_root_folder_id = ?")
+            params.append(drive_root_folder_id)
+
+        params.append(email)
+        sql = f"UPDATE users SET {', '.join(updates)} WHERE email = ?;"
+        with self._get_connection() as conn:
+            conn.execute(sql, params)
+            conn.commit()
+
+    def get_all_users(self) -> List[Dict[str, Any]]:
+        """Lấy danh sách tất cả người dùng trong hệ thống."""
+        sql = "SELECT id, email, name, avatar_url, drive_root_folder_id, created_at, updated_at FROM users ORDER BY id DESC;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+

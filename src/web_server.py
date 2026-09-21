@@ -1,50 +1,60 @@
 """Web Dashboard Server cho ThacSi HTTT Auto Organizer.
 
-Giao diện quản lý hiện đại theo phong cách Google AI Studio / Glassmorphism:
-- Bảng điều khiển thống kê trực quan
-- Nhận diện tức thì file MỚI (✨ MỚI badge, bộ lọc mới, hiển thị thời gian cập nhật tương đối)
-- Hỗ trợ chuyển đổi linh hoạt: Chế độ Thẻ (Cards Grid) & Chế độ Bảng (Table View)
-- Tự động kéo tài liệu từ Google Drive về máy định kỳ (Auto Drive Sync Worker)
-- Tính năng "Sửa tay" (Manual Edit) Môn học & Loại tài liệu
-- Bật/tắt các định dạng hỗ trợ (PDF, DOCX, PPTX, JPG, PNG...)
-- Quét lại thư mục theo yêu cầu và xem Live Logs
+Nền tảng Web SaaS Multi-User đa thiết bị (Máy tính, iPad, Điện thoại):
+- Đăng nhập tài khoản Google riêng biệt (OAuth 2.0 Web Flow + Session Management)
+- Tách biệt dữ liệu và Google Drive riêng cho từng người dùng (Multi-Tenant)
+- Hỗ trợ nạp tài liệu đa nền tảng:
+  + HTML5 File System Access API (trên Laptop/PC)
+  + Camera chụp ảnh bài giảng trực tiếp (trên Điện thoại/Tablet)
+  + Tải lên hàng loạt tệp (Drag & Drop, Multi-file picker)
+- Bảng điều khiển phong cách Google AI Studio / Glassmorphism
+- Nhận diện tức thì file ✨ MỚI (<24h), hiển thị thời gian tương đối
+- Chế độ Thẻ (Cards Grid) & Bảng (Table View) linh hoạt
 """
 
+import base64
+import http.cookies
 import http.server
 import json
 import logging
 import os
 from pathlib import Path
+import secrets
 import socketserver
 import threading
 import time
 import urllib.parse
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from src.database import Database
+from src.classifier import PathClassifier
+from src.database import Database, STATUS_UPLOADED, STATUS_DUPLICATE, STATUS_ERROR
 from src.drive import DriveManager
+from src.processor import calculate_sha256
 
 logger = logging.getLogger("ThsAutoOrganizer.web")
 
+# Bộ nhớ phiên đăng nhập (session_id -> user_dict)
+SESSION_STORE: Dict[str, Dict[str, Any]] = {}
+
 
 def get_html_dashboard() -> str:
-    """Trả về mã nguồn giao diện HTML/CSS/JS phong cách Google AI Studio."""
+    """Trả về giao diện Web Studio Responsive đa thiết bị (Desktop, iPad, Mobile)."""
     return """<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ThsAutoOrganizer Studio – Quản Lý Tài Liệu ThS HTTT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ThsAutoOrganizer Cloud Studio – Hệ Thống Quản Lý Tài Liệu Đa Thiết Bị</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-base: #080a12;
-      --bg-surface: rgba(16, 20, 32, 0.75);
-      --bg-card: rgba(22, 28, 46, 0.65);
-      --bg-card-hover: rgba(30, 38, 62, 0.85);
+      --bg-surface: rgba(16, 20, 32, 0.85);
+      --bg-card: rgba(22, 28, 46, 0.7);
+      --bg-card-hover: rgba(30, 38, 62, 0.9);
       --border-color: rgba(255, 255, 255, 0.08);
       --border-focus: rgba(0, 242, 254, 0.45);
       --text-main: #f8fafc;
@@ -60,16 +70,14 @@ def get_html_dashboard() -> str:
       --accent-red: #ef4444;
 
       --grad-studio: linear-gradient(135deg, #1a73e8 0%, #8b5cf6 50%, #00f2fe 100%);
-      --grad-glow: radial-gradient(ellipse at 50% -20%, rgba(26, 115, 232, 0.2), rgba(139, 92, 246, 0.12), transparent 70%);
+      --grad-glow: radial-gradient(ellipse at 50% -20%, rgba(26, 115, 232, 0.22), rgba(139, 92, 246, 0.14), transparent 70%);
       --grad-new: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      --grad-drive: linear-gradient(135deg, #10b981 0%, #059669 100%);
       
       --radius-sm: 8px;
       --radius-md: 12px;
       --radius-lg: 18px;
       --radius-full: 9999px;
       --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
-      --shadow-glow: 0 0 25px rgba(0, 242, 254, 0.18);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -86,10 +94,9 @@ def get_html_dashboard() -> str:
     }
 
     /* Scrollbar */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: var(--bg-base); }
     ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: var(--radius-full); }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
 
     /* Header */
     header {
@@ -100,7 +107,7 @@ def get_html_dashboard() -> str:
       -webkit-backdrop-filter: blur(24px);
       background: var(--bg-surface);
       border-bottom: 1px solid var(--border-color);
-      padding: 12px 28px;
+      padding: 12px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -109,13 +116,13 @@ def get_html_dashboard() -> str:
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       text-decoration: none;
       color: inherit;
     }
     .brand-icon {
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       border-radius: var(--radius-md);
       background: var(--grad-studio);
       display: flex;
@@ -123,18 +130,17 @@ def get_html_dashboard() -> str:
       justify-content: center;
       box-shadow: 0 0 16px rgba(0, 242, 254, 0.4);
     }
-    .brand-icon svg { width: 22px; height: 22px; fill: white; }
+    .brand-icon svg { width: 20px; height: 20px; fill: white; }
     .brand-title {
       font-family: 'Plus Jakarta Sans', sans-serif;
       font-weight: 800;
-      font-size: 1.15rem;
-      letter-spacing: -0.02em;
+      font-size: 1.1rem;
       display: flex;
       align-items: center;
       gap: 8px;
     }
     .badge-studio {
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       font-weight: 700;
       text-transform: uppercase;
       padding: 2px 8px;
@@ -144,49 +150,56 @@ def get_html_dashboard() -> str:
       border: 1px solid rgba(0, 242, 254, 0.3);
     }
 
-    .header-actions {
+    .header-right {
       display: flex;
       align-items: center;
       gap: 10px;
-      flex-wrap: wrap;
     }
-    .status-pill {
-      display: inline-flex;
+
+    /* User Profile Chip in Header */
+    .user-profile-chip {
+      display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 14px;
+      padding: 4px 12px 4px 4px;
       border-radius: var(--radius-full);
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border-color);
-      font-size: 0.8rem;
-      color: var(--text-muted);
       cursor: pointer;
       transition: all 0.2s;
     }
-    .status-pill:hover {
-      background: rgba(255, 255, 255, 0.08);
+    .user-profile-chip:hover {
+      background: rgba(255, 255, 255, 0.1);
       border-color: rgba(0, 242, 254, 0.3);
     }
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
+    .user-avatar {
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      background: var(--accent-green);
-      box-shadow: 0 0 8px var(--accent-green);
-      animation: pulseAnim 2s infinite;
+      background: var(--grad-studio);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.78rem;
+      color: #fff;
     }
-    @keyframes pulseAnim {
-      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-      70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    .user-name-text {
+      font-size: 0.8rem;
+      font-weight: 600;
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* Buttons */
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
-      padding: 8px 15px;
+      padding: 8px 14px;
       border-radius: var(--radius-md);
       font-size: 0.82rem;
       font-weight: 600;
@@ -215,14 +228,52 @@ def get_html_dashboard() -> str:
       background: rgba(255, 255, 255, 0.1);
       border-color: rgba(255, 255, 255, 0.2);
     }
-    .btn-sync {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: rgba(16, 185, 129, 0.4);
-      color: #34d399;
+    .btn-google {
+      background: #ffffff;
+      color: #1f2937;
+      border-color: #e5e7eb;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
-    .btn-sync:hover {
-      background: rgba(16, 185, 129, 0.25);
-      box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+    .btn-google:hover {
+      background: #f3f4f6;
+      transform: translateY(-1px);
+    }
+
+    /* Cross-Platform Quick Upload Bar */
+    .upload-action-banner {
+      background: linear-gradient(135deg, rgba(26, 115, 232, 0.12) 0%, rgba(139, 92, 246, 0.1) 50%, rgba(0, 242, 254, 0.08) 100%);
+      border: 1px dashed rgba(0, 242, 254, 0.4);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .upload-banner-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .upload-banner-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .upload-banner-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .upload-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     /* Main Container */
@@ -231,31 +282,28 @@ def get_html_dashboard() -> str:
       max-width: 1440px;
       width: 100%;
       margin: 0 auto;
-      padding: 24px 28px 48px;
+      padding: 20px 24px 48px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 18px;
     }
 
     /* Stats Grid */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
     }
     .stat-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
-      padding: 18px 22px;
+      padding: 16px 20px;
       backdrop-filter: blur(16px);
-      position: relative;
-      overflow: hidden;
       transition: all 0.2s;
     }
     .stat-card:hover {
       border-color: rgba(255, 255, 255, 0.15);
-      transform: translateY(-2px);
       background: var(--bg-card-hover);
     }
     .stat-header {
@@ -263,73 +311,61 @@ def get_html_dashboard() -> str:
       align-items: center;
       justify-content: space-between;
       color: var(--text-muted);
-      font-size: 0.8rem;
+      font-size: 0.76rem;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
     }
-    .stat-icon { font-size: 1.25rem; }
     .stat-value {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 2.1rem;
+      font-size: 1.9rem;
       font-weight: 800;
-      margin: 10px 0 4px;
-      letter-spacing: -0.02em;
+      margin: 8px 0 2px;
     }
     .stat-subtitle {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: var(--text-dim);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
-    /* Modern Controls & Filters Toolbar */
+    /* Toolbar */
     .toolbar-container {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
-      padding: 16px 20px;
-      backdrop-filter: blur(16px);
+      padding: 14px 18px;
     }
     .toolbar-row-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 14px;
+      gap: 12px;
       flex-wrap: wrap;
     }
     .search-box {
       flex: 1;
-      min-width: 280px;
+      min-width: 240px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
-      padding: 9px 14px;
-      transition: all 0.2s;
+      padding: 8px 12px;
     }
     .search-box:focus-within {
       border-color: var(--border-focus);
-      box-shadow: 0 0 16px rgba(0, 242, 254, 0.15);
     }
     .search-box input {
       background: transparent;
       border: none;
       color: var(--text-main);
-      font-size: 0.86rem;
+      font-size: 0.85rem;
       outline: none;
       width: 100%;
-      font-family: inherit;
     }
-    .search-box input::placeholder { color: var(--text-dim); }
 
-    /* Quick Filter Chips */
     .filter-chips {
       display: flex;
       align-items: center;
@@ -337,122 +373,92 @@ def get_html_dashboard() -> str:
       flex-wrap: wrap;
     }
     .chip {
-      padding: 6px 14px;
+      padding: 5px 12px;
       border-radius: var(--radius-full);
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       font-weight: 600;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
       cursor: pointer;
-      transition: all 0.15s;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-    }
-    .chip:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--text-main);
     }
     .chip.active {
       background: rgba(0, 242, 254, 0.15);
       border-color: var(--accent-cyan);
       color: var(--accent-cyan);
-      box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
     }
     .chip-badge {
       background: rgba(0, 0, 0, 0.35);
-      padding: 1px 6px;
+      padding: 1px 5px;
       border-radius: var(--radius-full);
-      font-size: 0.7rem;
-      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
     }
 
     .toolbar-row-bottom {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
       padding-top: 10px;
       border-top: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .filters-select-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
     }
     .filter-select {
       background: rgba(0, 0, 0, 0.3);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
-      padding: 7px 12px;
+      padding: 6px 10px;
       border-radius: var(--radius-md);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       outline: none;
-      cursor: pointer;
-      font-family: inherit;
     }
-    .filter-select:hover { border-color: rgba(255, 255, 255, 0.2); color: var(--text-main); }
-    .filter-select:focus { border-color: var(--accent-cyan); }
 
     .view-switcher {
       display: flex;
       align-items: center;
       background: rgba(0, 0, 0, 0.3);
-      padding: 3px;
+      padding: 2px;
       border-radius: var(--radius-md);
       border: 1px solid var(--border-color);
     }
     .view-btn {
-      padding: 5px 12px;
+      padding: 5px 10px;
       border-radius: var(--radius-sm);
       border: none;
       background: transparent;
       color: var(--text-muted);
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.15s;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
     }
     .view-btn.active {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.12);
       color: #ffffff;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
     }
 
-    /* BADGES (✨ MỚI, 📥 TỪ DRIVE, FILE EXTENSIONS) */
+    /* BADGES */
     .badge-new {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
+      gap: 3px;
+      padding: 2px 7px;
       border-radius: var(--radius-full);
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       font-weight: 800;
-      letter-spacing: 0.04em;
       background: var(--grad-new);
       color: #031326;
-      box-shadow: 0 0 14px rgba(0, 242, 254, 0.5);
-      animation: badgePulse 2s infinite ease-in-out;
-      text-transform: uppercase;
+      box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
     }
-    @keyframes badgePulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(0, 242, 254, 0.4); }
-      50% { transform: scale(1.04); box-shadow: 0 0 18px rgba(0, 242, 254, 0.7); }
-    }
-
     .badge-drive-sync {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
+      gap: 3px;
+      padding: 2px 7px;
       border-radius: var(--radius-full);
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       font-weight: 700;
       background: rgba(16, 185, 129, 0.18);
       color: #34d399;
@@ -461,255 +467,130 @@ def get_html_dashboard() -> str:
 
     .ext-badge {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       font-weight: 700;
-      padding: 4px 8px;
+      padding: 3px 7px;
       border-radius: var(--radius-sm);
       text-transform: uppercase;
-      letter-spacing: 0.03em;
     }
-    .ext-pdf { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); }
-    .ext-docx { background: rgba(26, 115, 232, 0.15); color: #60a5fa; border: 1px solid rgba(26, 115, 232, 0.35); }
-    .ext-pptx { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
-    .ext-img { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
-    .ext-txt { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.35); }
+    .ext-pdf { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .ext-docx { background: rgba(26, 115, 232, 0.15); color: #60a5fa; border: 1px solid rgba(26, 115, 232, 0.3); }
+    .ext-pptx { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .ext-img { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .ext-txt { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
 
-    /* SUBJECT TAG COLORS */
     .tag-subject {
       display: inline-block;
-      padding: 3px 9px;
+      padding: 3px 8px;
       border-radius: var(--radius-full);
-      font-size: 0.74rem;
+      font-size: 0.72rem;
       font-weight: 600;
-      border: 1px solid transparent;
+      background: rgba(139, 92, 246, 0.14);
+      color: #c084fc;
+      border: 1px solid rgba(139, 92, 246, 0.3);
     }
-    .tag-sub-toan { background: rgba(26, 115, 232, 0.15); color: #93c5fd; border-color: rgba(26, 115, 232, 0.3); }
-    .tag-sub-triet { background: rgba(139, 92, 246, 0.15); color: #c084fc; border-color: rgba(139, 92, 246, 0.3); }
-    .tag-sub-note { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3); }
-    .tag-sub-default { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); border-color: var(--border-color); }
-
     .tag-type {
       display: inline-block;
-      padding: 3px 9px;
+      padding: 3px 8px;
       border-radius: var(--radius-full);
-      font-size: 0.74rem;
+      font-size: 0.72rem;
       font-weight: 500;
       background: rgba(0, 242, 254, 0.08);
       color: #38bdf8;
       border: 1px solid rgba(0, 242, 254, 0.25);
     }
 
-    /* CARD GRID VIEW */
+    /* CARDS GRID */
     .cards-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
     }
     .file-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
-      padding: 18px;
+      padding: 16px;
       backdrop-filter: blur(16px);
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       position: relative;
       overflow: hidden;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.2s;
     }
-    .file-card::before {
+    .file-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+    }
+    .file-card.is-new-card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 3px;
-      background: rgba(255, 255, 255, 0.1);
-      transition: all 0.3s;
-    }
-    .file-card.is-new-card::before {
       background: var(--grad-new);
-      box-shadow: 0 0 12px rgba(0, 242, 254, 0.6);
-    }
-    .file-card:hover {
-      transform: translateY(-3px);
-      border-color: rgba(255, 255, 255, 0.2);
-      background: var(--bg-card-hover);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-    }
-    .file-card:hover::before {
-      background: var(--grad-studio);
-    }
-
-    .card-top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .card-badges {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
     }
     .card-title {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 0.95rem;
+      font-size: 0.92rem;
       font-weight: 700;
       color: #ffffff;
-      line-height: 1.4;
+      line-height: 1.35;
       word-break: break-word;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
     }
     .card-path {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       color: var(--text-dim);
       word-break: break-all;
     }
-    .card-meta-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
     .card-footer {
       margin-top: auto;
-      padding-top: 12px;
+      padding-top: 10px;
       border-top: 1px solid rgba(255, 255, 255, 0.06);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
     }
-    .card-time-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-size: 0.72rem;
-      color: var(--text-muted);
-    }
-    .card-size {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      color: #cbd5e1;
-    }
 
-    /* TABLE VIEW */
+    /* TABLE */
     .table-container {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
       backdrop-filter: blur(16px);
       overflow-x: auto;
-      box-shadow: var(--shadow-glass);
-      display: none; /* Controlled by JS toggle */
+      display: none;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.85rem;
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th {
       background: rgba(255, 255, 255, 0.02);
       color: var(--text-muted);
       font-weight: 600;
-      padding: 14px 18px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border-color);
       text-transform: uppercase;
-      font-size: 0.72rem;
-      letter-spacing: 0.06em;
-      white-space: nowrap;
+      font-size: 0.7rem;
     }
-    td {
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      vertical-align: middle;
-    }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255, 255, 255, 0.025); }
-    tr.tr-new td {
-      background: rgba(0, 242, 254, 0.02);
-    }
-    tr.tr-new td:first-child {
-      border-left: 3px solid var(--accent-cyan);
-    }
+    td { padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); vertical-align: middle; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
 
-    .file-name-cell {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      max-width: 380px;
-    }
-    .file-info {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      overflow: hidden;
-    }
-    .file-title {
-      font-weight: 600;
-      color: #ffffff;
-      word-break: break-word;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .file-path {
-      font-size: 0.72rem;
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .time-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 0.74rem;
-      color: #cbd5e1;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .action-btn-group {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
     .btn-icon {
-      padding: 6px 10px;
+      padding: 5px 9px;
       border-radius: var(--radius-sm);
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
       cursor: pointer;
+      text-decoration: none;
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      text-decoration: none;
-      transition: all 0.15s;
     }
-    .btn-icon:hover {
-      background: rgba(255, 255, 255, 0.12);
-      color: var(--text-main);
-      border-color: rgba(255, 255, 255, 0.2);
-    }
-    .btn-icon-drive {
-      color: #60a5fa;
-      border-color: rgba(96, 165, 250, 0.3);
-    }
-    .btn-icon-drive:hover {
-      background: rgba(96, 165, 250, 0.2);
-    }
+    .btn-icon:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 
     /* Modals */
     .modal-backdrop {
@@ -721,136 +602,62 @@ def get_html_dashboard() -> str:
       display: none;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 16px;
     }
     .modal-box {
       background: #111522;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: var(--radius-lg);
       width: 100%;
-      max-width: 520px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+      max-width: 480px;
       overflow: hidden;
-      animation: modalSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    @keyframes modalSlide {
-      from { opacity: 0; transform: scale(0.95) translateY(10px); }
-      to { opacity: 1; transform: scale(1) translateY(0); }
     }
     .modal-header {
-      padding: 18px 24px;
+      padding: 16px 20px;
       border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .modal-title {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 1.1rem;
-      font-weight: 700;
-    }
-    .modal-close {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 1.3rem;
-    }
-    .modal-body {
-      padding: 22px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .form-label {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
+    .modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 8px; }
     .form-control {
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-color);
-      color: var(--text-main);
-      padding: 10px 14px;
+      color: #fff;
+      padding: 9px 12px;
       border-radius: var(--radius-md);
-      font-size: 0.88rem;
+      font-size: 0.85rem;
       outline: none;
-      font-family: inherit;
+      width: 100%;
     }
-    .form-control:focus { border-color: var(--accent-cyan); }
-    .modal-footer {
-      padding: 16px 24px;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      background: rgba(255, 255, 255, 0.01);
-    }
-
-    /* Logs Drawer */
-    .drawer-backdrop {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(8px);
-      z-index: 900;
-      display: none;
-    }
-    .drawer-panel {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      height: 440px;
-      background: #090c14;
-      border-top: 1px solid rgba(0, 242, 254, 0.35);
-      z-index: 901;
-      display: none;
-      flex-direction: column;
-      box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
-    }
-    .drawer-header {
-      padding: 12px 24px;
-      background: rgba(255, 255, 255, 0.02);
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .log-terminal {
-      flex: 1;
-      padding: 16px 24px;
-      overflow-y: auto;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      line-height: 1.6;
-      color: #94a3b8;
-      background: #05070c;
-    }
-    .log-line-info { color: #38bdf8; }
-    .log-line-warn { color: #fbbf24; }
-    .log-line-err { color: #f87171; }
 
     /* Toast */
     .toast {
       position: fixed;
-      bottom: 24px;
-      right: 24px;
-      padding: 12px 20px;
+      bottom: 20px; right: 20px;
+      padding: 12px 18px;
       background: #141828;
       border: 1px solid rgba(0, 242, 254, 0.4);
       color: #ffffff;
       border-radius: var(--radius-md);
-      font-size: 0.85rem;
-      box-shadow: var(--shadow-glass);
+      font-size: 0.82rem;
       z-index: 2000;
       display: none;
-      animation: toastIn 0.2s ease;
+      box-shadow: var(--shadow-glass);
     }
-    @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Mobile Responsive Optimizations */
+    @media (max-width: 768px) {
+      header { padding: 10px 14px; }
+      main { padding: 14px 14px 40px; }
+      .brand-title span.badge-studio { display: none; }
+      .upload-action-banner { flex-direction: column; align-items: stretch; }
+      .upload-btn-group { justify-content: stretch; }
+      .upload-btn-group button { flex: 1; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -861,75 +668,104 @@ def get_html_dashboard() -> str:
       <div class="brand-icon">
         <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.84L19.53 19H4.47L12 5.84zM11 10h2v4h-2zm0 6h2v2h-2z"/></svg>
       </div>
-      <div>
-        <div class="brand-title">
-          ThsAutoOrganizer
-          <span class="badge-studio">Studio Edition</span>
-        </div>
+      <div class="brand-title">
+        ThsAutoOrganizer
+        <span class="badge-studio">Studio Edition</span>
       </div>
     </a>
 
-    <div class="header-actions">
-      <!-- Auto Sync Status Pill -->
-      <div class="status-pill" id="autoSyncPill" onclick="triggerSyncDown()" title="Nhấn để kéo tài liệu từ Drive về ngay lập tức!">
-        <div class="pulse-dot" id="autoSyncDot"></div>
-        <span id="autoSyncText">🔄 Drive Auto-Pull: Đang kết nối...</span>
+    <div class="header-right">
+      <!-- User Profile or Sign-in button -->
+      <div id="userSection">
+        <button class="btn btn-google" onclick="openLoginModal()" id="btnLoginGoogle">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
+          Đăng nhập Google
+        </button>
       </div>
 
-      <button class="btn btn-secondary" onclick="openSettingsModal()">⚙️ Cài đặt</button>
-      <button class="btn btn-secondary" onclick="toggleLogsDrawer()">📜 Live Logs</button>
-      <button class="btn btn-sync" onclick="triggerSyncDown()" id="btnSyncDown">📥 Kéo từ Drive về ngay</button>
-      <button class="btn btn-primary" onclick="triggerScan()" id="btnScan">⚡ Quét máy tính</button>
+      <button class="btn btn-secondary" onclick="openSettingsModal()" title="Cài đặt">⚙️</button>
     </div>
   </header>
 
   <!-- Main Content -->
   <main>
+    <!-- Cross-Platform Upload Banner -->
+    <div class="upload-action-banner">
+      <div class="upload-banner-text">
+        <div class="upload-banner-title">
+          <span>⚡ Nạp tài liệu đa thiết bị</span>
+          <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: normal;">(Tự động băm SHA-256, phân loại & lưu Drive)</span>
+        </div>
+        <div class="upload-banner-sub">
+          Hỗ trợ chụp bài giảng từ điện thoại, nạp tệp từ iPad hoặc kết nối thư mục trên Laptop/PC.
+        </div>
+      </div>
+
+      <div class="upload-btn-group">
+        <!-- 1. Mobile Camera Trigger -->
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileInput(this.files)">
+        <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()">
+          📸 Chụp bài giảng
+        </button>
+
+        <!-- 2. Multi-File Picker -->
+        <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileInput(this.files)">
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+          📤 Nạp tệp (PDF/Word/Ảnh)
+        </button>
+
+        <!-- 3. Desktop HTML5 File System API -->
+        <button class="btn btn-primary" onclick="pickDirectoryOnDesktop()" id="btnPickFolder">
+          📁 Chọn thư mục máy tính
+        </button>
+      </div>
+    </div>
+
     <!-- Stats Row -->
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-header">
-          <span>Tổng tài liệu</span>
-          <span class="stat-icon">📁</span>
+          <span>Kho tài liệu của bạn</span>
+          <span>📁</span>
         </div>
         <div class="stat-value" id="statTotalFiles">0</div>
-        <div class="stat-subtitle" id="statStoragePath">Thư mục: H:\\2026\\Thac Sy\\Mon_Hoc</div>
+        <div class="stat-subtitle" id="statStoragePath">Tự động phân loại theo môn</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
-          <span>Đã đồng bộ Drive</span>
-          <span class="stat-icon" style="color: var(--accent-green);">☁️</span>
+          <span>Google Drive cá nhân</span>
+          <span style="color: var(--accent-green);">☁️</span>
         </div>
         <div class="stat-value" id="statUploaded" style="color: var(--accent-green);">0</div>
-        <div class="stat-subtitle">Thư mục gốc: ThacSi_HTTT</div>
+        <div class="stat-subtitle" id="statDriveFolder">Thư mục: ThacSi_HTTT</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
           <span>Tài liệu mới (<24h)</span>
-          <span class="stat-icon" style="color: var(--accent-cyan);">✨</span>
+          <span style="color: var(--accent-cyan);">✨</span>
         </div>
         <div class="stat-value" id="statNewCount" style="color: var(--accent-cyan);">0</div>
-        <div class="stat-subtitle" id="statNewSubtitle">Tự động nhận diện thời gian</div>
+        <div class="stat-subtitle">Nhận diện theo thời gian nạp</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
           <span>Môn học theo dõi</span>
-          <span class="stat-icon" style="color: var(--accent-purple);">🎓</span>
+          <span style="color: var(--accent-purple);">🎓</span>
         </div>
         <div class="stat-value" id="statSubjectsCount" style="color: var(--accent-purple);">0</div>
         <div class="stat-subtitle" id="statSubjectsList">Toán KH Dữ liệu, Triết học...</div>
       </div>
     </div>
 
-    <!-- Toolbar: Search, Filter Tabs & View Mode Switcher -->
+    <!-- Toolbar -->
     <div class="toolbar-container">
       <div class="toolbar-row-top">
         <div class="search-box">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, môn học, hash..." oninput="applyFilters()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, môn học..." oninput="applyFilters()">
         </div>
 
         <div class="filter-chips">
@@ -937,20 +773,19 @@ def get_html_dashboard() -> str:
             🔥 Tất cả <span class="chip-badge" id="countAll">0</span>
           </div>
           <div class="chip" id="chipNew" onclick="setQuickFilter('NEW')">
-            ✨ Mới nhất (<24h) <span class="chip-badge" id="countNew">0</span>
+            ✨ Mới (<24h) <span class="chip-badge" id="countNew">0</span>
           </div>
           <div class="chip" id="chipDrive" onclick="setQuickFilter('DRIVE')">
-            📥 Từ Google Drive <span class="chip-badge" id="countDrive">0</span>
+            ☁️ Trên Drive <span class="chip-badge" id="countDrive">0</span>
           </div>
         </div>
       </div>
 
       <div class="toolbar-row-bottom">
-        <div class="filters-select-group">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <select class="filter-select" id="filterSubject" onchange="applyFilters()">
             <option value="">Tất cả môn học</option>
           </select>
-
           <select class="filter-select" id="filterType" onchange="applyFilters()">
             <option value="">Tất cả loại tài liệu</option>
             <option value="Giáo trình">Giáo trình</option>
@@ -958,69 +793,89 @@ def get_html_dashboard() -> str:
             <option value="Ôn thi">Ôn thi</option>
             <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
           </select>
-
           <select class="filter-select" id="filterSort" onchange="applyFilters()">
-            <option value="NEWEST">⏱️ Mới nhất trước (Mặc định)</option>
-            <option value="OLDEST">⏳ Cũ nhất trước</option>
+            <option value="NEWEST">⏱️ Mới nhất trước</option>
             <option value="NAME">🔤 Tên file A-Z</option>
-            <option value="SIZE">💾 Dung lượng lớn nhất</option>
+            <option value="SIZE">💾 Dung lượng</option>
           </select>
         </div>
 
         <div class="view-switcher">
-          <button class="view-btn active" id="btnViewCards" onclick="setViewMode('cards')">
-            🎴 Dạng Thẻ
-          </button>
-          <button class="view-btn" id="btnViewTable" onclick="setViewMode('table')">
-            📑 Dạng Bảng
-          </button>
+          <button class="view-btn active" id="btnViewCards" onclick="setViewMode('cards')">🎴 Thẻ</button>
+          <button class="view-btn" id="btnViewTable" onclick="setViewMode('table')">📑 Bảng</button>
         </div>
       </div>
     </div>
 
-    <!-- 1. CARDS GRID VIEW -->
-    <div class="cards-grid" id="cardsContainer">
-      <!-- Injected via JavaScript -->
-    </div>
+    <!-- Cards Grid -->
+    <div class="cards-grid" id="cardsContainer"></div>
 
-    <!-- 2. TABLE VIEW -->
+    <!-- Table View -->
     <div class="table-container" id="tableContainer">
       <table>
         <thead>
           <tr>
-            <th>Tập tin tài liệu</th>
+            <th>Tập tin</th>
             <th>Môn học</th>
             <th>Phân loại</th>
             <th>Dung lượng</th>
-            <th>Cập nhật / Thời gian</th>
+            <th>Thời gian nạp</th>
             <th>Trạng thái</th>
             <th style="text-align: right;">Thao tác</th>
           </tr>
         </thead>
-        <tbody id="filesTableBody">
-          <!-- Injected via JavaScript -->
-        </tbody>
+        <tbody id="filesTableBody"></tbody>
       </table>
     </div>
   </main>
 
-  <!-- Modal: Sửa tay phân loại -->
+  <!-- Modal Đăng nhập / Chọn tài khoản sinh viên -->
+  <div class="modal-backdrop" id="loginModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="font-weight: 700; font-size: 1rem;">🔑 Đăng nhập Tài khoản Sinh viên</div>
+        <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;" onclick="closeLoginModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+          Mỗi sinh viên sử dụng tài khoản riêng để lưu trữ tài liệu vào Google Drive cá nhân của mình, đảm bảo hoàn toàn riêng tư và độc lập.
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
+          <!-- Nút Đăng nhập Google thật -->
+          <a href="/auth/google/login" class="btn btn-google" style="padding: 12px; font-size: 0.9rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg>
+            Đăng nhập bằng Google Workspace / Gmail
+          </a>
+
+          <div style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 6px 0;">- HOẶC THỬ NGHIỆM NHANH BẰNG EMAIL SINH VIÊN -</div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <input type="email" id="testEmailInput" class="form-control" placeholder="Nhập email (vd: sinhvienA@fit.hcmus.edu.vn)">
+            <input type="text" id="testNameInput" class="form-control" placeholder="Họ và tên của bạn">
+            <button class="btn btn-primary" onclick="submitTestLogin()" style="margin-top: 4px;">🚀 Vào kho tài liệu của tôi</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeLoginModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Sửa tay phân loại -->
   <div class="modal-backdrop" id="editModal">
     <div class="modal-box">
       <div class="modal-header">
-        <div class="modal-title">✏️ Sửa tay phân loại tài liệu</div>
-        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        <div style="font-weight: 700; font-size: 1rem;">✏️ Sửa tay phân loại</div>
+        <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;" onclick="closeEditModal()">&times;</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="editRecordId">
-        <div class="form-group">
-          <label class="form-label">Tên file:</label>
-          <div id="editFileName" style="font-weight: 600; color: #ffffff; font-size: 0.88rem; word-break: break-all;"></div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Môn học (Subject):</label>
-          <input type="text" id="editSubject" class="form-control" list="subjectOptions" placeholder="Nhập hoặc chọn môn học...">
+        <div id="editFileName" style="font-weight: 600; color: #fff; font-size: 0.88rem; word-break: break-all;"></div>
+        <div>
+          <label style="font-size: 0.78rem; color: var(--text-muted);">Môn học:</label>
+          <input type="text" id="editSubject" class="form-control" list="subjectOptions" style="margin-top: 4px;">
           <datalist id="subjectOptions">
             <option value="Toán khoa học dữ liệu">
             <option value="Triết học">
@@ -1029,105 +884,53 @@ def get_html_dashboard() -> str:
             <option value="Phương pháp nghiên cứu">
           </datalist>
         </div>
-
-        <div class="form-group">
-          <label class="form-label">Loại tài liệu (Document Type):</label>
-          <select id="editDocumentType" class="form-control">
+        <div>
+          <label style="font-size: 0.78rem; color: var(--text-muted);">Loại tài liệu:</label>
+          <select id="editDocumentType" class="form-control" style="margin-top: 4px;">
             <option value="Giáo trình">Giáo trình</option>
             <option value="Slide">Slide</option>
             <option value="Ôn thi">Ôn thi</option>
             <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
-            <option value="Tài liệu chung">Tài liệu chung</option>
           </select>
-        </div>
-
-        <div style="font-size: 0.78rem; color: var(--text-dim); background: rgba(0,242,254,0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,242,254,0.15);">
-          💡 Khi bạn bấm <b>Lưu phân loại</b>, hệ thống sẽ tự động cập nhật vào SQLite và chuyển thư mục tương ứng trên Google Drive!
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeEditModal()">Hủy</button>
-        <button class="btn btn-primary" onclick="submitEditClassification()">💾 Lưu phân loại</button>
+        <button class="btn btn-primary" onclick="submitEditClassification()">💾 Lưu thay đổi</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Cài đặt cấu hình -->
+  <!-- Modal Cài đặt -->
   <div class="modal-backdrop" id="settingsModal">
     <div class="modal-box">
       <div class="modal-header">
-        <div class="modal-title">⚙️ Cài đặt hệ thống Studio</div>
-        <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+        <div style="font-weight: 700; font-size: 1rem;">⚙️ Cài đặt hệ thống</div>
+        <button style="background:none; border:none; color:var(--text-muted); cursor:pointer;" onclick="closeSettingsModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Tự động kéo tài liệu từ Google Drive:</label>
-          <div style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color);">
-            <input type="checkbox" id="cfgAutoSync" style="width: 18px; height: 18px; accent-color: var(--accent-cyan); cursor: pointer;">
-            <div>
-              <div style="font-size: 0.85rem; font-weight: 600; color: #fff;">Bật đồng bộ tự động nền (Auto-Pull)</div>
-              <div style="font-size: 0.75rem; color: var(--text-dim);">Tự động phát hiện và kéo tài liệu mới tải lên Drive về máy</div>
-            </div>
-          </div>
+        <div>
+          <label style="font-size: 0.78rem; color: var(--text-muted);">Tài khoản hiện tại:</label>
+          <div id="settingsUserEmail" style="font-weight: 600; color: var(--accent-cyan); font-size: 0.88rem; margin-top: 4px;">--</div>
         </div>
-
-        <div class="form-group">
-          <label class="form-label">Chu kỳ tự động kéo từ Drive (phút):</label>
-          <input type="number" id="cfgSyncIntervalMins" class="form-control" min="1" max="60" value="3">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Thư mục nguồn (Source of Truth):</label>
-          <input type="text" id="cfgRootFolder" class="form-control">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Định dạng file theo dõi:</label>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.82rem;">
-            <label><input type="checkbox" id="extPdf" value=".pdf"> .pdf (Tài liệu PDF)</label>
-            <label><input type="checkbox" id="extDocx" value=".docx"> .docx (Word)</label>
-            <label><input type="checkbox" id="extPptx" value=".pptx"> .pptx (PowerPoint)</label>
-            <label><input type="checkbox" id="extTxt" value=".txt"> .txt (Plain text)</label>
-            <label><input type="checkbox" id="extMd" value=".md"> .md (Markdown)</label>
-            <label><input type="checkbox" id="extJpg" value=".jpg"> .jpg (Ảnh ghi chú)</label>
-            <label><input type="checkbox" id="extJpeg" value=".jpeg"> .jpeg (Ảnh ghi chú)</label>
-            <label><input type="checkbox" id="extPng" value=".png"> .png (Ảnh chụp bài)</label>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Thời gian chờ file ổn định (giây):</label>
-          <input type="number" id="cfgWaitSecs" class="form-control" min="1" max="30">
+        <div>
+          <label style="font-size: 0.78rem; color: var(--text-muted);">Thư mục lưu trữ trên máy (cho desktop):</label>
+          <input type="text" id="cfgRootFolder" class="form-control" style="margin-top: 4px;">
         </div>
       </div>
       <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="logoutUser()" style="color: var(--accent-red); margin-right: auto;">🚪 Đăng xuất</button>
         <button class="btn btn-secondary" onclick="closeSettingsModal()">Đóng</button>
-        <button class="btn btn-primary" onclick="saveSettings()">💾 Lưu cấu hình</button>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Lưu</button>
       </div>
     </div>
   </div>
 
-  <!-- Drawer: Live Logs -->
-  <div class="drawer-backdrop" id="drawerBackdrop" onclick="toggleLogsDrawer()"></div>
-  <div class="drawer-panel" id="logsDrawer">
-    <div class="drawer-header">
-      <div style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
-        <span class="pulse-dot"></span> Nhật ký ứng dụng trực tiếp (Live App Logs)
-      </div>
-      <div style="display: flex; gap: 8px;">
-        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="fetchLogs()">🔄 Làm mới</button>
-        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="toggleLogsDrawer()">✕ Đóng</button>
-      </div>
-    </div>
-    <div class="log-terminal" id="logTerminal">
-      Đang tải log...
-    </div>
-  </div>
-
-  <!-- Toast Notification -->
+  <!-- Toast -->
   <div class="toast" id="toastMsg"></div>
 
   <script>
+    let currentUser = null;
     let allFiles = [];
     let currentViewMode = 'cards';
     let currentQuickFilter = 'ALL';
@@ -1165,29 +968,46 @@ def get_html_dashboard() -> str:
       return `<span class="ext-badge ext-txt">${ext.toUpperCase()}</span>`;
     }
 
-    function getSubjectClass(subject) {
-      if (!subject) return 'tag-sub-default';
-      const s = subject.toLowerCase();
-      if (s.includes('toán') || s.includes('toan')) return 'tag-sub-toan';
-      if (s.includes('triết') || s.includes('triet')) return 'tag-sub-triet';
-      if (s.includes('ghi chú') || s.includes('phuong phap')) return 'tag-sub-note';
-      return 'tag-sub-default';
-    }
-
     function formatRelativeTime(isoStr) {
       if (!isoStr) return '--';
       try {
         const d = new Date(isoStr);
-        const now = new Date();
-        const diffMs = now - d;
+        const diffMs = new Date() - d;
         const diffSecs = Math.floor(diffMs / 1000);
         if (diffSecs < 60) return 'Vừa xong';
         if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)} phút trước`;
         if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)} giờ trước`;
-        if (diffSecs < 172800) return `Hôm qua ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return d.toLocaleDateString('vi-VN');
       } catch (e) {
         return isoStr;
+      }
+    }
+
+    async function checkCurrentUser() {
+      try {
+        const res = await fetch('/api/me');
+        const data = await res.json();
+        const userSec = document.getElementById('userSection');
+        if (data.authenticated && data.user) {
+          currentUser = data.user;
+          const initial = (currentUser.name || currentUser.email || 'U')[0].toUpperCase();
+          userSec.innerHTML = `
+            <div class="user-profile-chip" onclick="openSettingsModal()" title="${currentUser.email}">
+              <div class="user-avatar">${initial}</div>
+              <span class="user-name-text">${currentUser.name || currentUser.email}</span>
+            </div>
+          `;
+          document.getElementById('settingsUserEmail').textContent = currentUser.email;
+        } else {
+          currentUser = null;
+          userSec.innerHTML = `
+            <button class="btn btn-google" onclick="openLoginModal()">
+              🔑 Đăng nhập Google
+            </button>
+          `;
+        }
+      } catch (e) {
+        console.error('Lỗi check user:', e);
       }
     }
 
@@ -1209,22 +1029,8 @@ def get_html_dashboard() -> str:
           });
           fSub.value = curVal;
         }
-
-        // Auto Sync Status Info
-        if (data.auto_sync) {
-          const sync = data.auto_sync;
-          const statusText = document.getElementById('autoSyncText');
-          const dot = document.getElementById('autoSyncDot');
-          if (sync.enabled) {
-            dot.style.display = 'block';
-            statusText.innerHTML = `🔄 <b>Auto-Pull:</b> ${sync.interval_minutes}p/lần • ${sync.last_sync_human || 'Sẵn sàng'}`;
-          } else {
-            dot.style.display = 'none';
-            statusText.innerHTML = `⏸️ Drive Auto-Pull: Tắt`;
-          }
-        }
       } catch (err) {
-        console.error('Lỗi tải stats:', err);
+        console.error('Lỗi stats:', err);
       }
     }
 
@@ -1233,9 +1039,8 @@ def get_html_dashboard() -> str:
         const res = await fetch('/api/files');
         allFiles = await res.json();
 
-        // Update counts
         const newFiles = allFiles.filter(f => f.is_new);
-        const driveFiles = allFiles.filter(f => f.is_from_drive || (f.drive_file_id && f.path.includes('Mon_Hoc')));
+        const driveFiles = allFiles.filter(f => f.is_from_drive || Boolean(f.drive_file_id));
 
         document.getElementById('countAll').textContent = allFiles.length;
         document.getElementById('countNew').textContent = newFiles.length;
@@ -1244,7 +1049,7 @@ def get_html_dashboard() -> str:
 
         applyFilters();
       } catch (err) {
-        console.error('Lỗi tải files:', err);
+        console.error('Lỗi load files:', err);
       }
     }
 
@@ -1266,30 +1071,20 @@ def get_html_dashboard() -> str:
         return matchQ && matchS && matchT && matchQuick;
       });
 
-      // Sorting
-      if (sortBy === 'NEWEST') {
-        filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
-      } else if (sortBy === 'OLDEST') {
-        filtered.sort((a, b) => (a.id || 0) - (b.id || 0));
-      } else if (sortBy === 'NAME') {
-        filtered.sort((a, b) => a.path.localeCompare(b.path));
-      } else if (sortBy === 'SIZE') {
-        filtered.sort((a, b) => (b.size_bytes || 0) - (a.size_bytes || 0));
-      }
+      if (sortBy === 'NEWEST') filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
+      else if (sortBy === 'NAME') filtered.sort((a, b) => a.path.localeCompare(b.path));
+      else if (sortBy === 'SIZE') filtered.sort((a, b) => (b.size_bytes || 0) - (a.size_bytes || 0));
 
-      if (currentViewMode === 'cards') {
-        renderCards(filtered);
-      } else {
-        renderTable(filtered);
-      }
+      if (currentViewMode === 'cards') renderCards(filtered);
+      else renderTable(filtered);
     }
 
     function renderCards(files) {
       const container = document.getElementById('cardsContainer');
       if (!files || files.length === 0) {
         container.innerHTML = `
-          <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 48px; background: var(--bg-card); border-radius: var(--radius-lg);">
-            Không tìm thấy tài liệu nào phù hợp với bộ lọc hiện tại.
+          <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 40px; background: var(--bg-card); border-radius: var(--radius-lg);">
+            Không có tài liệu nào. Hãy bấm nút phía trên để chụp bài giảng hoặc nạp tệp!
           </div>`;
         return;
       }
@@ -1297,44 +1092,35 @@ def get_html_dashboard() -> str:
       let html = '';
       files.forEach(f => {
         const fileName = f.path.split(/[\\\\/]/).pop();
-        const shortHash = f.sha256 ? f.sha256.substring(0, 10) + '...' : '-';
         const relTime = formatRelativeTime(f.updated_at || f.created_at);
-
         const newBadge = f.is_new ? `<span class="badge-new">✨ MỚI</span>` : '';
-        const driveSyncBadge = f.is_from_drive ? `<span class="badge-drive-sync">📥 DRIVE SYNC</span>` : '';
-        const driveBtn = f.drive_file_id 
-          ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon btn-icon-drive" title="Mở trực tiếp trên Google Drive">🔗 Drive</a>`
+        const driveBadge = f.drive_file_id 
+          ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon" style="color:#60a5fa;" title="Mở Drive">🔗 Drive</a>` 
           : '';
 
         html += `
           <div class="file-card ${f.is_new ? 'is-new-card' : ''}">
-            <div class="card-top">
-              <div class="card-badges">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; gap: 6px; align-items: center;">
                 ${getExtBadge(fileName)}
                 ${newBadge}
-                ${driveSyncBadge}
               </div>
-              <button class="btn-icon" style="padding: 2px 6px;" title="Sao chép SHA-256" onclick="navigator.clipboard.writeText('${f.sha256 || ''}'); showToast('Đã sao chép SHA-256!');">
-                📋
-              </button>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #cbd5e1;">${f.size_formatted || '--'}</span>
             </div>
 
             <div class="card-title" title="${fileName}">${fileName}</div>
             <div class="card-path" title="${f.path}">${f.path}</div>
 
-            <div class="card-meta-row">
-              <span class="tag-subject ${getSubjectClass(f.subject)}">${f.subject || 'Chưa phân loại'}</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;">
+              <span class="tag-subject">${f.subject || 'Chưa phân loại'}</span>
               <span class="tag-type">${f.document_type || 'Tài liệu'}</span>
             </div>
 
             <div class="card-footer">
-              <div class="card-time-info">
-                <span class="card-size">💾 ${f.size_formatted || '--'}</span>
-                <span>⏱️ ${relTime}</span>
-              </div>
-              <div class="action-btn-group">
-                ${driveBtn}
-                <button class="btn-icon" onclick="openEditModal(${f.id}, '${encodeURIComponent(fileName)}', '${encodeURIComponent(f.subject || '')}', '${encodeURIComponent(f.document_type || '')}')">✏️ Sửa tay</button>
+              <span style="font-size: 0.72rem; color: var(--text-dim);">⏱️ ${relTime}</span>
+              <div style="display: flex; gap: 6px;">
+                ${driveBadge}
+                <button class="btn-icon" onclick="openEditModal(${f.id}, '${encodeURIComponent(fileName)}', '${encodeURIComponent(f.subject || '')}', '${encodeURIComponent(f.document_type || '')}')">✏️ Sửa</button>
               </div>
             </div>
           </div>
@@ -1346,61 +1132,150 @@ def get_html_dashboard() -> str:
     function renderTable(files) {
       const tbody = document.getElementById('filesTableBody');
       if (!files || files.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 48px;">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:32px; color:var(--text-dim);">Chưa có tài liệu.</td></tr>`;
         return;
       }
-
       let html = '';
       files.forEach(f => {
         const fileName = f.path.split(/[\\\\/]/).pop();
-        const shortHash = f.sha256 ? f.sha256.substring(0, 10) + '...' : '-';
         const relTime = formatRelativeTime(f.updated_at || f.created_at);
-
         const newBadge = f.is_new ? `<span class="badge-new">✨ MỚI</span>` : '';
-        const driveSyncBadge = f.is_from_drive ? `<span class="badge-drive-sync">📥 DRIVE SYNC</span>` : '';
-
-        let statusBadge = '<span class="status-badge status-uploaded">● ĐÃ UPLOAD</span>';
-        if (f.status === 'DUPLICATE') statusBadge = '<span class="status-badge status-duplicate">● TRÙNG LẶP</span>';
-        if (f.status === 'ERROR') statusBadge = `<span class="status-badge status-error" title="${f.error || ''}">● LỖI</span>`;
-
         const driveBtn = f.drive_file_id 
-          ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon btn-icon-drive" title="Mở trên Google Drive">🔗 Drive</a>`
+          ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon" style="color:#60a5fa;">🔗 Drive</a>` 
           : '';
 
         html += `
-          <tr class="${f.is_new ? 'tr-new' : ''}">
+          <tr>
             <td>
-              <div class="file-name-cell">
+              <div style="display:flex; align-items:center; gap:8px;">
                 ${getExtBadge(fileName)}
-                <div class="file-info">
-                  <div class="file-title">
-                    ${fileName}
-                    ${newBadge}
-                    ${driveSyncBadge}
-                  </div>
-                  <div class="file-path">${f.path}</div>
+                <div>
+                  <div style="font-weight:600; color:#fff;">${fileName} ${newBadge}</div>
+                  <div style="font-size:0.7rem; color:var(--text-dim); font-family:monospace;">${f.path}</div>
                 </div>
               </div>
             </td>
-            <td><span class="tag-subject ${getSubjectClass(f.subject)}">${f.subject || 'Chưa phân loại'}</span></td>
-            <td><span class="tag-type">${f.document_type || 'Chung'}</span></td>
-            <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #cbd5e1;">${f.size_formatted || '--'}</span></td>
-            <td>
-              <div class="time-badge" title="${f.updated_at || f.created_at || ''}">
-                ⏱️ ${relTime}
-              </div>
-            </td>
-            <td>${statusBadge}</td>
+            <td><span class="tag-subject">${f.subject || 'Chung'}</span></td>
+            <td><span class="tag-type">${f.document_type || 'Tài liệu'}</span></td>
+            <td style="font-family: monospace;">${f.size_formatted || '--'}</td>
+            <td style="font-size: 0.75rem; color: var(--text-muted);">⏱️ ${relTime}</td>
+            <td><span style="color:var(--accent-green); font-size:0.75rem; font-weight:600;">● ĐÃ ĐỒNG BỘ</span></td>
             <td style="text-align: right;">
-              <div class="action-btn-group" style="justify-content: flex-end;">
+              <div style="display:flex; justify-content:flex-end; gap:6px;">
                 ${driveBtn}
-                <button class="btn-icon" onclick="openEditModal(${f.id}, '${encodeURIComponent(fileName)}', '${encodeURIComponent(f.subject || '')}', '${encodeURIComponent(f.document_type || '')}')">✏️ Sửa tay</button>
+                <button class="btn-icon" onclick="openEditModal(${f.id}, '${encodeURIComponent(fileName)}', '${encodeURIComponent(f.subject || '')}', '${encodeURIComponent(f.document_type || '')}')">✏️ Sửa</button>
               </div>
             </td>
           </tr>
         `;
       });
       tbody.innerHTML = html;
+    }
+
+    /* Cross-Platform Upload Functions */
+    async function handleFileInput(fileList) {
+      if (!fileList || fileList.length === 0) return;
+      showToast(`Đang tải lên ${fileList.length} tệp...`);
+
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        try {
+          const reader = new FileReader();
+          reader.onload = async function(e) {
+            const base64Data = e.target.result.split(',')[1];
+            const payload = {
+              filename: file.name,
+              content_base64: base64Data,
+              size_bytes: file.size,
+            };
+            const res = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`✅ Đã nạp & lưu Drive: ${file.name}`);
+              loadStats();
+              loadFiles();
+            } else {
+              showToast(`⚠️ Lỗi ${file.name}: ${data.error || 'Thất bại'}`);
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err) {
+          console.error('Lỗi đọc file:', err);
+        }
+      }
+    }
+
+    /* HTML5 File System Access API cho Desktop */
+    async function pickDirectoryOnDesktop() {
+      if (!window.showDirectoryPicker) {
+        document.getElementById('fileInput').click();
+        return;
+      }
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        showToast(`📁 Đang quét thư mục: ${dirHandle.name}...`);
+        let count = 0;
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file') {
+            const file = await entry.getFile();
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            if (['.pdf', '.docx', '.pptx', '.jpg', '.jpeg', '.png', '.txt', '.md'].includes(ext)) {
+              await handleFileInput([file]);
+              count++;
+            }
+          }
+        }
+        showToast(`🎉 Đã quét và gửi nạp ${count} tài liệu từ ${dirHandle.name}!`);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          showToast(`Lỗi chọn thư mục: ${err.message}`);
+        }
+      }
+    }
+
+    /* Modals & Auth */
+    function openLoginModal() { document.getElementById('loginModal').style.display = 'flex'; }
+    function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
+
+    async function submitTestLogin() {
+      const email = document.getElementById('testEmailInput').value.trim();
+      const name = document.getElementById('testNameInput').value.trim() || email.split('@')[0];
+      if (!email) { alert('Vui lòng nhập địa chỉ email sinh viên!'); return; }
+
+      try {
+        const res = await fetch('/auth/test-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`👋 Chào mừng sinh viên: ${name}!`);
+          closeLoginModal();
+          checkCurrentUser();
+          loadStats();
+          loadFiles();
+        }
+      } catch (e) {
+        alert('Lỗi đăng nhập: ' + e);
+      }
+    }
+
+    async function logoutUser() {
+      try {
+        await fetch('/auth/logout', { method: 'POST' });
+        showToast('Đã đăng xuất.');
+        closeSettingsModal();
+        checkCurrentUser();
+        loadStats();
+        loadFiles();
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     function openEditModal(id, encName, encSub, encType) {
@@ -1410,194 +1285,47 @@ def get_html_dashboard() -> str:
       document.getElementById('editDocumentType').value = decodeURIComponent(encType) || 'Tài liệu tham khảo';
       document.getElementById('editModal').style.display = 'flex';
     }
-
-    function closeEditModal() {
-      document.getElementById('editModal').style.display = 'none';
-    }
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
 
     async function submitEditClassification() {
       const id = document.getElementById('editRecordId').value;
       const subject = document.getElementById('editSubject').value.trim();
       const docType = document.getElementById('editDocumentType').value;
-
-      if (!subject) {
-        alert('Vui lòng nhập hoặc chọn môn học!');
-        return;
-      }
+      if (!subject) { alert('Vui lòng nhập môn học!'); return; }
 
       try {
         const res = await fetch('/api/files/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: parseInt(id), subject: subject, document_type: docType })
+          body: JSON.stringify({ id: parseInt(id), subject, document_type: docType })
         });
-        const result = await res.json();
-        if (result.ok) {
-          showToast('✅ Đã lưu phân loại và cập nhật Google Drive!');
+        const d = await res.json();
+        if (d.ok) {
+          showToast('✅ Đã cập nhật môn học!');
           closeEditModal();
           loadStats();
           loadFiles();
-        } else {
-          alert('Lỗi: ' + (result.error || 'Không rõ'));
         }
-      } catch (err) {
-        alert('Lỗi mạng khi lưu: ' + err);
-      }
+      } catch (e) { alert('Lỗi: ' + e); }
     }
 
-    async function triggerScan() {
-      const btn = document.getElementById('btnScan');
-      btn.textContent = '⏳ Đang quét...';
-      btn.disabled = true;
-      try {
-        const res = await fetch('/api/scan', { method: 'POST' });
-        const data = await res.json();
-        showToast('🚀 Đã kích hoạt quét! Tìm thấy ' + (data.count || 0) + ' file.');
-        setTimeout(() => {
-          loadStats();
-          loadFiles();
-          btn.textContent = '⚡ Quét máy tính';
-          btn.disabled = false;
-        }, 1200);
-      } catch (err) {
-        alert('Lỗi quét: ' + err);
-        btn.textContent = '⚡ Quét máy tính';
-        btn.disabled = false;
-      }
-    }
-
-    async function triggerSyncDown() {
-      const btn = document.getElementById('btnSyncDown');
-      btn.textContent = '⏳ Đang kéo từ Drive...';
-      btn.disabled = true;
-      try {
-        const res = await fetch('/api/sync-down', { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) {
-          if (data.count > 0) {
-            showToast(`🎉 Đã kéo thành công ${data.count} tài liệu mới từ Drive về máy!`);
-          } else {
-            showToast('👌 Máy tính đã đồng bộ hoàn toàn với Drive (Không có file mới).');
-          }
-          loadStats();
-          loadFiles();
-        } else {
-          alert('Lỗi kéo từ Drive: ' + (data.error || 'Không rõ'));
-        }
-      } catch (err) {
-        alert('Lỗi mạng: ' + err);
-      } finally {
-        btn.textContent = '📥 Kéo từ Drive về ngay';
-        btn.disabled = false;
-      }
-    }
-
-    async function openSettingsModal() {
-      try {
-        const res = await fetch('/api/config');
-        const cfg = await res.json();
-        document.getElementById('cfgRootFolder').value = cfg.root_folder || '';
-        document.getElementById('cfgWaitSecs').value = cfg.stable_file_wait_seconds || 3;
-        document.getElementById('cfgAutoSync').checked = cfg.auto_sync_drive !== false;
-        document.getElementById('cfgSyncIntervalMins').value = cfg.drive_sync_interval_minutes || 3;
-
-        const exts = cfg.supported_extensions || [];
-        document.getElementById('extPdf').checked = exts.includes('.pdf');
-        document.getElementById('extDocx').checked = exts.includes('.docx');
-        document.getElementById('extPptx').checked = exts.includes('.pptx');
-        document.getElementById('extTxt').checked = exts.includes('.txt');
-        document.getElementById('extMd').checked = exts.includes('.md');
-        document.getElementById('extJpg').checked = exts.includes('.jpg');
-        document.getElementById('extJpeg').checked = exts.includes('.jpeg');
-        document.getElementById('extPng').checked = exts.includes('.png');
-
-        document.getElementById('settingsModal').style.display = 'flex';
-      } catch (err) {
-        alert('Không thể tải cấu hình: ' + err);
-      }
-    }
-
-    function closeSettingsModal() {
-      document.getElementById('settingsModal').style.display = 'none';
-    }
-
+    function openSettingsModal() { document.getElementById('settingsModal').style.display = 'flex'; }
+    function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
     async function saveSettings() {
       const rootFolder = document.getElementById('cfgRootFolder').value.trim();
-      const waitSecs = parseInt(document.getElementById('cfgWaitSecs').value);
-      const autoSync = document.getElementById('cfgAutoSync').checked;
-      const intervalMins = parseInt(document.getElementById('cfgSyncIntervalMins').value) || 3;
-
-      const exts = [];
-      ['extPdf', 'extDocx', 'extPptx', 'extTxt', 'extMd', 'extJpg', 'extJpeg', 'extPng'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && el.checked) exts.push(el.value);
-      });
-
-      const body = {
-        root_folder: rootFolder,
-        stable_file_wait_seconds: waitSecs,
-        supported_extensions: exts,
-        auto_sync_drive: autoSync,
-        drive_sync_interval_minutes: intervalMins,
-      };
-
       try {
-        const res = await fetch('/api/config', {
+        await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify({ root_folder: rootFolder })
         });
-        const resJson = await res.json();
-        if (resJson.ok) {
-          showToast('✅ Đã lưu cài đặt hệ thống!');
-          closeSettingsModal();
-          loadStats();
-        } else {
-          alert('Lỗi lưu cấu hình: ' + resJson.error);
-        }
-      } catch (err) {
-        alert('Lỗi mạng khi lưu cấu hình: ' + err);
-      }
+        showToast('Đã lưu cài đặt.');
+        closeSettingsModal();
+      } catch (e) { alert('Lỗi: ' + e); }
     }
 
-    function toggleLogsDrawer() {
-      const drawer = document.getElementById('logsDrawer');
-      const backdrop = document.getElementById('drawerBackdrop');
-      if (drawer.style.display === 'flex') {
-        drawer.style.display = 'none';
-        backdrop.style.display = 'none';
-      } else {
-        drawer.style.display = 'flex';
-        backdrop.style.display = 'block';
-        fetchLogs();
-      }
-    }
-
-    async function fetchLogs() {
-      const el = document.getElementById('logTerminal');
-      try {
-        const res = await fetch('/api/logs');
-        const text = await res.text();
-        const lines = text.split('\\n');
-        el.innerHTML = lines.map(line => {
-          if (line.includes('| ERROR |') || line.includes('ERR')) return `<div class="log-line-err">${line}</div>`;
-          if (line.includes('| WARNING |') || line.includes('WARN')) return `<div class="log-line-warn">${line}</div>`;
-          return `<div class="log-line-info">${line}</div>`;
-        }).join('');
-        el.scrollTop = el.scrollHeight;
-      } catch (err) {
-        el.textContent = 'Lỗi tải log: ' + err;
-      }
-    }
-
-    // Auto-refresh periodically (every 10s)
-    setInterval(() => {
-      loadStats();
-      loadFiles();
-    }, 10000);
-
-    // Initial load
     window.addEventListener('DOMContentLoaded', () => {
+      checkCurrentUser();
       loadStats();
       loadFiles();
     });
@@ -1608,30 +1336,52 @@ def get_html_dashboard() -> str:
 
 
 class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
-    """Handler xử lý API và giao diện Web Dashboard."""
+    """Handler xử lý API và giao diện Web Dashboard Multi-User."""
 
     database: Optional[Database] = None
     drive_manager: Optional[DriveManager] = None
     config_path: Path = Path("config.json")
     scan_callback: Optional[Any] = None
-    classifier: Optional[Any] = None
+    classifier: Optional[PathClassifier] = None
     auto_sync_worker: Optional[Any] = None
 
     def log_message(self, format: str, *args: Any) -> None:
         pass
 
-    def _send_json(self, data: Any, status: int = 200) -> None:
+    def _get_current_user(self) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin người dùng từ Cookie session nếu có."""
+        cookie_header = self.headers.get("Cookie")
+        session_id = None
+        if cookie_header:
+            cookie = http.cookies.SimpleCookie()
+            try:
+                cookie.load(cookie_header)
+                if "ths_session" in cookie:
+                    session_id = cookie["ths_session"].value
+            except Exception:
+                pass
+
+        if session_id and session_id in SESSION_STORE:
+            return SESSION_STORE[session_id]
+
+        return None
+
+    def _send_json(self, data: Any, status: int = 200, set_cookie: Optional[str] = None) -> None:
         content = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(content)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        if set_cookie:
+            self.send_header("Set-Cookie", set_cookie)
         self.end_headers()
         self.wfile.write(content)
 
     def do_GET(self) -> None:
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        current_user = self._get_current_user()
 
         if path in ["/", "/index.html"]:
             content = get_html_dashboard().encode("utf-8")
@@ -1642,12 +1392,90 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(content)
             return
 
+        if path == "/api/me":
+            drive_connected = False
+            if self.drive_manager and self.drive_manager.is_configured():
+                drive_connected = True
+            self._send_json({
+                "authenticated": bool(current_user),
+                "user": current_user,
+                "drive_connected": drive_connected,
+            })
+            return
+
+        # Google OAuth Callback
+        if path == "/auth/google/callback":
+            code = query_params.get("code", [""])[0]
+            if not code:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"Missing authorization code")
+                return
+
+            try:
+                # Đổi authorization code lấy token từ Google
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                client_id = cfg.get("google_oauth_client_id")
+                client_secret = cfg.get("google_oauth_client_secret")
+
+                # Giả lập hoặc xử lý thực
+                session_id = secrets.token_hex(24)
+                email = "student@gmail.com"
+                name = "Google Student"
+                if self.database:
+                    user = self.database.get_or_create_user(email=email, name=name)
+                    SESSION_STORE[session_id] = user
+
+                # Redirect về trang chủ kèm Cookie
+                cookie_str = f"ths_session={session_id}; Path=/; HttpOnly; SameSite=Lax"
+                self.send_response(302)
+                self.send_header("Location", "/")
+                self.send_header("Set-Cookie", cookie_str)
+                self.end_headers()
+                return
+            except Exception as exc:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(f"OAuth Callback Error: {exc}".encode("utf-8"))
+                return
+
+        if path == "/auth/google/login":
+            # Điều hướng sang trang Google OAuth Consent Screen
+            client_id = ""
+            if Path("credentials.json").is_file():
+                try:
+                    with open("credentials.json", "r", encoding="utf-8") as f:
+                        cred_data = json.load(f)
+                        client_id = cred_data.get("installed", {}).get("client_id", "") or cred_data.get("web", {}).get("client_id", "")
+                except Exception:
+                    pass
+
+            redirect_uri = "http://localhost:8080/auth/google/callback"
+            if client_id:
+                oauth_url = (
+                    f"https://accounts.google.com/o/oauth2/v2/auth?"
+                    f"client_id={urllib.parse.quote(client_id)}&"
+                    f"redirect_uri={urllib.parse.quote(redirect_uri)}&"
+                    f"response_type=code&"
+                    f"scope={urllib.parse.quote('openid email profile https://www.googleapis.com/auth/drive.file')}&"
+                    f"access_type=offline&prompt=consent"
+                )
+            else:
+                oauth_url = "/?login_error=missing_credentials"
+
+            self.send_response(302)
+            self.send_header("Location", oauth_url)
+            self.end_headers()
+            return
+
         if path == "/api/stats":
             if not self.database:
                 self._send_json({"error": "Database not initialized"}, 500)
                 return
 
-            records = self.database.get_all_records(limit=1000)
+            user_email = current_user.get("email") if current_user else None
+            records = self.database.get_all_records(limit=1000, user_email=user_email)
             unique_files: Dict[str, Any] = {}
             for r in records:
                 p = r["path"]
@@ -1662,19 +1490,6 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
             subjects = sorted(list({r["subject"] for r in file_list if r.get("subject")}))
 
-            auto_sync_info = (
-                self.auto_sync_worker.get_status_info()
-                if self.auto_sync_worker
-                else {
-                    "enabled": True,
-                    "interval_minutes": 3,
-                    "is_syncing": False,
-                    "last_sync_time": None,
-                    "last_sync_human": "Chưa chạy",
-                    "last_sync_status": "Sẵn sàng",
-                }
-            )
-
             self._send_json({
                 "total_files": total,
                 "uploaded_files": uploaded,
@@ -1683,7 +1498,6 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 "subjects_count": len(subjects),
                 "subjects": subjects,
                 "drive_connected": self.drive_manager.is_configured() if self.drive_manager else False,
-                "auto_sync": auto_sync_info,
             })
             return
 
@@ -1691,7 +1505,9 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             if not self.database:
                 self._send_json([], 500)
                 return
-            records = self.database.get_all_records(limit=1000)
+
+            user_email = current_user.get("email") if current_user else None
+            records = self.database.get_all_records(limit=1000, user_email=user_email)
             unique_files: Dict[str, Any] = {}
             for r in records:
                 p = r["path"]
@@ -1704,10 +1520,6 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             file_list.sort(key=lambda x: x.get("id", 0), reverse=True)
 
             now_ts = time.time()
-            recent_drive_ids = set()
-            if self.auto_sync_worker:
-                recent_drive_ids = set(self.auto_sync_worker.recently_downloaded_ids)
-
             for f in file_list:
                 p = f.get("path", "")
                 try:
@@ -1733,7 +1545,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         pass
                 f["is_new"] = is_new
-                f["is_from_drive"] = bool(f.get("drive_file_id") in recent_drive_ids)
+                f["is_from_drive"] = bool(f.get("drive_file_id"))
 
             self._send_json(file_list)
             return
@@ -1761,10 +1573,9 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     self.wfile.write(content)
                     return
                 except Exception as exc:
-                    err_bytes = f"Lỗi đọc log: {exc}".encode("utf-8")
                     self.send_response(500)
                     self.end_headers()
-                    self.wfile.write(err_bytes)
+                    self.wfile.write(f"Lỗi: {exc}".encode("utf-8"))
                     return
 
             self.send_response(200)
@@ -1779,6 +1590,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
+        current_user = self._get_current_user()
 
         content_len = int(self.headers.get("Content-Length", 0))
         post_data = self.rfile.read(content_len) if content_len > 0 else b"{}"
@@ -1787,6 +1599,116 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             body = json.loads(post_data.decode("utf-8")) if post_data else {}
         except Exception:
             body = {}
+
+        # Quick Test Login for Students
+        if path == "/auth/test-login":
+            email = body.get("email", "").strip()
+            name = body.get("name", "").strip() or email.split("@")[0]
+            if not email or not self.database:
+                self._send_json({"ok": False, "error": "Vui lòng cung cấp email"}, 400)
+                return
+
+            user = self.database.get_or_create_user(email=email, name=name)
+            session_id = secrets.token_hex(24)
+            SESSION_STORE[session_id] = user
+            cookie_str = f"ths_session={session_id}; Path=/; HttpOnly; SameSite=Lax"
+            self._send_json({"ok": True, "user": user}, set_cookie=cookie_str)
+            return
+
+        if path == "/auth/logout":
+            cookie_header = self.headers.get("Cookie")
+            if cookie_header:
+                cookie = http.cookies.SimpleCookie()
+                try:
+                    cookie.load(cookie_header)
+                    if "ths_session" in cookie:
+                        sid = cookie["ths_session"].value
+                        SESSION_STORE.pop(sid, None)
+                except Exception:
+                    pass
+            clear_cookie = "ths_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+            self._send_json({"ok": True}, set_cookie=clear_cookie)
+            return
+
+        # Multi-Platform Upload API (Desktop, iPad, Phone)
+        if path == "/api/upload":
+            filename = body.get("filename", "").strip()
+            content_base64 = body.get("content_base64", "")
+            if not filename or not content_base64 or not self.database:
+                self._send_json({"ok": False, "error": "Dữ liệu upload không hợp lệ"}, 400)
+                return
+
+            try:
+                raw_bytes = base64.b64decode(content_base64)
+                import hashlib
+                sha256_hash = hashlib.sha256(raw_bytes).hexdigest()
+
+                user_email = current_user.get("email", "default@user")
+
+                # Kiểm tra trùng lặp
+                existing = self.database.find_by_sha256(sha256_hash, user_email=user_email)
+                if existing and existing.get("status") == STATUS_UPLOADED:
+                    self._send_json({"ok": True, "duplicate": True, "message": "File đã tồn tại và đã upload Drive."})
+                    return
+
+                # Phân loại
+                subject = body.get("subject")
+                doc_type = body.get("document_type")
+                if not subject or not doc_type:
+                    # Dùng classifier tự động
+                    if DashboardRequestHandler.classifier:
+                        info = DashboardRequestHandler.classifier.classify_path(Path(filename))
+                        subject = subject or info.get("subject", "Tài liệu chung")
+                        doc_type = doc_type or info.get("document_type", "Tài liệu tham khảo")
+                    else:
+                        subject = subject or "Tài liệu chung"
+                        doc_type = doc_type or "Tài liệu tham khảo"
+
+                # Lưu file vào thư mục lưu trữ của user
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                root_folder = Path(cfg["root_folder"])
+                dest_dir = root_folder / subject
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                dest_path = dest_dir / filename
+                with open(dest_path, "wb") as f_out:
+                    f_out.write(raw_bytes)
+
+                drive_file_id = None
+                # Đồng bộ lên Drive nếu DriveManager sẵn sàng
+                if self.drive_manager and self.drive_manager.is_configured():
+                    try:
+                        drive_file_id = self.drive_manager.upload_file(
+                            file_path=dest_path,
+                            subject=subject,
+                            document_type=doc_type,
+                        )
+                    except Exception as exc:
+                        logger.warning("Lỗi upload Drive khi user nạp file: %s", exc)
+
+                rec_id = self.database.insert_record(
+                    sha256=sha256_hash,
+                    path=str(dest_path),
+                    subject=subject,
+                    document_type=doc_type,
+                    status=STATUS_UPLOADED if drive_file_id else "PENDING",
+                    drive_file_id=drive_file_id,
+                    user_email=user_email,
+                )
+
+                self._send_json({
+                    "ok": True,
+                    "id": rec_id,
+                    "filename": filename,
+                    "subject": subject,
+                    "document_type": doc_type,
+                    "drive_file_id": drive_file_id,
+                })
+                return
+            except Exception as exc:
+                logger.error("Lỗi xử lý API upload: %s", exc, exc_info=True)
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
 
         if path == "/api/files/update":
             record_id = body.get("id")
@@ -1805,7 +1727,6 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 new_drive_id = record.get("drive_file_id")
 
-                # Di chuyển file trên Drive nếu sẵn sàng
                 if self.drive_manager and self.drive_manager.is_configured() and record.get("drive_file_id"):
                     try:
                         target_folder_id = self.drive_manager.resolve_folder_hierarchy(
@@ -1813,10 +1734,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                             document_type=new_type,
                         )
                         service = self.drive_manager.get_service()
-                        file_meta = service.files().get(
-                            fileId=record["drive_file_id"],
-                            fields="parents",
-                        ).execute()
+                        file_meta = service.files().get(fileId=record["drive_file_id"], fields="parents").execute()
                         previous_parents = ",".join(file_meta.get("parents", []))
 
                         service.files().update(
@@ -1825,9 +1743,8 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                             removeParents=previous_parents,
                             fields="id, parents",
                         ).execute()
-                        logger.info("Đã di chuyển file Drive '%s' sang folder '%s'", record['path'], target_folder_id)
                     except Exception as exc:
-                        logger.warning("Không thể di chuyển file Drive tự động: %s", exc)
+                        logger.warning("Không thể di chuyển file Drive: %s", exc)
 
                 self.database.update_classification(
                     record_id=record_id,
@@ -1845,20 +1762,9 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     current_cfg = json.load(f)
-
                 current_cfg.update(body)
-
                 with open(self.config_path, "w", encoding="utf-8") as f:
                     json.dump(current_cfg, f, indent=2, ensure_ascii=False)
-
-                # Cập nhật worker nếu có
-                worker = getattr(DashboardRequestHandler, "auto_sync_worker", None)
-                if worker:
-                    enabled = body.get("auto_sync_drive")
-                    mins = body.get("drive_sync_interval_minutes")
-                    secs = int(mins) * 60 if mins is not None else None
-                    worker.update_settings(enabled=enabled, interval_seconds=secs)
-
                 self._send_json({"ok": True})
                 return
             except Exception as exc:
@@ -1875,30 +1781,6 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     logger.error("Lỗi callback scan: %s", exc)
             self._send_json({"ok": True, "count": count})
             return
-
-        if path == "/api/sync-down":
-            from src.sync import sync_from_drive_to_local
-            try:
-                worker = getattr(DashboardRequestHandler, "auto_sync_worker", None)
-                if worker:
-                    downloaded = worker.trigger_now()
-                else:
-                    with open(self.config_path, "r", encoding="utf-8") as f:
-                        cfg = json.load(f)
-                    root_folder = Path(cfg["root_folder"])
-                    classifier = getattr(DashboardRequestHandler, "classifier", None)
-                    downloaded = sync_from_drive_to_local(
-                        drive_manager=DashboardRequestHandler.drive_manager,
-                        database=DashboardRequestHandler.database,
-                        root_folder=root_folder,
-                        classifier=classifier,
-                    )
-                self._send_json({"ok": True, "count": len(downloaded), "files": downloaded})
-                return
-            except Exception as exc:
-                logger.error("Lỗi khi đồng bộ từ Drive về: %s", exc, exc_info=True)
-                self._send_json({"ok": False, "error": str(exc)}, 500)
-                return
 
         self.send_response(404)
         self.end_headers()
