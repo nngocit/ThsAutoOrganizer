@@ -122,3 +122,22 @@ def test_classify_direct_subject_files(tmp_path: Path) -> None:
     assert res3.subject == "Toán khoa học dữ liệu"
     assert res3.document_type == "Ôn thi"
 
+
+def test_dynamic_classifier_by_major():
+    from src.classifier import PathClassifier
+
+    classifier = PathClassifier(root_folder="H:/2026/Thac Sy/Users_Storage/lan_anh")
+
+    # Bản đồ môn học của ngành Quản trị kinh doanh
+    qtkd_subject_map = {
+        "Marketing_Quoc_Te": "Marketing quốc tế",
+        "Quan_Tri_Chien_Luoc": "Quản trị chiến lược",
+    }
+
+    # Đường dẫn file của sinh viên QTKD
+    path_slide = Path("H:/2026/Thac Sy/Users_Storage/lan_anh/Quan_Tri_Kinh_Doanh/Marketing_Quoc_Te/02_Slide/Slide_Chuong1.pdf")
+    res = classifier.classify(path_slide, root_folder="H:/2026/Thac Sy/Users_Storage/lan_anh/Quan_Tri_Kinh_Doanh", subject_map=qtkd_subject_map)
+    assert res.subject == "Marketing quốc tế"
+    assert res.document_type == "Slide"
+
+

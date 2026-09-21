@@ -8,7 +8,8 @@ và cấu trúc 2 cấp (khi người dùng để file trực tiếp trong thư 
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
 
 
 class ClassifierError(Exception):
@@ -101,18 +102,24 @@ class PathClassifier:
         self,
         file_path: Path | str,
         root_folder: Optional[Path | str] = None,
+        subject_map: Optional[Dict[str, str]] = None,
+        type_map: Optional[Dict[str, str]] = None,
     ) -> ClassificationResult:
         """Phân loại môn học và loại tài liệu từ file_path.
 
         Args:
             file_path: Đường dẫn đầy đủ hoặc tương đối của file cần phân loại.
             root_folder: Thư mục gốc tùy chọn (mặc định là self.root_folder).
+            subject_map: Bản đồ môn học tùy biến (mặc định là self.subject_map).
+            type_map: Bản đồ loại tài liệu tùy biến (mặc định là self.type_map).
 
         Returns:
             ClassificationResult chứa thông tin môn học và loại tài liệu.
         """
         resolved_root = Path(root_folder).resolve() if root_folder else self.root_folder
         resolved_file = Path(file_path).resolve()
+        active_subject_map = self.subject_map if subject_map is None else subject_map
+        active_type_map = self.type_map if type_map is None else type_map
 
         try:
             rel_path = resolved_file.relative_to(resolved_root)
@@ -130,13 +137,13 @@ class PathClassifier:
             )
 
         subject_raw = parts[0]
-        if subject_raw not in self.subject_map:
-            valid_subjects = ", ".join(self.subject_map.keys())
+        if subject_raw not in active_subject_map:
+            valid_subjects = ", ".join(active_subject_map.keys())
             raise UnknownSubjectError(
                 f"Thư mục môn '{subject_raw}' chưa được định nghĩa. Các môn hợp lệ: [{valid_subjects}]"
             )
 
-        subject = self.subject_map[subject_raw]
+        subject = active_subject_map[subject_raw]
 
         if len(parts) == 2:
             # File nằm trực tiếp trong thư mục môn
@@ -172,16 +179,27 @@ class PathClassifier:
 
         # len(parts) >= 3: có thư mục loại tài liệu
         type_raw = parts[1]
-        if type_raw not in self.type_map:
-            valid_types = ", ".join(self.type_map.keys())
+        if type_raw not in active_type_map:
+            valid_types = ", ".join(active_type_map.keys())
             raise UnknownDocumentTypeError(
                 f"Thư mục loại '{type_raw}' chưa được định nghĩa. Các loại hợp lệ: [{valid_types}]"
             )
 
         return ClassificationResult(
             subject=subject,
-            document_type=self.type_map[type_raw],
+            document_type=active_type_map[type_raw],
             subject_raw=subject_raw,
             document_type_raw=type_raw,
             relative_path=str(rel_path).replace("\\", "/"),
         )
+
+    def classify_for_major(
+        self,
+        file_path: Path | str,
+        major_subjects: List[Dict[str, Any]],
+        root_folder: Optional[Path | str] = None,
+    ) -> ClassificationResult:
+        """Phân loại đường dẫn dựa trên danh mục môn học của chuyên ngành."""
+        subject_map = {s["folder_name"]: s["name"] for s in major_subjects}
+        return self.classify(file_path, root_folder=root_folder, subject_map=subject_map)
+

@@ -1466,8 +1466,20 @@ def get_html_dashboard() -> str:
           <h2 class="tester-title">Thử ngay: AI đang nói gì về tài liệu của bạn?</h2>
           <div class="tester-sub-en">Build your AI document classification health check.</div>
           <p class="tester-desc">
-            Chỉ cần nhập tên tệp bài giảng hoặc đồ án của bạn. Hệ thống sẽ tự động phân tích từ khóa, cấu trúc môn học và gợi ý vị trí lưu trữ tối ưu theo chuẩn Thạc sĩ HTTT. Bạn sẽ nhanh chóng nhận ra tài liệu được tổ chức khoa học tức thì.
+            Chỉ cần chọn chuyên ngành và nhập tên tệp bài giảng của bạn. Hệ thống sẽ tự động phân tích từ khóa, cấu trúc môn học và gợi ý vị trí lưu trữ tối ưu theo quy chuẩn 4 thư mục con bất biến của từng ngành đào tạo Thạc sĩ.
           </p>
+
+          <!-- Major Selector for Tester -->
+          <div style="display: flex; gap: 10px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
+            <label style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 600;">Chuyên ngành:</label>
+            <select id="demoMajorSelect" class="form-control" style="max-width: 280px; font-size: 0.84rem; padding: 6px 10px;" onchange="onDemoMajorChange()">
+              <option value="HTTT">Hệ thống thông tin (HTTT)</option>
+              <option value="QTKD">Quản trị kinh doanh (QTKD)</option>
+              <option value="LKT">Luật kinh tế (LKT)</option>
+              <option value="TH">Toán học (TH)</option>
+              <option value="QLGD">Quản lý giáo dục (QLGD)</option>
+            </select>
+          </div>
 
           <div class="tester-input-bar">
             <input type="text" id="demoInputFile" class="tester-input" placeholder="Nhập tên tệp bài giảng của bạn..." value="BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong1.pdf">
@@ -1477,8 +1489,8 @@ def get_html_dashboard() -> str:
           </div>
 
           <!-- Quick Samples -->
-          <div class="tester-samples">
-            <span class="tester-samples-label">Gợi ý thử nhanh:</span>
+          <div class="tester-samples" id="demoSampleChips">
+            <span class="tester-samples-label">Gợi ý thử nhanh (HTTT):</span>
             <span class="sample-chip" onclick="setDemoInput('BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong2.pdf')">Toán KH Dữ liệu (Slide)</span>
             <span class="sample-chip" onclick="setDemoInput('De_Cuong_On_Thi_Triet_Hoc_Mac_Lenin.docx')">Triết học (Ôn thi)</span>
             <span class="sample-chip" onclick="setDemoInput('Slide_Co_So_Du_Lieu_Nang_Cao.pptx')">Cơ sở dữ liệu (Slide)</span>
@@ -2079,6 +2091,55 @@ def get_html_dashboard() -> str:
     }
 
     /* Interactive AI Tester */
+    function onDemoMajorChange() {
+      const sel = document.getElementById('demoMajorSelect');
+      const major = sel ? sel.value : 'HTTT';
+      const chipsContainer = document.getElementById('demoSampleChips');
+      if (!chipsContainer) return;
+
+      if (major === 'QTKD') {
+        chipsContainer.innerHTML = `
+          <span class="tester-samples-label">Gợi ý thử nhanh (QTKD):</span>
+          <span class="sample-chip" onclick="setDemoInput('Marketing_Can_Ban_Chuong1.pptx')">Marketing căn bản (Slide)</span>
+          <span class="sample-chip" onclick="setDemoInput('Giao_Trinh_Quan_Tri_Chien_Luoc.pdf')">Quản trị chiến lược (Giáo trình)</span>
+          <span class="sample-chip" onclick="setDemoInput('De_Cuong_On_Thi_Marketing.docx')">Marketing (Ôn thi)</span>
+        `;
+        document.getElementById('demoInputFile').value = 'Marketing_Can_Ban_Chuong1.pptx';
+      } else if (major === 'LKT') {
+        chipsContainer.innerHTML = `
+          <span class="tester-samples-label">Gợi ý thử nhanh (LKT):</span>
+          <span class="sample-chip" onclick="setDemoInput('Phap_Luat_Hop_Dong_Thuong_Mai.pdf')">Pháp luật hợp đồng (Giáo trình)</span>
+          <span class="sample-chip" onclick="setDemoInput('Slide_Phap_Luat_Doanh_Nghiep.pptx')">Pháp luật doanh nghiệp (Slide)</span>
+          <span class="sample-chip" onclick="setDemoInput('On_Thi_Luat_Kinh_Te.docx')">Luật kinh tế (Ôn thi)</span>
+        `;
+        document.getElementById('demoInputFile').value = 'Phap_Luat_Hop_Dong_Thuong_Mai.pdf';
+      } else if (major === 'QLGD') {
+        chipsContainer.innerHTML = `
+          <span class="tester-samples-label">Gợi ý thử nhanh (QLGD):</span>
+          <span class="sample-chip" onclick="setDemoInput('Quan_Ly_Truong_Hoc_Hien_Dai.pdf')">Quản lý trường học (Giáo trình)</span>
+          <span class="sample-chip" onclick="setDemoInput('Slide_Danh_Gia_Trong_Giao_Duc.pptx')">Đánh giá trong GD (Slide)</span>
+        `;
+        document.getElementById('demoInputFile').value = 'Quan_Ly_Truong_Hoc_Hien_Dai.pdf';
+      } else if (major === 'TH') {
+        chipsContainer.innerHTML = `
+          <span class="tester-samples-label">Gợi ý thử nhanh (Toán học):</span>
+          <span class="sample-chip" onclick="setDemoInput('Giao_Trinh_Dai_So_Truu_Tuong.pdf')">Đại số trừu tượng (Giáo trình)</span>
+          <span class="sample-chip" onclick="setDemoInput('Slide_Giai_Tich_Thuc.pptx')">Giải tích thực (Slide)</span>
+        `;
+        document.getElementById('demoInputFile').value = 'Giao_Trinh_Dai_So_Truu_Tuong.pdf';
+      } else {
+        chipsContainer.innerHTML = `
+          <span class="tester-samples-label">Gợi ý thử nhanh (HTTT):</span>
+          <span class="sample-chip" onclick="setDemoInput('BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong2.pdf')">Toán KH Dữ liệu (Slide)</span>
+          <span class="sample-chip" onclick="setDemoInput('De_Cuong_On_Thi_Triet_Hoc_Mac_Lenin.docx')">Triết học (Ôn thi)</span>
+          <span class="sample-chip" onclick="setDemoInput('Slide_Co_So_Du_Lieu_Nang_Cao.pptx')">Cơ sở dữ liệu (Slide)</span>
+          <span class="sample-chip" onclick="setDemoInput('Giao_Trinh_Phuong_Phap_Nghien_Cuu.pdf')">PP Nghiên cứu (Giáo trình)</span>
+        `;
+        document.getElementById('demoInputFile').value = 'BaiGiang_Toan_Khoa_Hoc_Du_Lieu_Chuong2.pdf';
+      }
+      runDemoClassifier();
+    }
+
     function setDemoInput(filename) {
       document.getElementById('demoInputFile').value = filename;
       runDemoClassifier();
@@ -2088,25 +2149,40 @@ def get_html_dashboard() -> str:
       const input = document.getElementById('demoInputFile').value.trim();
       if (!input) return;
 
+      const sel = document.getElementById('demoMajorSelect');
+      const majorCode = sel ? sel.value : 'HTTT';
+
       const resBox = document.getElementById('testerResultCard');
       const resSub = document.getElementById('resSubject');
       const resPath = document.getElementById('resPath');
       const resTags = document.getElementById('resTags');
 
-      let subject = 'Toán khoa học dữ liệu';
-      let docType = 'Slide';
+      let subject = 'Tài liệu chung';
+      let docType = 'Tài liệu tham khảo';
       const fnLower = input.toLowerCase();
 
-      if (fnLower.includes('triet')) subject = 'Triết học';
+      // Phân tích Môn học đa ngành
+      if (fnLower.includes('marketing') || fnLower.includes('mkt')) subject = 'Marketing căn bản';
+      else if (fnLower.includes('chien_luoc') || fnLower.includes('strategy')) subject = 'Quản trị chiến lược';
+      else if (fnLower.includes('hop_dong')) subject = 'Pháp luật hợp đồng';
+      else if (fnLower.includes('doanh_nghiep')) subject = 'Pháp luật doanh nghiệp';
+      else if (fnLower.includes('truong_hoc')) subject = 'Quản lý trường học';
+      else if (fnLower.includes('danh_gia')) subject = 'Đánh giá trong giáo dục';
+      else if (fnLower.includes('dai_so')) subject = 'Đại số trừu tượng';
+      else if (fnLower.includes('giai_tich')) subject = 'Giải tích thực';
+      else if (fnLower.includes('triet')) subject = 'Triết học';
       else if (fnLower.includes('toan') || fnLower.includes('du_lieu') || fnLower.includes('data')) subject = 'Toán khoa học dữ liệu';
       else if (fnLower.includes('csdl') || fnLower.includes('du lieu') || fnLower.includes('database')) subject = 'Cơ sở dữ liệu';
       else if (fnLower.includes('nghien_cuu') || fnLower.includes('phuong_phap')) subject = 'Phương pháp nghiên cứu';
       else if (fnLower.includes('ghi_chu') || fnLower.includes('note')) subject = 'Phương pháp ghi chú';
+      else {
+        subject = (majorCode === 'QTKD') ? 'Marketing căn bản' : (majorCode === 'LKT') ? 'Pháp luật hợp đồng' : (majorCode === 'QLGD') ? 'Quản lý trường học' : 'Toán khoa học dữ liệu';
+      }
 
       const ext = input.split('.').pop().toLowerCase();
-      if (fnLower.includes('slide') || fnLower.includes('bai_giang') || fnLower.includes('baigiang') || ext === 'pptx') {
+      if (fnLower.includes('slide') || fnLower.includes('bai_giang') || fnLower.includes('baigiang') || ext === 'pptx' || ext === 'ppt') {
         docType = 'Slide';
-      } else if (fnLower.includes('on_thi') || fnLower.includes('de_cuong') || fnLower.includes('onthi')) {
+      } else if (fnLower.includes('on_thi') || fnLower.includes('de_cuong') || fnLower.includes('onthi') || fnLower.includes('de_thi')) {
         docType = 'Ôn thi';
       } else if (fnLower.includes('giao_trinh') || fnLower.includes('giaotrinh') || fnLower.includes('book')) {
         docType = 'Giáo trình';
@@ -2115,11 +2191,10 @@ def get_html_dashboard() -> str:
       }
 
       const safeSub = subject.replace(/\\s+/g, '_');
-      const safeType = docType.replace(/\\s+/g, '_');
       const folderName = (docType === 'Giáo trình') ? '01_Giao_Trinh' : (docType === 'Slide') ? '02_Slide' : (docType === 'Ôn thi') ? '04_On_Thi' : '03_Tai_Lieu_Tham_Khao';
 
       resSub.textContent = subject;
-      resPath.textContent = `📁 Thư mục đề xuất: /${safeSub}/${folderName}/${input}`;
+      resPath.textContent = `📁 Thư mục đề xuất: /${majorCode}/${safeSub}/${folderName}/${input}`;
       resTags.innerHTML = `
         <span class="tag-subject">${subject}</span>
         <span class="tag-type">${docType}</span>
@@ -2129,6 +2204,7 @@ def get_html_dashboard() -> str:
       resBox.style.display = 'flex';
       showToast(`✨ Đã phân loại: ${subject} (${docType})`);
     }
+
 
     function setViewMode(mode) {
       currentViewMode = mode;

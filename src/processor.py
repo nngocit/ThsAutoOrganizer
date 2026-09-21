@@ -122,7 +122,7 @@ class FileProcessor:
     def _get_drive_manager_for_user(self, user_email: str) -> Optional[DriveManager]:
         """Lấy DriveManager phù hợp với tài khoản người dùng."""
         clean_email = (user_email or "").strip().lower()
-        if clean_email in ["xuanngocit@gmail.com", "default@user"]:
+        if not clean_email or clean_email in ["xuanngocit@gmail.com", "default@user"]:
             if self.drive_manager:
                 if hasattr(self.drive_manager, "is_configured"):
                     if self.drive_manager.is_configured():
@@ -181,27 +181,48 @@ class FileProcessor:
         user_dir.mkdir(parents=True, exist_ok=True)
         return user_dir
 
-    def _infer_classification_from_filename(self, path: Path) -> Tuple[str, str]:
+    def _infer_classification_from_filename(self, path: Path, user_email: Optional[str] = None) -> Tuple[str, str]:
         """Tự động suy luận Môn học và Loại tài liệu thông minh khi file không nằm trong cấu trúc thư mục chuẩn."""
         fn_lower = path.name.lower()
         parent_name = path.parent.name.lower()
         combined = f"{parent_name} {fn_lower}"
 
-        # 1. Nhận diện Môn học
+        # 1. Nhận diện Môn học (ưu tiên theo chuyên ngành của user)
         subject = "Tài liệu chung"
-        if any(k in combined for k in ["triết", "triet", "mac", "lenin"]):
-            subject = "Triết học"
-        elif any(k in combined for k in ["toán", "toan", "dữ liệu", "du_lieu", "data"]):
-            subject = "Toán khoa học dữ liệu"
-        elif any(k in combined for k in ["cơ sở dữ liệu", "co_so_du_lieu", "csdl", "database", "sql"]):
-            subject = "Cơ sở dữ liệu"
-        elif any(k in combined for k in ["nghiên cứu", "nghien_cuu", "phương pháp nghiên cứu", "ppnc"]):
-            subject = "Phương pháp nghiên cứu"
-        elif any(k in combined for k in ["ghi chú", "ghi_chu", "note", "phuong_phap_ghi_chu"]):
-            subject = "Phương pháp ghi chú"
-        elif parent_name not in ["new folder", "thư mục mới", "downloads", "desktop", "", "users_storage"]:
-            # Dùng tên thư mục nếu có ý nghĩa
-            subject = path.parent.name
+        matched = False
+        if user_email and self.database:
+            clean_email = user_email.strip().lower()
+            db_user = self.database.get_user_by_email(clean_email)
+            if db_user and db_user.get("major_id"):
+                subjects = self.database.get_subjects_by_major(db_user["major_id"])
+                for s in subjects:
+                    s_name = s["name"]
+                    kw_list = [s_name.lower(), s["code"].lower(), s["folder_name"].lower()]
+                    try:
+                        kws = json.loads(s.get("keywords", "[]"))
+                        if isinstance(kws, list):
+                            kw_list.extend([k.lower() for k in kws])
+                    except Exception:
+                        pass
+                    if any(k in combined for k in kw_list if k):
+                        subject = s_name
+                        matched = True
+                        break
+
+        if not matched:
+            if any(k in combined for k in ["triết", "triet", "mac", "lenin"]):
+                subject = "Triết học"
+            elif any(k in combined for k in ["toán", "toan", "dữ liệu", "du_lieu", "data"]):
+                subject = "Toán khoa học dữ liệu"
+            elif any(k in combined for k in ["cơ sở dữ liệu", "co_so_du_lieu", "csdl", "database", "sql"]):
+                subject = "Cơ sở dữ liệu"
+            elif any(k in combined for k in ["nghiên cứu", "nghien_cuu", "phương pháp nghiên cứu", "ppnc"]):
+                subject = "Phương pháp nghiên cứu"
+            elif any(k in combined for k in ["ghi chú", "ghi_chu", "note", "phuong_phap_ghi_chu"]):
+                subject = "Phương pháp ghi chú"
+            elif parent_name not in ["new folder", "thư mục mới", "downloads", "desktop", "", "users_storage"]:
+                # Dùng tên thư mục nếu có ý nghĩa
+                subject = path.parent.name
 
         # 2. Nhận diện Loại tài liệu
         doc_type = "Tài liệu tham khảo"
@@ -238,32 +259,27 @@ class FileProcessor:
         if ext not in self.supported_extensions:
             return False
 
+        # Kiểm tra kích thước tối thiểu
+        try:
+            if path.stat().st_size < self.min_file_size_bytes:
+                return False
+        except OSError:
+            return False
+
         return True
 
-    def process_file(self, file_path: Path | str, user_email: str = "default@user") -> ProcessingResult:
-        """Thực thi toàn bộ pipeline cho một file gắn với tài khoản người dùng."""
+    def process_file(
+        self,
+        file_path: Path | str,
+        user_email: Optional[str] = None,
+    ) -> ProcessingResult:
+        """Xử lý toàn diện một file: phân loại, hash, lưu DB, trích xuất, upload Drive."""
         path = Path(file_path).resolve()
-        logger.info("Detected: %s (User: %s)", path.name, user_email)
+        logger.info("Bắt đầu xử lý file: %s (User: %s)", path, user_email or "default")
 
-        if not path.is_file():
-            err_msg = f"File không tồn tại hoặc đã bị xóa: '{path}'"
-            logger.warning(err_msg)
-            return ProcessingResult(
-                file_path=str(path),
-                sha256=None,
-                subject=None,
-                document_type=None,
-                status=STATUS_ERROR,
-                error=err_msg,
-            )
-
-        # 1. Kiểm tra kích thước tối thiểu
-        file_size = path.stat().st_size
-        if file_size < self.min_file_size_bytes:
-            err_msg = (
-                f"Kích thước file {file_size} bytes nhỏ hơn ngưỡng tối thiểu "
-                f"{self.min_file_size_bytes} bytes."
-            )
+        # 1. Kiểm tra hợp lệ
+        if not self.should_process_file(path):
+            err_msg = f"File '{path.name}' không thỏa điều kiện xử lý (sai extension hoặc quá nhỏ)."
             logger.warning(err_msg)
             return ProcessingResult(
                 file_path=str(path),
@@ -278,8 +294,18 @@ class FileProcessor:
         user_root = self._get_user_storage_folder(user_email)
         subject = None
         document_type = None
+
+        subject_map = None
+        if user_email and self.database:
+            clean_email = user_email.strip().lower()
+            db_user = self.database.get_user_by_email(clean_email)
+            if db_user and db_user.get("major_id"):
+                major_subs = self.database.get_subjects_by_major(db_user["major_id"])
+                if major_subs:
+                    subject_map = {s["folder_name"]: s["name"] for s in major_subs}
+
         try:
-            classification = self.classifier.classify(path, root_folder=user_root)
+            classification = self.classifier.classify(path, root_folder=user_root, subject_map=subject_map)
             subject = classification.subject
             document_type = classification.document_type
         except ClassifierError as exc:
