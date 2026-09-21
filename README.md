@@ -190,18 +190,30 @@ python main.py
 - Trong lần chạy đầu tiên (nếu có `credentials.json`), trình duyệt web sẽ tự động mở để bạn đăng nhập và cấp quyền truy cập Drive. Sau đó, mã xác thực sẽ được lưu vào `token.json` cho các lần chạy sau mà không cần hỏi lại.
 - Nếu bạn chưa đặt `credentials.json`, hệ thống sẽ hiển thị cảnh báo `[WAITING] Google OAuth credentials` nhưng **vẫn hoạt động hoàn hảo** cho việc phân loại cục bộ, tính hash SHA-256, trích xuất text và lưu trữ vào SQLite.
 
-### Chạy kiểm thử tự động (Unit & Integration Tests):
+### Khởi chạy hệ thống & Web Dashboard:
+
+```powershell
+python main.py
+```
+
+Khi chạy:
+1. Watcher tự động giám sát thư mục `H:\2026\Thac Sy\Mon_Hoc`.
+2. **Web Dashboard Studio** tự động khởi động tại địa chỉ:
+   👉 **`http://localhost:8080`**
+
+### Các tính năng trên Web Dashboard Studio:
+- **Thống kê tổng quan**: Xem tổng số tài liệu, tỷ lệ upload Drive, dung lượng đã quét.
+- **Bảng quản lý tài liệu**: Tìm kiếm, lọc theo môn học, loại tài liệu, trạng thái.
+- **Sửa tay (Manual Edit)**: Bấm nút **✏️ Sửa tay** trên bất kỳ file nào để chọn lại Môn học hoặc Loại tài liệu $\rightarrow$ Hệ thống tự động cập nhật SQLite và đồng bộ chuyển thư mục trên Google Drive!
+- **Mở trực tiếp trên Drive**: Nút **🔗 Drive** nhảy thẳng đến file trên Google Drive.
+- **Cài đặt & Bật/tắt định dạng**: Quản lý các đuôi file `.pdf`, `.docx`, `.pptx`, `.jpg`, `.png` trực tiếp trên web.
+- **Live Terminal Logs**: Xem nhật ký quét và upload theo thời gian thực.
+
+### Chạy kiểm thử tự động (35 Tests):
 
 ```powershell
 pytest -v
 ```
-
-Toàn bộ 29 bài test bao phủ các module:
-- `test_classifier.py`: Kiểm tra phân loại đường dẫn, kiểm tra lỗi đường dẫn sai cấu trúc.
-- `test_database.py`: Kiểm tra tạo database, chỉ mục, thêm mới, chống trùng lặp SHA-256.
-- `test_extractors.py`: Kiểm tra trích xuất text từ các định dạng file.
-- `test_processor.py`: Kiểm tra pipeline hoàn chỉnh và xử lý lỗi an toàn.
-- `test_e2e_pipeline.py`: Kiểm thử tích hợp end-to-end.
 
 ---
 
