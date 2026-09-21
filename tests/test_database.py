@@ -189,3 +189,25 @@ def test_majors_and_subjects_schema_and_seed(tmp_path: Path):
     db.set_user_major("student@univ.edu", httt["id"])
     updated_user = db.get_user_by_email("student@univ.edu")
     assert updated_user["major_id"] == httt["id"]
+
+
+def test_database_session_lifecycle(tmp_path):
+    """Kiểm tra tạo, truy vấn và xóa session người dùng trong SQLite."""
+    db = Database(tmp_path / "test_session.db")
+    db.initialize()
+
+    db.get_or_create_user("learner@univ.edu", "Học viên A")
+    session_token = "test_sess_tok_12345"
+
+    # Tạo session
+    db.create_session(session_token, "learner@univ.edu", expiry_days=7)
+
+    # Truy vấn session hợp lệ
+    user = db.get_session_user(session_token)
+    assert user is not None
+    assert user["email"] == "learner@univ.edu"
+    assert user["name"] == "Học viên A"
+
+    # Xóa session
+    db.delete_session(session_token)
+    assert db.get_session_user(session_token) is None

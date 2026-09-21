@@ -398,6 +398,44 @@ def test_google_oauth_login_uses_select_account_prompt(tmp_path: Path):
         server.shutdown()
 
 
+def test_persistent_session_restoration_across_restart(web_test_env):
+    """Kiểm tra session được phục hồi từ SQLite sau khi SESSION_STORE bị xóa (mô phỏng restart server)."""
+    from src.web_server import SESSION_STORE
+    base_url, database, _ = web_test_env
+
+    # 1. Đăng nhập tạo session
+    req_data = json.dumps({"email": "persistent_user@univ.edu", "name": "Persistent User"}).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/auth/test-login", data=req_data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        set_cookie = resp.headers.get("Set-Cookie", "")
+        assert "ths_session=" in set_cookie
+        assert "Max-Age=2592000" in set_cookie
+        cookie_val = set_cookie.split(";")[0]
+
+    # 2. Xóa sạch in-memory SESSION_STORE (mô phỏng khởi động lại web server)
+    SESSION_STORE.clear()
+
+    # 3. Gửi request tới /api/me kèm Cookie cũ
+    me_req = urllib.request.Request(f"{base_url}/api/me", headers={"Cookie": cookie_val})
+    with urllib.request.urlopen(me_req) as resp:
+        me_data = json.loads(resp.read().decode("utf-8"))
+        assert me_data.get("authenticated") is True
+        assert me_data["user"]["email"] == "persistent_user@univ.edu"
+
+    # 4. Đăng xuất
+    logout_req = urllib.request.Request(f"{base_url}/auth/logout", data=b"{}", headers={"Cookie": cookie_val, "Content-Type": "application/json"})
+    with urllib.request.urlopen(logout_req) as resp:
+        clear_cookie = resp.headers.get("Set-Cookie", "")
+        assert "Max-Age" not in clear_cookie or "1970" in clear_cookie
+
+    # 5. Sau khi đăng xuất, /api/me không còn authenticated
+    me_req2 = urllib.request.Request(f"{base_url}/api/me", headers={"Cookie": cookie_val})
+    with urllib.request.urlopen(me_req2) as resp:
+        me_data2 = json.loads(resp.read().decode("utf-8"))
+        assert me_data2.get("authenticated") is False
+
+
+
 
 
 

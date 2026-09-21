@@ -3361,8 +3361,14 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-        if session_id and session_id in SESSION_STORE:
-            return SESSION_STORE[session_id]
+        if session_id:
+            if session_id in SESSION_STORE:
+                return SESSION_STORE[session_id]
+            if self.database:
+                user = self.database.get_session_user(session_id)
+                if user:
+                    SESSION_STORE[session_id] = user
+                    return user
 
         return None
 
@@ -3490,12 +3496,13 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     if access_token:
                         self.database.update_user_tokens(email=email, access_token=access_token, refresh_token=refresh_token)
                         user = self.database.get_user_by_email(email) or user
+                    self.database.create_session(session_id, email)
                     SESSION_STORE[session_id] = user
                 else:
                     SESSION_STORE[session_id] = {"email": email, "name": name, "avatar_url": avatar_url}
 
-                # Redirect về trang chủ kèm Cookie
-                cookie_str = f"ths_session={session_id}; Path=/; HttpOnly; SameSite=Lax"
+                # Redirect về trang chủ kèm Cookie (lưu 30 ngày)
+                cookie_str = f"ths_session={session_id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000"
                 self.send_response(302)
                 self.send_header("Location", "/")
                 self.send_header("Set-Cookie", cookie_str)
@@ -3717,8 +3724,10 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
             user = self.database.get_or_create_user(email=email, name=name)
             session_id = secrets.token_hex(24)
+            if self.database:
+                self.database.create_session(session_id, email)
             SESSION_STORE[session_id] = user
-            cookie_str = f"ths_session={session_id}; Path=/; HttpOnly; SameSite=Lax"
+            cookie_str = f"ths_session={session_id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000"
             self._send_json({"ok": True, "user": user}, set_cookie=cookie_str)
             return
 
@@ -3731,6 +3740,8 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     if "ths_session" in cookie:
                         sid = cookie["ths_session"].value
                         SESSION_STORE.pop(sid, None)
+                        if self.database:
+                            self.database.delete_session(sid)
                 except Exception:
                     pass
             clear_cookie = "ths_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"

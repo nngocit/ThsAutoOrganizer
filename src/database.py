@@ -3,7 +3,7 @@
 Lưu trữ metadata, hash SHA-256 để chống trùng, trạng thái xử lý và ID Google Drive.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 from pathlib import Path
 import sqlite3
@@ -125,12 +125,26 @@ class Database:
         CREATE INDEX IF NOT EXISTS idx_subjects_major_id ON subjects(major_id);
         """
 
+        create_table_sessions = """
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            user_email TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        );
+        """
+        create_index_sessions_email = """
+        CREATE INDEX IF NOT EXISTS idx_sessions_email ON sessions(user_email);
+        """
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(create_table_users)
             cursor.execute(create_table_files)
             cursor.execute(create_table_majors)
             cursor.execute(create_table_subjects)
+            cursor.execute(create_table_sessions)
+            cursor.execute(create_index_sessions_email)
 
             # Migration an toàn nếu bảng cũ chưa có các cột mới
             try:
@@ -494,6 +508,41 @@ class Database:
             cursor.execute(sql)
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
+
+    # ==================== Session Management ====================
+
+    def create_session(self, session_id: str, email: str, expiry_days: int = 30) -> None:
+        """Lưu phiên đăng nhập vào SQLite để duy trì đăng nhập qua các lần restart."""
+        now = current_iso_time()
+        expiry = (datetime.now(timezone.utc) + timedelta(days=expiry_days)).isoformat()
+        sql = """
+        INSERT OR REPLACE INTO sessions (session_id, user_email, created_at, expires_at)
+        VALUES (?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            conn.execute(sql, (session_id, email.strip().lower(), now, expiry))
+            conn.commit()
+
+    def get_session_user(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin user từ session_id nếu còn hạn sử dụng."""
+        now = current_iso_time()
+        sql = """
+        SELECT u.* FROM users u
+        JOIN sessions s ON LOWER(u.email) = LOWER(s.user_email)
+        WHERE s.session_id = ? AND s.expires_at > ?
+        LIMIT 1;
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (session_id, now))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def delete_session(self, session_id: str) -> None:
+        """Xóa session khi người dùng bấm đăng xuất."""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM sessions WHERE session_id = ?;", (session_id,))
+            conn.commit()
 
     # ==================== Major & Subject Management ====================
 
