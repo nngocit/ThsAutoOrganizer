@@ -335,6 +335,34 @@ def test_logout_comprehensive_cleanup_and_empty_demo_state(web_test_env):
         assert "document.getElementById('searchQuery').value = '';" in html
 
 
+def test_dashboard_javascript_syntax_validity():
+    import subprocess
+    import shutil
+    import tempfile
+    import re
+    import os
+    from src.web_server import get_html_dashboard
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        return
+
+    html = get_html_dashboard()
+    scripts = re.findall(r"<script>(.*?)</script>", html, re.DOTALL)
+    assert len(scripts) > 0
+
+    with tempfile.NamedTemporaryFile(suffix=".js", delete=False, mode="w", encoding="utf-8") as tmp:
+        tmp.write("\n".join(scripts))
+        tmp_path = tmp.name
+
+    try:
+        proc = subprocess.run([node_bin, "--check", tmp_path], capture_output=True, text=True)
+        assert proc.returncode == 0, f"JavaScript syntax error in dashboard: {proc.stderr}"
+    finally:
+        os.unlink(tmp_path)
+
+
+
 
 
 

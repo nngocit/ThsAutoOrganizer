@@ -2285,7 +2285,6 @@ def get_html_dashboard() -> str:
       const sel = document.getElementById('demoMajorSelect');
       const majorCode = sel ? sel.value : 'HTTT';
 
-      const resBox = document.getElementById('testerResultCard');
       const resSub = document.getElementById('resSubject');
       const resPath = document.getElementById('resPath');
       const resTags = document.getElementById('resTags');
