@@ -42,7 +42,7 @@
   - Cột `users.major_id`
   - Các hàm DB: `get_all_majors()`, `get_major_by_id(major_id)`, `get_subjects_by_major(major_id)`, `add_major(...)`, `add_subject(...)`, `set_user_major(email, major_id)`.
 
-- [ ] **Step 1: Viết test kiểm tra schema bảng `majors` và `subjects` cùng dữ liệu 14 chuyên ngành mẫu**
+- [x] **Step 1: Viết test kiểm tra schema bảng `majors` và `subjects` cùng dữ liệu 14 chuyên ngành mẫu**
 
 Thêm test case vào `tests/test_database.py`:
 ```python
@@ -73,21 +73,21 @@ def test_majors_and_subjects_schema_and_seed(tmp_path: Path):
     assert updated_user["major_id"] == httt["id"]
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 Run: `pytest tests/test_database.py::test_majors_and_subjects_schema_and_seed -v`
 Expected: FAIL (AttributeError: 'Database' object has no attribute 'get_all_majors')
 
-- [ ] **Step 3: Cập nhật `src/database.py`**
+- [x] **Step 3: Cập nhật `src/database.py`**
 - Thêm `CREATE TABLE IF NOT EXISTS majors` và `CREATE TABLE IF NOT EXISTS subjects`.
 - Thêm cột `major_id INTEGER REFERENCES majors(id)` trong `users` (dùng `PRAGMA table_info(users)` để tự động `ALTER TABLE` nếu bảng đã tồn tại).
 - Tạo hàm `_seed_default_majors_and_subjects()` khởi tạo 14 chuyên ngành chuẩn và môn học mẫu kèm từ khóa.
 - Triển khai các phương thức truy vấn và cập nhật `majors`, `subjects`, `set_user_major`.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_database.py::test_majors_and_subjects_schema_and_seed -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/database.py tests/test_database.py
 git commit -m "feat(db): add majors and subjects schema with 14 seed academic disciplines"
@@ -111,7 +111,7 @@ git commit -m "feat(db): add majors and subjects schema with 14 seed academic di
   - `POST /api/admin/majors` (Admin Only)
   - `POST /api/admin/subjects` (Admin Only)
 
-- [ ] **Step 1: Viết test kiểm tra phân quyền Admin API**
+- [x] **Step 1: Viết test kiểm tra phân quyền Admin API**
 
 Thêm test vào `tests/test_web_server.py`:
 ```python
@@ -162,20 +162,20 @@ def test_admin_majors_api_access_control(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 Run: `pytest tests/test_web_server.py::test_admin_majors_api_access_control -v`
 Expected: FAIL (404 Not Found hoặc không có endpoint)
 
-- [ ] **Step 3: Triển khai các API quản trị và kiểm tra quyền Admin trong `src/web_server.py`**
+- [x] **Step 3: Triển khai các API quản trị và kiểm tra quyền Admin trong `src/web_server.py`**
 - Thêm hàm `_is_admin(current_user)` kiểm tra email có khớp `root_account_email` (`xuanngocit@gmail.com`).
 - Xử lý `GET /api/majors`, `GET /api/majors/<id>/subjects`.
 - Xử lý `GET /api/admin/majors`, `POST /api/admin/majors`, `POST /api/admin/subjects` (nếu không phải Admin trả về HTTP 403).
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_web_server.py::test_admin_majors_api_access_control -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_web_server.py
 git commit -m "feat(api): implement admin major management endpoints with strict authorization"
@@ -197,7 +197,7 @@ git commit -m "feat(api): implement admin major management endpoints with strict
   - Sinh viên chọn ngành -> Tạo cấu trúc thư mục trên máy tính `{User_Storage}/{user}/{Major}/{Subject}/{01_Giao_Trinh | 02_Slide | 03_Tai_Lieu_Tham_Khao | 04_On_Thi}`.
   - Trả về thông tin chuyên ngành đã chọn cho client.
 
-- [ ] **Step 1: Viết test kiểm tra luồng chọn ngành và tự động sinh 4 thư mục con**
+- [x] **Step 1: Viết test kiểm tra luồng chọn ngành và tự động sinh 4 thư mục con**
 
 Thêm test vào `tests/test_multi_user.py`:
 ```python
@@ -254,20 +254,20 @@ def test_student_select_major_and_folder_provisioning(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 Run: `pytest tests/test_multi_user.py::test_student_select_major_and_folder_provisioning -v`
 Expected: FAIL (404 Not Found endpoint `/api/user/select-major`)
 
-- [ ] **Step 3: Triển khai endpoint `/api/user/select-major` và Modal Onboarding trong `src/web_server.py`**
+- [x] **Step 3: Triển khai endpoint `/api/user/select-major` và Modal Onboarding trong `src/web_server.py`**
 - Thêm handler `POST /api/user/select-major`: Nhận `major_id`, cập nhật database, lấy danh sách môn học của ngành đó và tự động `mkdir(parents=True, exist_ok=True)` 4 thư mục con chuẩn (`01_Giao_Trinh`, `02_Slide`, `03_Tai_Lieu_Tham_Khao`, `04_On_Thi`) cho từng môn.
 - Thêm HTML `#onboardingModal` với giao diện Obsidian: Tiêu đề trang nhã, ô tìm kiếm nhanh và danh sách 14 thẻ chuyên ngành.
 - Trong JS `checkCurrentUser()`: Nếu `currentUser && !currentUser.major_id`, tự động gọi `openOnboardingModal()`.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_multi_user.py::test_student_select_major_and_folder_provisioning -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_multi_user.py
 git commit -m "feat(onboarding): implement student major selection with automatic 4-subfolder provisioning"
@@ -288,7 +288,7 @@ git commit -m "feat(onboarding): implement student major selection with automati
   - Khóa hiển thị Lock Card tại `#subtabSync` khi chưa đăng nhập.
   - Từ chối upload với HTTP 401 khi không có session cookie.
 
-- [ ] **Step 1: Viết test kiểm tra bảo mật upload bắt buộc đăng nhập**
+- [x] **Step 1: Viết test kiểm tra bảo mật upload bắt buộc đăng nhập**
 
 Thêm test vào `tests/test_web_server.py`:
 ```python
@@ -334,21 +334,21 @@ def test_upload_strictly_requires_auth(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 Run: `pytest tests/test_web_server.py::test_upload_strictly_requires_auth -v`
 Expected: FAIL
 
-- [ ] **Step 3: Cập nhật giao diện Lock Card và kiểm tra session trong `src/web_server.py`**
+- [x] **Step 3: Cập nhật giao diện Lock Card và kiểm tra session trong `src/web_server.py`**
 - Cập nhật `#subtabSync`:
   - Thêm thẻ khóa bảo vệ `#syncLockCard` (hiển thị mặc định khi chưa login).
   - Khối nút nạp file `#syncUploadButtons` chỉ hiển thị khi `currentUser !== null`.
 - Trong `do_POST` `/api/upload`: Đảm bảo kiểm tra `if not current_user` trả về mã 401 rõ ràng.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_web_server.py::test_upload_strictly_requires_auth -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_web_server.py
 git commit -m "fix(security): enforce strict authentication for multi-device upload and add calm UI lock card"
@@ -370,7 +370,7 @@ git commit -m "fix(security): enforce strict authentication for multi-device upl
   - `PathClassifier.classify_for_major(file_path, major_subjects_map)`
   - Dropdown chọn ngành và các chip thử nghiệm đa dạng trên Trang chủ.
 
-- [ ] **Step 1: Viết test kiểm tra phân loại động theo chuyên ngành**
+- [x] **Step 1: Viết test kiểm tra phân loại động theo chuyên ngành**
 
 Thêm test vào `tests/test_classifier.py`:
 ```python
@@ -392,11 +392,11 @@ def test_dynamic_classifier_by_major():
     assert res.document_type == "Slide"
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 Run: `pytest tests/test_classifier.py::test_dynamic_classifier_by_major -v`
 Expected: FAIL (nếu hàm chưa hỗ trợ truyền `subject_map` tùy biến hoặc lỗi đường dẫn)
 
-- [ ] **Step 3: Cập nhật `src/classifier.py`, `src/processor.py` và Trang chủ trong `src/web_server.py`**
+- [x] **Step 3: Cập nhật `src/classifier.py`, `src/processor.py` và Trang chủ trong `src/web_server.py`**
 - Hỗ trợ truyền `subject_map` linh hoạt trong `PathClassifier.classify()`.
 - Trong `processor.py`: Trích xuất môn học theo danh mục môn của `major_id` người dùng khi phân loại dự phòng.
 - Trong `src/web_server.py` (Trang chủ `#sectionTester`):
@@ -404,11 +404,11 @@ Expected: FAIL (nếu hàm chưa hỗ trợ truyền `subject_map` tùy biến h
   - Thêm dropdown chọn Chuyên ngành mẫu (QTKD, HTTT, Luật kinh tế, Toán học, Quản lý giáo dục).
   - Cập nhật các chip gợi ý đại diện cho nhiều ngành.
 
-- [ ] **Step 4: Chạy test để xác nhận test pass**
+- [x] **Step 4: Chạy test để xác nhận test pass**
 Run: `pytest tests/test_classifier.py::test_dynamic_classifier_by_major -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/classifier.py src/processor.py src/web_server.py tests/test_classifier.py
 git commit -m "feat(classifier): support dynamic academic subject mapping and generalize home page tester"
@@ -428,7 +428,7 @@ git commit -m "feat(classifier): support dynamic academic subject mapping and ge
 - Consumes: `/api/admin/majors`, `/api/admin/subjects`
 - Produces: Giao diện quản trị phong cách Obsidian Zinc, kiểm thử toàn bộ hệ thống đạt 100%.
 
-- [ ] **Step 1: Viết test kiểm tra hiển thị menu Admin chỉ cho tài khoản Admin**
+- [x] **Step 1: Viết test kiểm tra hiển thị menu Admin chỉ cho tài khoản Admin**
 
 Thêm test vào `tests/test_web_server.py`:
 ```python
@@ -472,21 +472,21 @@ def test_admin_sidebar_item_visibility(tmp_path: Path):
         server.shutdown()
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận test thất bại**
+- [x] **Step 2: Chạy test để xác nhận test thất bại**
 Run: `pytest tests/test_web_server.py::test_admin_sidebar_item_visibility -v`
 Expected: FAIL
 
-- [ ] **Step 3: Triển khai Giao diện `#adminView` và cập nhật `/api/me` `is_admin`**
+- [x] **Step 3: Triển khai Giao diện `#adminView` và cập nhật `/api/me` `is_admin`**
 - Trong `/api/me`: Bổ sung trường `"is_admin": is_admin_user(current_user)`.
 - Trong Sidebar HTML: Thêm mục `#navItemAdmin` (mặc định `display: none`, chỉ hiển thị khi `data.is_admin === true`).
 - Thêm HTML `#adminView`: 2 cột Obsidian Zinc hiển thị danh sách Chuyên ngành (trái) và Môn học (phải) kèm form thêm môn/ngành.
 - Viết JS gọi `/api/admin/majors` và `/api/admin/subjects`.
 
-- [ ] **Step 4: Chạy toàn bộ test suite pytest**
+- [x] **Step 4: Chạy toàn bộ test suite pytest**
 Run: `pytest tests/`
 Expected: Tất cả 54+ tests PASSED trong < 10s.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add src/web_server.py tests/test_web_server.py
 git commit -m "feat(admin): implement admin management view and finalize multi-major test suite"
