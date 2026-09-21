@@ -115,3 +115,150 @@ def sync_from_drive_to_local(
         logger.info("Máy tính đã đồng bộ hoàn toàn với Google Drive, không có tài liệu mới cần tải.")
 
     return downloaded_files
+
+
+class AutoDriveSyncWorker:
+    """Worker chạy nền tự động quét và kéo tài liệu mới từ Google Drive về máy định kỳ."""
+
+    def __init__(
+        self,
+        drive_manager: DriveManager,
+        database: Database,
+        root_folder: Path | str,
+        classifier: Optional[PathClassifier] = None,
+        interval_seconds: int = 180,
+        enabled: bool = True,
+    ) -> None:
+        self.drive_manager = drive_manager
+        self.database = database
+        self.root_folder = Path(root_folder).resolve()
+        self.classifier = classifier
+        self.interval_seconds = max(30, int(interval_seconds))
+        self.enabled = enabled
+
+        import threading
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._sync_lock = threading.Lock()
+
+        # Trạng thái theo dõi
+        self.is_syncing: bool = False
+        self.last_sync_time: Optional[float] = None
+        self.last_sync_status: str = "Chưa chạy"
+        self.recently_downloaded_ids: set[str] = set()
+
+    def start(self) -> None:
+        """Bắt đầu luồng kiểm tra tự động nền."""
+        if not self.enabled:
+            logger.info("Tự động đồng bộ Drive đang tắt trong cấu hình.")
+            return
+
+        if self._thread and self._thread.is_alive():
+            return
+
+        self._stop_event.clear()
+        import threading
+        self._thread = threading.Thread(
+            target=self._run_loop,
+            daemon=True,
+            name="AutoDriveSyncWorker",
+        )
+        self._thread.start()
+        logger.info(
+            "🚀 Đã kích hoạt tính năng TỰ ĐỘNG KÉO TÀI LIỆU từ Google Drive (Chu kỳ: %d giây / %.1f phút).",
+            self.interval_seconds,
+            self.interval_seconds / 60,
+        )
+
+    def stop(self) -> None:
+        """Dừng luồng nền một cách an toàn."""
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3.0)
+        logger.info("Đã dừng luồng tự động đồng bộ Google Drive.")
+
+    def trigger_now(self) -> List[Dict[str, Any]]:
+        """Kích hoạt đồng bộ ngay lập tức (dùng khi bấm nút trên giao diện)."""
+        return self._do_sync()
+
+    def update_settings(self, enabled: Optional[bool] = None, interval_seconds: Optional[int] = None) -> None:
+        """Cập nhật cài đặt chu kỳ và bật/tắt từ Web Dashboard."""
+        if interval_seconds is not None:
+            self.interval_seconds = max(30, int(interval_seconds))
+        if enabled is not None:
+            self.enabled = bool(enabled)
+            if self.enabled and (not self._thread or not self._thread.is_alive()):
+                self.start()
+
+    def _do_sync(self) -> List[Dict[str, Any]]:
+        with self._sync_lock:
+            if self.is_syncing:
+                return []
+            self.is_syncing = True
+
+        import time
+        self.last_sync_status = "Đang kiểm tra Google Drive..."
+        try:
+            downloaded = sync_from_drive_to_local(
+                drive_manager=self.drive_manager,
+                database=self.database,
+                root_folder=self.root_folder,
+                classifier=self.classifier,
+            )
+            self.last_sync_time = time.time()
+            if downloaded:
+                for item in downloaded:
+                    if item.get("drive_file_id"):
+                        self.recently_downloaded_ids.add(item["drive_file_id"])
+                self.last_sync_status = f"Thành công (+{len(downloaded)} tài liệu mới)"
+            else:
+                self.last_sync_status = "Đã đồng bộ (Không có file mới)"
+            return downloaded
+        except Exception as exc:
+            self.last_sync_time = time.time()
+            self.last_sync_status = f"Lỗi: {exc}"
+            logger.error("Lỗi tự động kéo tài liệu từ Drive: %s", exc, exc_info=True)
+            return []
+        finally:
+            self.is_syncing = False
+
+    def _run_loop(self) -> None:
+        # Chờ 5s lúc khởi động để local scan hoàn tất trước
+        if self._stop_event.wait(timeout=5.0):
+            return
+
+        while not self._stop_event.is_set():
+            if self.enabled and self.drive_manager and self.drive_manager.is_configured():
+                try:
+                    self._do_sync()
+                except Exception as exc:
+                    logger.error("Lỗi trong vòng lặp auto sync: %s", exc)
+
+            # Chờ đúng interval_seconds (hoặc thức dậy ngay nếu có lệnh stop)
+            if self._stop_event.wait(timeout=self.interval_seconds):
+                break
+
+    def get_status_info(self) -> Dict[str, Any]:
+        """Trả về thông tin trạng thái phục vụ hiển thị trên Web Studio."""
+        import time
+        last_str = "Chưa đồng bộ"
+        if self.last_sync_time:
+            diff = int(time.time() - self.last_sync_time)
+            if diff < 60:
+                last_str = f"{diff} giây trước"
+            elif diff < 3600:
+                last_str = f"{diff // 60} phút trước"
+            else:
+                last_str = f"{diff // 3600} giờ trước"
+
+        return {
+            "enabled": self.enabled,
+            "interval_seconds": self.interval_seconds,
+            "interval_minutes": round(self.interval_seconds / 60, 1),
+            "is_syncing": self.is_syncing,
+            "last_sync_time": self.last_sync_time,
+            "last_sync_human": last_str,
+            "last_sync_status": self.last_sync_status,
+            "recent_drive_ids": list(self.recently_downloaded_ids),
+        }
+

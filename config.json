@@ -5,6 +5,8 @@
   "create_drive_subfolders": true,
   "process_existing_files_on_start": true,
   "allow_direct_subject_files": true,
+  "auto_sync_drive": true,
+  "drive_sync_interval_minutes": 3,
   "min_file_size_bytes": 1000,
   "stable_file_wait_seconds": 3,
   "log_level": "INFO",

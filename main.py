@@ -291,7 +291,23 @@ def main() -> None:
     else:
         logger.error("Thư mục root '%s' không thể theo dõi vì không tồn tại.", root_folder)
 
-    # 8. Khởi động Web Dashboard Server
+    # 8. Khởi động Auto Drive Sync Worker (Tự động kéo tài liệu từ Drive định kỳ)
+    from src.sync import AutoDriveSyncWorker
+
+    auto_sync_interval = int(config.get("drive_sync_interval_minutes", 3)) * 60
+    auto_sync_enabled = bool(config.get("auto_sync_drive", True))
+    auto_sync_worker = AutoDriveSyncWorker(
+        drive_manager=drive_manager,
+        database=database,
+        root_folder=root_folder,
+        classifier=classifier,
+        interval_seconds=auto_sync_interval,
+        enabled=auto_sync_enabled,
+    )
+    if auto_sync_enabled and drive_manager.is_configured():
+        auto_sync_worker.start()
+
+    # 9. Khởi động Web Dashboard Server
     web_server = None
     if config.get("enable_web_ui", True):
         from src.web_server import start_web_server
@@ -308,15 +324,17 @@ def main() -> None:
                 config_path="config.json",
                 scan_callback=trigger_rescan,
                 classifier=classifier,
+                auto_sync_worker=auto_sync_worker,
             )
             logger.info("👉 Mở trình duyệt truy cập Web Dashboard: http://localhost:%d", web_port)
         except Exception as exc:
             logger.warning("Không thể khởi động Web Dashboard trên port %d: %s", web_port, exc)
 
-    # 9. Xử lý tắt chương trình nhẹ nhàng (Graceful Shutdown)
+    # 10. Xử lý tắt chương trình nhẹ nhàng (Graceful Shutdown)
     def shutdown_signal_handler(signum: int, frame: Any) -> None:
         logger.info("Nhận tín hiệu dừng chương trình. Đang đóng các tiến trình...")
         stop_event.set()
+        auto_sync_worker.stop()
         if observer.is_alive():
             observer.stop()
         task_queue.put(None)

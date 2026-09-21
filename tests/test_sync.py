@@ -69,3 +69,46 @@ def test_sync_from_drive_to_local(tmp_path: Path) -> None:
         classifier=classifier,
     )
     assert len(downloaded_again) == 0
+
+
+def test_auto_drive_sync_worker(tmp_path: Path) -> None:
+    from src.sync import AutoDriveSyncWorker
+
+    root = tmp_path / "Mon_Hoc"
+    root.mkdir(parents=True, exist_ok=True)
+    db_file = tmp_path / "test_worker.db"
+
+    database = Database(db_path=db_file)
+    database.initialize()
+
+    mock_drive = MagicMock()
+    mock_drive.is_configured.return_value = True
+    mock_drive.list_all_study_materials.return_value = []
+
+    worker = AutoDriveSyncWorker(
+        drive_manager=mock_drive,
+        database=database,
+        root_folder=root,
+        interval_seconds=60,
+        enabled=True,
+    )
+
+    info = worker.get_status_info()
+    assert info["enabled"] is True
+    assert info["interval_seconds"] == 60
+    assert info["last_sync_status"] == "Chưa chạy"
+
+    # Kích hoạt trigger_now
+    result = worker.trigger_now()
+    assert result == []
+
+    updated_info = worker.get_status_info()
+    assert "Đã đồng bộ" in updated_info["last_sync_status"]
+
+    # Cập nhật setting
+    worker.update_settings(enabled=False, interval_seconds=120)
+    assert worker.enabled is False
+    assert worker.interval_seconds == 120
+
+    worker.stop()
+

@@ -2,7 +2,9 @@
 
 Giao diện quản lý hiện đại theo phong cách Google AI Studio / Glassmorphism:
 - Bảng điều khiển thống kê trực quan
-- Danh sách tài liệu trong SQLite & liên kết Google Drive
+- Nhận diện tức thì file MỚI (✨ MỚI badge, bộ lọc mới, hiển thị thời gian cập nhật tương đối)
+- Hỗ trợ chuyển đổi linh hoạt: Chế độ Thẻ (Cards Grid) & Chế độ Bảng (Table View)
+- Tự động kéo tài liệu từ Google Drive về máy định kỳ (Auto Drive Sync Worker)
 - Tính năng "Sửa tay" (Manual Edit) Môn học & Loại tài liệu
 - Bật/tắt các định dạng hỗ trợ (PDF, DOCX, PPTX, JPG, PNG...)
 - Quét lại thư mục theo yêu cầu và xem Live Logs
@@ -11,15 +13,17 @@ Giao diện quản lý hiện đại theo phong cách Google AI Studio / Glassmo
 import http.server
 import json
 import logging
+import os
 from pathlib import Path
 import socketserver
 import threading
+import time
 import urllib.parse
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from src.database import Database
 from src.drive import DriveManager
-from src.extractors import extract_text, ExtractionError
 
 logger = logging.getLogger("ThsAutoOrganizer.web")
 
@@ -34,16 +38,16 @@ def get_html_dashboard() -> str:
   <title>ThsAutoOrganizer Studio – Quản Lý Tài Liệu ThS HTTT</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-base: #0a0c14;
-      --bg-surface: rgba(18, 22, 34, 0.75);
-      --bg-card: rgba(23, 28, 44, 0.65);
-      --bg-card-hover: rgba(32, 39, 61, 0.85);
+      --bg-base: #080a12;
+      --bg-surface: rgba(16, 20, 32, 0.75);
+      --bg-card: rgba(22, 28, 46, 0.65);
+      --bg-card-hover: rgba(30, 38, 62, 0.85);
       --border-color: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(0, 242, 254, 0.4);
-      --text-main: #f1f5f9;
+      --border-focus: rgba(0, 242, 254, 0.45);
+      --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --text-dim: #64748b;
       
@@ -56,13 +60,16 @@ def get_html_dashboard() -> str:
       --accent-red: #ef4444;
 
       --grad-studio: linear-gradient(135deg, #1a73e8 0%, #8b5cf6 50%, #00f2fe 100%);
-      --grad-glow: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.15), transparent 70%);
+      --grad-glow: radial-gradient(ellipse at 50% -20%, rgba(26, 115, 232, 0.2), rgba(139, 92, 246, 0.12), transparent 70%);
+      --grad-new: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      --grad-drive: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      
       --radius-sm: 8px;
       --radius-md: 12px;
       --radius-lg: 18px;
       --radius-full: 9999px;
-      --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-      --shadow-glow: 0 0 25px rgba(0, 242, 254, 0.15);
+      --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+      --shadow-glow: 0 0 25px rgba(0, 242, 254, 0.18);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -70,6 +77,7 @@ def get_html_dashboard() -> str:
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: var(--bg-base);
       background-image: var(--grad-glow);
+      background-attachment: fixed;
       color: var(--text-main);
       min-height: 100vh;
       display: flex;
@@ -77,13 +85,13 @@ def get_html_dashboard() -> str:
       overflow-x: hidden;
     }
 
-    /* Scrollbar Styling */
+    /* Scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg-base); }
     ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: var(--radius-full); }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
 
-    /* Top Navigation Bar */
+    /* Header */
     header {
       position: sticky;
       top: 0;
@@ -92,10 +100,11 @@ def get_html_dashboard() -> str:
       -webkit-backdrop-filter: blur(24px);
       background: var(--bg-surface);
       border-bottom: 1px solid var(--border-color);
-      padding: 14px 28px;
+      padding: 12px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 16px;
     }
     .brand {
       display: flex;
@@ -126,31 +135,37 @@ def get_html_dashboard() -> str:
     }
     .badge-studio {
       font-size: 0.68rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      padding: 2px 8px;
-      background: linear-gradient(135deg, rgba(26, 115, 232, 0.25), rgba(139, 92, 246, 0.25));
-      border: 1px solid rgba(0, 242, 254, 0.3);
-      color: var(--accent-cyan);
-      border-radius: var(--radius-full);
       font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      flex-wrap: wrap;
     }
     .status-pill {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 8px;
       padding: 6px 14px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border-color);
       border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
       font-size: 0.8rem;
       color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .status-pill:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(0, 242, 254, 0.3);
     }
     .pulse-dot {
       width: 8px;
@@ -158,56 +173,68 @@ def get_html_dashboard() -> str:
       border-radius: 50%;
       background: var(--accent-green);
       box-shadow: 0 0 8px var(--accent-green);
-      animation: pulse 2s infinite;
+      animation: pulseAnim 2s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+    @keyframes pulseAnim {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
+    /* Buttons */
     .btn {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      font-size: 0.85rem;
-      font-weight: 600;
+      gap: 6px;
+      padding: 8px 15px;
       border-radius: var(--radius-md);
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       border: 1px solid transparent;
-      outline: none;
-      font-family: inherit;
+      text-decoration: none;
+      white-space: nowrap;
     }
     .btn-primary {
       background: var(--grad-studio);
       color: #ffffff;
-      box-shadow: 0 2px 12px rgba(26, 115, 232, 0.3);
+      box-shadow: 0 2px 12px rgba(0, 242, 254, 0.25);
     }
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 20px rgba(0, 242, 254, 0.45);
+      box-shadow: 0 4px 18px rgba(0, 242, 254, 0.4);
     }
     .btn-secondary {
       background: rgba(255, 255, 255, 0.05);
-      color: var(--text-main);
       border-color: var(--border-color);
+      color: var(--text-main);
     }
     .btn-secondary:hover {
       background: rgba(255, 255, 255, 0.1);
       border-color: rgba(255, 255, 255, 0.2);
     }
+    .btn-sync {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+    .btn-sync:hover {
+      background: rgba(16, 185, 129, 0.25);
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+    }
 
     /* Main Container */
     main {
       flex: 1;
-      max-width: 1400px;
+      max-width: 1440px;
       width: 100%;
       margin: 0 auto;
-      padding: 28px 24px;
+      padding: 24px 28px 48px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
     }
 
     /* Stats Grid */
@@ -218,252 +245,439 @@ def get_html_dashboard() -> str:
     }
     .stat-card {
       background: var(--bg-card);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
-      padding: 20px 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      padding: 18px 22px;
+      backdrop-filter: blur(16px);
       position: relative;
       overflow: hidden;
-      transition: all 0.3s ease;
+      transition: all 0.2s;
     }
     .stat-card:hover {
-      background: var(--bg-card-hover);
       border-color: rgba(255, 255, 255, 0.15);
       transform: translateY(-2px);
-      box-shadow: var(--shadow-glass);
-    }
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--grad-studio);
-      opacity: 0.6;
+      background: var(--bg-card-hover);
     }
     .stat-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       color: var(--text-muted);
-      font-size: 0.85rem;
-      font-weight: 500;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
-    .stat-icon-wrapper {
-      width: 34px;
-      height: 34px;
-      border-radius: var(--radius-sm);
-      background: rgba(255, 255, 255, 0.04);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent-cyan);
-    }
+    .stat-icon { font-size: 1.25rem; }
     .stat-value {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 1.9rem;
+      font-size: 2.1rem;
       font-weight: 800;
-      color: var(--text-main);
-      letter-spacing: -0.03em;
+      margin: 10px 0 4px;
+      letter-spacing: -0.02em;
     }
     .stat-subtitle {
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    /* Filter & Controls Toolbar */
-    .toolbar-card {
+    /* Modern Controls & Filters Toolbar */
+    .toolbar-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
       background: var(--bg-card);
-      backdrop-filter: blur(16px);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
       padding: 16px 20px;
+      backdrop-filter: blur(16px);
+    }
+    .toolbar-row-top {
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 14px;
+      flex-wrap: wrap;
     }
     .search-box {
+      flex: 1;
+      min-width: 280px;
       display: flex;
       align-items: center;
-      background: rgba(0, 0, 0, 0.3);
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
-      padding: 8px 14px;
-      gap: 10px;
-      min-width: 280px;
-      flex: 1;
-      transition: border-color 0.2s;
+      padding: 9px 14px;
+      transition: all 0.2s;
     }
     .search-box:focus-within {
-      border-color: var(--accent-cyan);
-      box-shadow: 0 0 0 1px var(--accent-cyan);
+      border-color: var(--border-focus);
+      box-shadow: 0 0 16px rgba(0, 242, 254, 0.15);
     }
     .search-box input {
       background: transparent;
       border: none;
       color: var(--text-main);
-      font-size: 0.88rem;
-      width: 100%;
+      font-size: 0.86rem;
       outline: none;
+      width: 100%;
       font-family: inherit;
     }
     .search-box input::placeholder { color: var(--text-dim); }
 
-    .filters-group {
+    /* Quick Filter Chips */
+    .filter-chips {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+    .chip.active {
+      background: rgba(0, 242, 254, 0.15);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+    }
+    .chip-badge {
+      background: rgba(0, 0, 0, 0.35);
+      padding: 1px 6px;
+      border-radius: var(--radius-full);
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .toolbar-row-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .filters-select-group {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
     }
-    select.filter-select {
+    .filter-select {
       background: rgba(0, 0, 0, 0.3);
       border: 1px solid var(--border-color);
-      color: var(--text-main);
-      padding: 8px 14px;
+      color: var(--text-muted);
+      padding: 7px 12px;
       border-radius: var(--radius-md);
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       outline: none;
       cursor: pointer;
       font-family: inherit;
     }
-    select.filter-select:focus {
-      border-color: var(--accent-cyan);
+    .filter-select:hover { border-color: rgba(255, 255, 255, 0.2); color: var(--text-main); }
+    .filter-select:focus { border-color: var(--accent-cyan); }
+
+    .view-switcher {
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 3px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+    }
+    .view-btn {
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .view-btn.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
     }
 
-    /* Table Container */
-    .table-container {
+    /* BADGES (✨ MỚI, 📥 TỪ DRIVE, FILE EXTENSIONS) */
+    .badge-new {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      background: var(--grad-new);
+      color: #031326;
+      box-shadow: 0 0 14px rgba(0, 242, 254, 0.5);
+      animation: badgePulse 2s infinite ease-in-out;
+      text-transform: uppercase;
+    }
+    @keyframes badgePulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(0, 242, 254, 0.4); }
+      50% { transform: scale(1.04); box-shadow: 0 0 18px rgba(0, 242, 254, 0.7); }
+    }
+
+    .badge-drive-sync {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .ext-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .ext-pdf { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); }
+    .ext-docx { background: rgba(26, 115, 232, 0.15); color: #60a5fa; border: 1px solid rgba(26, 115, 232, 0.35); }
+    .ext-pptx { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
+    .ext-img { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+    .ext-txt { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.35); }
+
+    /* SUBJECT TAG COLORS */
+    .tag-subject {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: var(--radius-full);
+      font-size: 0.74rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .tag-sub-toan { background: rgba(26, 115, 232, 0.15); color: #93c5fd; border-color: rgba(26, 115, 232, 0.3); }
+    .tag-sub-triet { background: rgba(139, 92, 246, 0.15); color: #c084fc; border-color: rgba(139, 92, 246, 0.3); }
+    .tag-sub-note { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3); }
+    .tag-sub-default { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); border-color: var(--border-color); }
+
+    .tag-type {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: var(--radius-full);
+      font-size: 0.74rem;
+      font-weight: 500;
+      background: rgba(0, 242, 254, 0.08);
+      color: #38bdf8;
+      border: 1px solid rgba(0, 242, 254, 0.25);
+    }
+
+    /* CARD GRID VIEW */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .file-card {
       background: var(--bg-card);
-      backdrop-filter: blur(16px);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
+      padding: 18px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
       overflow: hidden;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .file-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      transition: all 0.3s;
+    }
+    .file-card.is-new-card::before {
+      background: var(--grad-new);
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.6);
+    }
+    .file-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.2);
+      background: var(--bg-card-hover);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    }
+    .file-card:hover::before {
+      background: var(--grad-studio);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-badges {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .card-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.4;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      word-break: break-all;
+    }
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .card-footer {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-time-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .card-size {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    /* TABLE VIEW */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(16px);
+      overflow-x: auto;
       box-shadow: var(--shadow-glass);
+      display: none; /* Controlled by JS toggle */
     }
     table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 0.88rem;
+      font-size: 0.85rem;
     }
     th {
       background: rgba(255, 255, 255, 0.02);
-      padding: 14px 18px;
-      font-weight: 600;
       color: var(--text-muted);
+      font-weight: 600;
+      padding: 14px 18px;
       border-bottom: 1px solid var(--border-color);
-      font-size: 0.78rem;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
     }
     td {
       padding: 14px 18px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text-main);
       vertical-align: middle;
     }
-    tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255, 255, 255, 0.025); }
+    tr.tr-new td {
+      background: rgba(0, 242, 254, 0.02);
+    }
+    tr.tr-new td:first-child {
+      border-left: 3px solid var(--accent-cyan);
     }
 
     .file-name-cell {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
+      max-width: 380px;
     }
-    .ext-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 4px 8px;
-      border-radius: var(--radius-sm);
-      text-transform: uppercase;
-    }
-    .ext-pdf { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .ext-docx { background: rgba(26, 115, 232, 0.15); color: #60a5fa; border: 1px solid rgba(26, 115, 232, 0.3); }
-    .ext-pptx { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-    .ext-img { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .ext-txt { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
-
     .file-info {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
+      overflow: hidden;
     }
     .file-title {
       font-weight: 600;
       color: #ffffff;
+      word-break: break-word;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
     }
     .file-path {
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .tag-subject {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: var(--radius-full);
-      font-size: 0.78rem;
-      font-weight: 500;
-      background: rgba(139, 92, 246, 0.12);
-      color: #c084fc;
-      border: 1px solid rgba(139, 92, 246, 0.25);
-    }
-    .tag-type {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: var(--radius-full);
-      font-size: 0.78rem;
-      font-weight: 500;
-      background: rgba(0, 242, 254, 0.1);
-      color: #38bdf8;
-      border: 1px solid rgba(0, 242, 254, 0.25);
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: var(--radius-full);
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .status-uploaded {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--accent-green);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-    .status-duplicate {
-      background: rgba(245, 158, 11, 0.15);
-      color: var(--accent-amber);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-    }
-    .status-error {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--accent-red);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-
-    .hash-code {
-      font-family: 'JetBrains Mono', monospace;
       font-size: 0.72rem;
       color: var(--text-dim);
-      background: rgba(0, 0, 0, 0.25);
-      padding: 2px 6px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .hash-code:hover { color: var(--accent-cyan); }
+
+    .time-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.74rem;
+      color: #cbd5e1;
+      font-family: 'JetBrains Mono', monospace;
+    }
 
     .action-btn-group {
       display: flex;
@@ -473,7 +687,7 @@ def get_html_dashboard() -> str:
     .btn-icon {
       padding: 6px 10px;
       border-radius: var(--radius-sm);
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
@@ -497,14 +711,11 @@ def get_html_dashboard() -> str:
       background: rgba(96, 165, 250, 0.2);
     }
 
-    /* Modal Styling */
+    /* Modals */
     .modal-backdrop {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
       backdrop-filter: blur(12px);
       z-index: 1000;
       display: none;
@@ -513,12 +724,12 @@ def get_html_dashboard() -> str:
       padding: 20px;
     }
     .modal-box {
-      background: #131724;
+      background: #111522;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: var(--radius-lg);
       width: 100%;
       max-width: 520px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
       overflow: hidden;
       animation: modalSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -543,7 +754,7 @@ def get_html_dashboard() -> str:
       border: none;
       color: var(--text-muted);
       cursor: pointer;
-      font-size: 1.2rem;
+      font-size: 1.3rem;
     }
     .modal-body {
       padding: 22px 24px;
@@ -562,7 +773,7 @@ def get_html_dashboard() -> str:
       color: var(--text-muted);
     }
     .form-control {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-color);
       color: var(--text-main);
       padding: 10px 14px;
@@ -585,7 +796,7 @@ def get_html_dashboard() -> str:
     .drawer-backdrop {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.6);
       backdrop-filter: blur(8px);
       z-index: 900;
       display: none;
@@ -593,13 +804,13 @@ def get_html_dashboard() -> str:
     .drawer-panel {
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      height: 420px;
-      background: #0d101a;
-      border-top: 1px solid rgba(0, 242, 254, 0.3);
+      height: 440px;
+      background: #090c14;
+      border-top: 1px solid rgba(0, 242, 254, 0.35);
       z-index: 901;
       display: none;
       flex-direction: column;
-      box-shadow: 0 -10px 40px rgba(0,0,0,0.7);
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
     }
     .drawer-header {
       padding: 12px 24px;
@@ -617,19 +828,19 @@ def get_html_dashboard() -> str:
       font-size: 0.78rem;
       line-height: 1.6;
       color: #94a3b8;
-      background: #080a10;
+      background: #05070c;
     }
     .log-line-info { color: #38bdf8; }
     .log-line-warn { color: #fbbf24; }
     .log-line-err { color: #f87171; }
 
-    /* Toast Notification */
+    /* Toast */
     .toast {
       position: fixed;
       bottom: 24px;
       right: 24px;
       padding: 12px 20px;
-      background: #1a1e2d;
+      background: #141828;
       border: 1px solid rgba(0, 242, 254, 0.4);
       color: #ffffff;
       border-radius: var(--radius-md);
@@ -637,14 +848,14 @@ def get_html_dashboard() -> str:
       box-shadow: var(--shadow-glass);
       z-index: 2000;
       display: none;
-      animation: fadeIn 0.2s ease;
+      animation: toastIn 0.2s ease;
     }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation Bar -->
+  <!-- Top Navigation -->
   <header>
     <a href="#" class="brand">
       <div class="brand-icon">
@@ -659,14 +870,16 @@ def get_html_dashboard() -> str:
     </a>
 
     <div class="header-actions">
-      <div class="status-pill">
-        <div class="pulse-dot"></div>
-        <span id="driveStatusText">Google Drive: Đã kết nối</span>
+      <!-- Auto Sync Status Pill -->
+      <div class="status-pill" id="autoSyncPill" onclick="triggerSyncDown()" title="Nhấn để kéo tài liệu từ Drive về ngay lập tức!">
+        <div class="pulse-dot" id="autoSyncDot"></div>
+        <span id="autoSyncText">🔄 Drive Auto-Pull: Đang kết nối...</span>
       </div>
+
       <button class="btn btn-secondary" onclick="openSettingsModal()">⚙️ Cài đặt</button>
       <button class="btn btn-secondary" onclick="toggleLogsDrawer()">📜 Live Logs</button>
-      <button class="btn btn-secondary" onclick="triggerSyncDown()" id="btnSyncDown">📥 Kéo từ Drive về</button>
-      <button class="btn btn-primary" onclick="triggerScan()" id="btnScan">⚡ Quét lại ngay</button>
+      <button class="btn btn-sync" onclick="triggerSyncDown()" id="btnSyncDown">📥 Kéo từ Drive về ngay</button>
+      <button class="btn btn-primary" onclick="triggerScan()" id="btnScan">⚡ Quét máy tính</button>
     </div>
   </header>
 
@@ -676,17 +889,17 @@ def get_html_dashboard() -> str:
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-header">
-          <span>Tổng tài liệu đã quét</span>
-          <div class="stat-icon-wrapper">📁</div>
+          <span>Tổng tài liệu</span>
+          <span class="stat-icon">📁</span>
         </div>
         <div class="stat-value" id="statTotalFiles">0</div>
-        <div class="stat-subtitle" id="statStorageSize">Theo dõi tại: H:\\2026\\Thac Sy\\Mon_Hoc</div>
+        <div class="stat-subtitle" id="statStoragePath">Thư mục: H:\\2026\\Thac Sy\\Mon_Hoc</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
-          <span>Đồng bộ Google Drive</span>
-          <div class="stat-icon-wrapper" style="color: var(--accent-green);">☁️</div>
+          <span>Đã đồng bộ Drive</span>
+          <span class="stat-icon" style="color: var(--accent-green);">☁️</span>
         </div>
         <div class="stat-value" id="statUploaded" style="color: var(--accent-green);">0</div>
         <div class="stat-subtitle">Thư mục gốc: ThacSi_HTTT</div>
@@ -694,71 +907,98 @@ def get_html_dashboard() -> str:
 
       <div class="stat-card">
         <div class="stat-header">
-          <span>Trùng lặp (Deduplicated)</span>
-          <div class="stat-icon-wrapper" style="color: var(--accent-amber);">🛡️</div>
+          <span>Tài liệu mới (<24h)</span>
+          <span class="stat-icon" style="color: var(--accent-cyan);">✨</span>
         </div>
-        <div class="stat-value" id="statDuplicates" style="color: var(--accent-amber);">0</div>
-        <div class="stat-subtitle">Bảo vệ bằng mã băm SHA-256</div>
+        <div class="stat-value" id="statNewCount" style="color: var(--accent-cyan);">0</div>
+        <div class="stat-subtitle" id="statNewSubtitle">Tự động nhận diện thời gian</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
-          <span>Môn học đang theo dõi</span>
-          <div class="stat-icon-wrapper" style="color: var(--accent-purple);">🎓</div>
+          <span>Môn học theo dõi</span>
+          <span class="stat-icon" style="color: var(--accent-purple);">🎓</span>
         </div>
         <div class="stat-value" id="statSubjectsCount" style="color: var(--accent-purple);">0</div>
         <div class="stat-subtitle" id="statSubjectsList">Toán KH Dữ liệu, Triết học...</div>
       </div>
     </div>
 
-    <!-- Filter & Search Toolbar -->
-    <div class="toolbar-card">
-      <div class="search-box">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, đường dẫn, hash..." oninput="applyFilters()">
+    <!-- Toolbar: Search, Filter Tabs & View Mode Switcher -->
+    <div class="toolbar-container">
+      <div class="toolbar-row-top">
+        <div class="search-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu theo tên, môn học, hash..." oninput="applyFilters()">
+        </div>
+
+        <div class="filter-chips">
+          <div class="chip active" id="chipAll" onclick="setQuickFilter('ALL')">
+            🔥 Tất cả <span class="chip-badge" id="countAll">0</span>
+          </div>
+          <div class="chip" id="chipNew" onclick="setQuickFilter('NEW')">
+            ✨ Mới nhất (<24h) <span class="chip-badge" id="countNew">0</span>
+          </div>
+          <div class="chip" id="chipDrive" onclick="setQuickFilter('DRIVE')">
+            📥 Từ Google Drive <span class="chip-badge" id="countDrive">0</span>
+          </div>
+        </div>
       </div>
 
-      <div class="filters-group">
-        <select class="filter-select" id="filterSubject" onchange="applyFilters()">
-          <option value="">Tất cả môn học</option>
-        </select>
+      <div class="toolbar-row-bottom">
+        <div class="filters-select-group">
+          <select class="filter-select" id="filterSubject" onchange="applyFilters()">
+            <option value="">Tất cả môn học</option>
+          </select>
 
-        <select class="filter-select" id="filterType" onchange="applyFilters()">
-          <option value="">Tất cả loại tài liệu</option>
-          <option value="Giáo trình">Giáo trình</option>
-          <option value="Slide">Slide</option>
-          <option value="Ôn thi">Ôn thi</option>
-          <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
-        </select>
+          <select class="filter-select" id="filterType" onchange="applyFilters()">
+            <option value="">Tất cả loại tài liệu</option>
+            <option value="Giáo trình">Giáo trình</option>
+            <option value="Slide">Slide</option>
+            <option value="Ôn thi">Ôn thi</option>
+            <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
+          </select>
 
-        <select class="filter-select" id="filterStatus" onchange="applyFilters()">
-          <option value="">Tất cả trạng thái</option>
-          <option value="UPLOADED">Đã upload Drive</option>
-          <option value="DUPLICATE">Trùng lặp</option>
-          <option value="ERROR">Lỗi</option>
-        </select>
+          <select class="filter-select" id="filterSort" onchange="applyFilters()">
+            <option value="NEWEST">⏱️ Mới nhất trước (Mặc định)</option>
+            <option value="OLDEST">⏳ Cũ nhất trước</option>
+            <option value="NAME">🔤 Tên file A-Z</option>
+            <option value="SIZE">💾 Dung lượng lớn nhất</option>
+          </select>
+        </div>
+
+        <div class="view-switcher">
+          <button class="view-btn active" id="btnViewCards" onclick="setViewMode('cards')">
+            🎴 Dạng Thẻ
+          </button>
+          <button class="view-btn" id="btnViewTable" onclick="setViewMode('table')">
+            📑 Dạng Bảng
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Data Table -->
-    <div class="table-container">
+    <!-- 1. CARDS GRID VIEW -->
+    <div class="cards-grid" id="cardsContainer">
+      <!-- Injected via JavaScript -->
+    </div>
+
+    <!-- 2. TABLE VIEW -->
+    <div class="table-container" id="tableContainer">
       <table>
         <thead>
           <tr>
             <th>Tập tin tài liệu</th>
             <th>Môn học</th>
             <th>Phân loại</th>
-            <th>SHA-256 / Cập nhật</th>
+            <th>Dung lượng</th>
+            <th>Cập nhật / Thời gian</th>
             <th>Trạng thái</th>
             <th style="text-align: right;">Thao tác</th>
           </tr>
         </thead>
         <tbody id="filesTableBody">
-          <tr>
-            <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 36px;">
-              Đang tải dữ liệu tài liệu...
-            </td>
-          </tr>
+          <!-- Injected via JavaScript -->
         </tbody>
       </table>
     </div>
@@ -802,7 +1042,7 @@ def get_html_dashboard() -> str:
         </div>
 
         <div style="font-size: 0.78rem; color: var(--text-dim); background: rgba(0,242,254,0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,242,254,0.15);">
-          💡 Khi bạn bấm <b>Lưu phân loại</b>, hệ thống sẽ cập nhật ngay vào SQLite và tự động tạo thư mục tương ứng trên Google Drive!
+          💡 Khi bạn bấm <b>Lưu phân loại</b>, hệ thống sẽ tự động cập nhật vào SQLite và chuyển thư mục tương ứng trên Google Drive!
         </div>
       </div>
       <div class="modal-footer">
@@ -816,17 +1056,33 @@ def get_html_dashboard() -> str:
   <div class="modal-backdrop" id="settingsModal">
     <div class="modal-box">
       <div class="modal-header">
-        <div class="modal-title">⚙️ Cài đặt hệ thống</div>
+        <div class="modal-title">⚙️ Cài đặt hệ thống Studio</div>
         <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
       </div>
       <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Tự động kéo tài liệu từ Google Drive:</label>
+          <div style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color);">
+            <input type="checkbox" id="cfgAutoSync" style="width: 18px; height: 18px; accent-color: var(--accent-cyan); cursor: pointer;">
+            <div>
+              <div style="font-size: 0.85rem; font-weight: 600; color: #fff;">Bật đồng bộ tự động nền (Auto-Pull)</div>
+              <div style="font-size: 0.75rem; color: var(--text-dim);">Tự động phát hiện và kéo tài liệu mới tải lên Drive về máy</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Chu kỳ tự động kéo từ Drive (phút):</label>
+          <input type="number" id="cfgSyncIntervalMins" class="form-control" min="1" max="60" value="3">
+        </div>
+
         <div class="form-group">
           <label class="form-label">Thư mục nguồn (Source of Truth):</label>
           <input type="text" id="cfgRootFolder" class="form-control">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Định dạng file được theo dõi:</label>
+          <label class="form-label">Định dạng file theo dõi:</label>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.82rem;">
             <label><input type="checkbox" id="extPdf" value=".pdf"> .pdf (Tài liệu PDF)</label>
             <label><input type="checkbox" id="extDocx" value=".docx"> .docx (Word)</label>
@@ -856,7 +1112,7 @@ def get_html_dashboard() -> str:
   <div class="drawer-panel" id="logsDrawer">
     <div class="drawer-header">
       <div style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
-        <span class="pulse-dot"></span> Nhật ký hệ thống trực tiếp (Live App Logs)
+        <span class="pulse-dot"></span> Nhật ký ứng dụng trực tiếp (Live App Logs)
       </div>
       <div style="display: flex; gap: 8px;">
         <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="fetchLogs()">🔄 Làm mới</button>
@@ -873,12 +1129,31 @@ def get_html_dashboard() -> str:
 
   <script>
     let allFiles = [];
+    let currentViewMode = 'cards';
+    let currentQuickFilter = 'ALL';
 
     function showToast(msg) {
       const t = document.getElementById('toastMsg');
       t.textContent = msg;
       t.style.display = 'block';
-      setTimeout(() => { t.style.display = 'none'; }, 3000);
+      setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      document.getElementById('btnViewCards').classList.toggle('active', mode === 'cards');
+      document.getElementById('btnViewTable').classList.toggle('active', mode === 'table');
+      document.getElementById('cardsContainer').style.display = (mode === 'cards') ? 'grid' : 'none';
+      document.getElementById('tableContainer').style.display = (mode === 'table') ? 'block' : 'none';
+      applyFilters();
+    }
+
+    function setQuickFilter(f) {
+      currentQuickFilter = f;
+      document.getElementById('chipAll').classList.toggle('active', f === 'ALL');
+      document.getElementById('chipNew').classList.toggle('active', f === 'NEW');
+      document.getElementById('chipDrive').classList.toggle('active', f === 'DRIVE');
+      applyFilters();
     }
 
     function getExtBadge(name) {
@@ -890,18 +1165,42 @@ def get_html_dashboard() -> str:
       return `<span class="ext-badge ext-txt">${ext.toUpperCase()}</span>`;
     }
 
+    function getSubjectClass(subject) {
+      if (!subject) return 'tag-sub-default';
+      const s = subject.toLowerCase();
+      if (s.includes('toán') || s.includes('toan')) return 'tag-sub-toan';
+      if (s.includes('triết') || s.includes('triet')) return 'tag-sub-triet';
+      if (s.includes('ghi chú') || s.includes('phuong phap')) return 'tag-sub-note';
+      return 'tag-sub-default';
+    }
+
+    function formatRelativeTime(isoStr) {
+      if (!isoStr) return '--';
+      try {
+        const d = new Date(isoStr);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffSecs = Math.floor(diffMs / 1000);
+        if (diffSecs < 60) return 'Vừa xong';
+        if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)} phút trước`;
+        if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)} giờ trước`;
+        if (diffSecs < 172800) return `Hôm qua ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      } catch (e) {
+        return isoStr;
+      }
+    }
+
     async function loadStats() {
       try {
         const res = await fetch('/api/stats');
         const data = await res.json();
         document.getElementById('statTotalFiles').textContent = data.total_files || 0;
         document.getElementById('statUploaded').textContent = data.uploaded_files || 0;
-        document.getElementById('statDuplicates').textContent = data.duplicate_files || 0;
         document.getElementById('statSubjectsCount').textContent = data.subjects_count || 0;
+
         if (data.subjects && data.subjects.length > 0) {
           document.getElementById('statSubjectsList').textContent = data.subjects.join(', ');
-          
-          // Cập nhật filterSubject dropdown
           const fSub = document.getElementById('filterSubject');
           const curVal = fSub.value;
           fSub.innerHTML = '<option value="">Tất cả môn học</option>';
@@ -909,6 +1208,20 @@ def get_html_dashboard() -> str:
             fSub.innerHTML += `<option value="${s}">${s}</option>`;
           });
           fSub.value = curVal;
+        }
+
+        // Auto Sync Status Info
+        if (data.auto_sync) {
+          const sync = data.auto_sync;
+          const statusText = document.getElementById('autoSyncText');
+          const dot = document.getElementById('autoSyncDot');
+          if (sync.enabled) {
+            dot.style.display = 'block';
+            statusText.innerHTML = `🔄 <b>Auto-Pull:</b> ${sync.interval_minutes}p/lần • ${sync.last_sync_human || 'Sẵn sàng'}`;
+          } else {
+            dot.style.display = 'none';
+            statusText.innerHTML = `⏸️ Drive Auto-Pull: Tắt`;
+          }
         }
       } catch (err) {
         console.error('Lỗi tải stats:', err);
@@ -919,54 +1232,163 @@ def get_html_dashboard() -> str:
       try {
         const res = await fetch('/api/files');
         allFiles = await res.json();
-        renderTable(allFiles);
+
+        // Update counts
+        const newFiles = allFiles.filter(f => f.is_new);
+        const driveFiles = allFiles.filter(f => f.is_from_drive || (f.drive_file_id && f.path.includes('Mon_Hoc')));
+
+        document.getElementById('countAll').textContent = allFiles.length;
+        document.getElementById('countNew').textContent = newFiles.length;
+        document.getElementById('countDrive').textContent = driveFiles.length;
+        document.getElementById('statNewCount').textContent = newFiles.length;
+
+        applyFilters();
       } catch (err) {
         console.error('Lỗi tải files:', err);
       }
     }
 
-    function renderTable(files) {
-      const tbody = document.getElementById('filesTableBody');
+    function applyFilters() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const s = document.getElementById('filterSubject').value;
+      const t = document.getElementById('filterType').value;
+      const sortBy = document.getElementById('filterSort').value;
+
+      let filtered = allFiles.filter(f => {
+        const matchQ = !q || f.path.toLowerCase().includes(q) || (f.sha256 && f.sha256.toLowerCase().includes(q));
+        const matchS = !s || f.subject === s;
+        const matchT = !t || f.document_type === t;
+
+        let matchQuick = true;
+        if (currentQuickFilter === 'NEW') matchQuick = f.is_new;
+        if (currentQuickFilter === 'DRIVE') matchQuick = f.is_from_drive || Boolean(f.drive_file_id);
+
+        return matchQ && matchS && matchT && matchQuick;
+      });
+
+      // Sorting
+      if (sortBy === 'NEWEST') {
+        filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
+      } else if (sortBy === 'OLDEST') {
+        filtered.sort((a, b) => (a.id || 0) - (b.id || 0));
+      } else if (sortBy === 'NAME') {
+        filtered.sort((a, b) => a.path.localeCompare(b.path));
+      } else if (sortBy === 'SIZE') {
+        filtered.sort((a, b) => (b.size_bytes || 0) - (a.size_bytes || 0));
+      }
+
+      if (currentViewMode === 'cards') {
+        renderCards(filtered);
+      } else {
+        renderTable(filtered);
+      }
+    }
+
+    function renderCards(files) {
+      const container = document.getElementById('cardsContainer');
       if (!files || files.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 36px;">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
+        container.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 48px; background: var(--bg-card); border-radius: var(--radius-lg);">
+            Không tìm thấy tài liệu nào phù hợp với bộ lọc hiện tại.
+          </div>`;
         return;
       }
 
       let html = '';
       files.forEach(f => {
         const fileName = f.path.split(/[\\\\/]/).pop();
-        let statusBadge = '';
-        if (f.status === 'UPLOADED') {
-          statusBadge = `<span class="status-badge status-uploaded">● ĐÃ UPLOAD</span>`;
-        } else if (f.status === 'DUPLICATE') {
-          statusBadge = `<span class="status-badge status-duplicate">● TRÙNG LẶP</span>`;
-        } else if (f.status === 'ERROR') {
-          statusBadge = `<span class="status-badge status-error" title="${f.error || ''}">● LỖI</span>`;
-        } else {
-          statusBadge = `<span class="status-badge">${f.status}</span>`;
-        }
+        const shortHash = f.sha256 ? f.sha256.substring(0, 10) + '...' : '-';
+        const relTime = formatRelativeTime(f.updated_at || f.created_at);
+
+        const newBadge = f.is_new ? `<span class="badge-new">✨ MỚI</span>` : '';
+        const driveSyncBadge = f.is_from_drive ? `<span class="badge-drive-sync">📥 DRIVE SYNC</span>` : '';
+        const driveBtn = f.drive_file_id 
+          ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon btn-icon-drive" title="Mở trực tiếp trên Google Drive">🔗 Drive</a>`
+          : '';
+
+        html += `
+          <div class="file-card ${f.is_new ? 'is-new-card' : ''}">
+            <div class="card-top">
+              <div class="card-badges">
+                ${getExtBadge(fileName)}
+                ${newBadge}
+                ${driveSyncBadge}
+              </div>
+              <button class="btn-icon" style="padding: 2px 6px;" title="Sao chép SHA-256" onclick="navigator.clipboard.writeText('${f.sha256 || ''}'); showToast('Đã sao chép SHA-256!');">
+                📋
+              </button>
+            </div>
+
+            <div class="card-title" title="${fileName}">${fileName}</div>
+            <div class="card-path" title="${f.path}">${f.path}</div>
+
+            <div class="card-meta-row">
+              <span class="tag-subject ${getSubjectClass(f.subject)}">${f.subject || 'Chưa phân loại'}</span>
+              <span class="tag-type">${f.document_type || 'Tài liệu'}</span>
+            </div>
+
+            <div class="card-footer">
+              <div class="card-time-info">
+                <span class="card-size">💾 ${f.size_formatted || '--'}</span>
+                <span>⏱️ ${relTime}</span>
+              </div>
+              <div class="action-btn-group">
+                ${driveBtn}
+                <button class="btn-icon" onclick="openEditModal(${f.id}, '${encodeURIComponent(fileName)}', '${encodeURIComponent(f.subject || '')}', '${encodeURIComponent(f.document_type || '')}')">✏️ Sửa tay</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function renderTable(files) {
+      const tbody = document.getElementById('filesTableBody');
+      if (!files || files.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 48px;">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      files.forEach(f => {
+        const fileName = f.path.split(/[\\\\/]/).pop();
+        const shortHash = f.sha256 ? f.sha256.substring(0, 10) + '...' : '-';
+        const relTime = formatRelativeTime(f.updated_at || f.created_at);
+
+        const newBadge = f.is_new ? `<span class="badge-new">✨ MỚI</span>` : '';
+        const driveSyncBadge = f.is_from_drive ? `<span class="badge-drive-sync">📥 DRIVE SYNC</span>` : '';
+
+        let statusBadge = '<span class="status-badge status-uploaded">● ĐÃ UPLOAD</span>';
+        if (f.status === 'DUPLICATE') statusBadge = '<span class="status-badge status-duplicate">● TRÙNG LẶP</span>';
+        if (f.status === 'ERROR') statusBadge = `<span class="status-badge status-error" title="${f.error || ''}">● LỖI</span>`;
 
         const driveBtn = f.drive_file_id 
           ? `<a href="https://drive.google.com/file/d/${f.drive_file_id}/view" target="_blank" class="btn-icon btn-icon-drive" title="Mở trên Google Drive">🔗 Drive</a>`
           : '';
 
-        const shortHash = f.sha256 ? f.sha256.substring(0, 10) + '...' : '-';
-
         html += `
-          <tr>
+          <tr class="${f.is_new ? 'tr-new' : ''}">
             <td>
               <div class="file-name-cell">
                 ${getExtBadge(fileName)}
                 <div class="file-info">
-                  <div class="file-title">${fileName}</div>
+                  <div class="file-title">
+                    ${fileName}
+                    ${newBadge}
+                    ${driveSyncBadge}
+                  </div>
                   <div class="file-path">${f.path}</div>
                 </div>
               </div>
             </td>
-            <td><span class="tag-subject">${f.subject || 'Chưa phân loại'}</span></td>
+            <td><span class="tag-subject ${getSubjectClass(f.subject)}">${f.subject || 'Chưa phân loại'}</span></td>
             <td><span class="tag-type">${f.document_type || 'Chung'}</span></td>
+            <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #cbd5e1;">${f.size_formatted || '--'}</span></td>
             <td>
-              <span class="hash-code" title="${f.sha256 || ''}" onclick="navigator.clipboard.writeText('${f.sha256 || ''}'); showToast('Đã copy SHA-256!');">${shortHash}</span>
+              <div class="time-badge" title="${f.updated_at || f.created_at || ''}">
+                ⏱️ ${relTime}
+              </div>
             </td>
             <td>${statusBadge}</td>
             <td style="text-align: right;">
@@ -979,23 +1401,6 @@ def get_html_dashboard() -> str:
         `;
       });
       tbody.innerHTML = html;
-    }
-
-    function applyFilters() {
-      const q = document.getElementById('searchInput').value.toLowerCase();
-      const s = document.getElementById('filterSubject').value;
-      const t = document.getElementById('filterType').value;
-      const st = document.getElementById('filterStatus').value;
-
-      const filtered = allFiles.filter(f => {
-        const matchQ = !q || f.path.toLowerCase().includes(q) || (f.sha256 && f.sha256.toLowerCase().includes(q));
-        const matchS = !s || f.subject === s;
-        const matchT = !t || f.document_type === t;
-        const matchSt = !st || f.status === st;
-        return matchQ && matchS && matchT && matchSt;
-      });
-
-      renderTable(filtered);
     }
 
     function openEditModal(id, encName, encSub, encType) {
@@ -1028,7 +1433,7 @@ def get_html_dashboard() -> str:
         });
         const result = await res.json();
         if (result.ok) {
-          showToast('✅ Đã cập nhật phân loại và đồng bộ Drive!');
+          showToast('✅ Đã lưu phân loại và cập nhật Google Drive!');
           closeEditModal();
           loadStats();
           loadFiles();
@@ -1051,38 +1456,38 @@ def get_html_dashboard() -> str:
         setTimeout(() => {
           loadStats();
           loadFiles();
-          btn.textContent = '⚡ Quét lại ngay';
+          btn.textContent = '⚡ Quét máy tính';
           btn.disabled = false;
-        }, 1500);
+        }, 1200);
       } catch (err) {
-        showToast('Lỗi khi kích hoạt quét');
-        btn.textContent = '⚡ Quét lại ngay';
+        alert('Lỗi quét: ' + err);
+        btn.textContent = '⚡ Quét máy tính';
         btn.disabled = false;
       }
     }
 
     async function triggerSyncDown() {
       const btn = document.getElementById('btnSyncDown');
-      btn.textContent = '⏳ Đang kiểm tra Drive...';
+      btn.textContent = '⏳ Đang kéo từ Drive...';
       btn.disabled = true;
       try {
         const res = await fetch('/api/sync-down', { method: 'POST' });
         const data = await res.json();
         if (data.ok) {
           if (data.count > 0) {
-            showToast('✅ Đã tải về thành công ' + data.count + ' tài liệu mới từ Drive!');
+            showToast(`🎉 Đã kéo thành công ${data.count} tài liệu mới từ Drive về máy!`);
           } else {
-            showToast('👌 Máy tính đã đồng bộ hoàn toàn với Drive (không có file mới)!');
+            showToast('👌 Máy tính đã đồng bộ hoàn toàn với Drive (Không có file mới).');
           }
           loadStats();
           loadFiles();
         } else {
-          showToast('Lỗi đồng bộ: ' + (data.error || ''));
+          alert('Lỗi kéo từ Drive: ' + (data.error || 'Không rõ'));
         }
       } catch (err) {
-        showToast('Lỗi kết nối khi đồng bộ: ' + err);
+        alert('Lỗi mạng: ' + err);
       } finally {
-        btn.textContent = '📥 Kéo từ Drive về';
+        btn.textContent = '📥 Kéo từ Drive về ngay';
         btn.disabled = false;
       }
     }
@@ -1093,16 +1498,22 @@ def get_html_dashboard() -> str:
         const cfg = await res.json();
         document.getElementById('cfgRootFolder').value = cfg.root_folder || '';
         document.getElementById('cfgWaitSecs').value = cfg.stable_file_wait_seconds || 3;
-        
+        document.getElementById('cfgAutoSync').checked = cfg.auto_sync_drive !== false;
+        document.getElementById('cfgSyncIntervalMins').value = cfg.drive_sync_interval_minutes || 3;
+
         const exts = cfg.supported_extensions || [];
-        ['.pdf', '.docx', '.pptx', '.txt', '.md', '.jpg', '.jpeg', '.png'].forEach(ext => {
-          const el = document.querySelector(`input[value="${ext}"]`);
-          if (el) el.checked = exts.includes(ext);
-        });
+        document.getElementById('extPdf').checked = exts.includes('.pdf');
+        document.getElementById('extDocx').checked = exts.includes('.docx');
+        document.getElementById('extPptx').checked = exts.includes('.pptx');
+        document.getElementById('extTxt').checked = exts.includes('.txt');
+        document.getElementById('extMd').checked = exts.includes('.md');
+        document.getElementById('extJpg').checked = exts.includes('.jpg');
+        document.getElementById('extJpeg').checked = exts.includes('.jpeg');
+        document.getElementById('extPng').checked = exts.includes('.png');
 
         document.getElementById('settingsModal').style.display = 'flex';
       } catch (err) {
-        alert('Lỗi tải cấu hình: ' + err);
+        alert('Không thể tải cấu hình: ' + err);
       }
     }
 
@@ -1112,39 +1523,47 @@ def get_html_dashboard() -> str:
 
     async function saveSettings() {
       const rootFolder = document.getElementById('cfgRootFolder').value.trim();
-      const waitSecs = parseInt(document.getElementById('cfgWaitSecs').value) || 3;
-      
+      const waitSecs = parseInt(document.getElementById('cfgWaitSecs').value);
+      const autoSync = document.getElementById('cfgAutoSync').checked;
+      const intervalMins = parseInt(document.getElementById('cfgSyncIntervalMins').value) || 3;
+
       const exts = [];
-      document.querySelectorAll('input[type="checkbox"]:checked').forEach(c => exts.push(c.value));
+      ['extPdf', 'extDocx', 'extPptx', 'extTxt', 'extMd', 'extJpg', 'extJpeg', 'extPng'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.checked) exts.push(el.value);
+      });
+
+      const body = {
+        root_folder: rootFolder,
+        stable_file_wait_seconds: waitSecs,
+        supported_extensions: exts,
+        auto_sync_drive: autoSync,
+        drive_sync_interval_minutes: intervalMins,
+      };
 
       try {
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            root_folder: rootFolder,
-            stable_file_wait_seconds: waitSecs,
-            supported_extensions: exts
-          })
+          body: JSON.stringify(body)
         });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('✅ Đã lưu cấu hình mới!');
+        const resJson = await res.json();
+        if (resJson.ok) {
+          showToast('✅ Đã lưu cài đặt hệ thống!');
           closeSettingsModal();
           loadStats();
         } else {
-          alert('Lỗi lưu: ' + data.error);
+          alert('Lỗi lưu cấu hình: ' + resJson.error);
         }
       } catch (err) {
-        alert('Lỗi lưu cấu hình: ' + err);
+        alert('Lỗi mạng khi lưu cấu hình: ' + err);
       }
     }
 
     function toggleLogsDrawer() {
       const drawer = document.getElementById('logsDrawer');
       const backdrop = document.getElementById('drawerBackdrop');
-      const isVisible = drawer.style.display === 'flex';
-      if (isVisible) {
+      if (drawer.style.display === 'flex') {
         drawer.style.display = 'none';
         backdrop.style.display = 'none';
       } else {
@@ -1171,7 +1590,7 @@ def get_html_dashboard() -> str:
       }
     }
 
-    // Auto-refresh periodically
+    // Auto-refresh periodically (every 10s)
     setInterval(() => {
       loadStats();
       loadFiles();
@@ -1195,9 +1614,10 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
     drive_manager: Optional[DriveManager] = None
     config_path: Path = Path("config.json")
     scan_callback: Optional[Any] = None
+    classifier: Optional[Any] = None
+    auto_sync_worker: Optional[Any] = None
 
     def log_message(self, format: str, *args: Any) -> None:
-        # Tắt bớt log HTTP mặc định trên console để không làm rối terminal
         pass
 
     def _send_json(self, data: Any, status: int = 200) -> None:
@@ -1242,6 +1662,19 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
             subjects = sorted(list({r["subject"] for r in file_list if r.get("subject")}))
 
+            auto_sync_info = (
+                self.auto_sync_worker.get_status_info()
+                if self.auto_sync_worker
+                else {
+                    "enabled": True,
+                    "interval_minutes": 3,
+                    "is_syncing": False,
+                    "last_sync_time": None,
+                    "last_sync_human": "Chưa chạy",
+                    "last_sync_status": "Sẵn sàng",
+                }
+            )
+
             self._send_json({
                 "total_files": total,
                 "uploaded_files": uploaded,
@@ -1250,6 +1683,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 "subjects_count": len(subjects),
                 "subjects": subjects,
                 "drive_connected": self.drive_manager.is_configured() if self.drive_manager else False,
+                "auto_sync": auto_sync_info,
             })
             return
 
@@ -1261,9 +1695,47 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             unique_files: Dict[str, Any] = {}
             for r in records:
                 p = r["path"]
-                if p not in unique_files or r.get("status") == "UPLOADED":
+                if p not in unique_files:
                     unique_files[p] = r
-            self._send_json(list(unique_files.values()))
+                elif r.get("status") == "UPLOADED" and unique_files[p].get("status") != "UPLOADED":
+                    unique_files[p] = r
+
+            file_list = list(unique_files.values())
+            file_list.sort(key=lambda x: x.get("id", 0), reverse=True)
+
+            now_ts = time.time()
+            recent_drive_ids = set()
+            if self.auto_sync_worker:
+                recent_drive_ids = set(self.auto_sync_worker.recently_downloaded_ids)
+
+            for f in file_list:
+                p = f.get("path", "")
+                try:
+                    size_b = os.path.getsize(p)
+                    if size_b < 1024:
+                        f["size_formatted"] = f"{size_b} B"
+                    elif size_b < 1024 * 1024:
+                        f["size_formatted"] = f"{size_b / 1024:.1f} KB"
+                    else:
+                        f["size_formatted"] = f"{size_b / (1024 * 1024):.1f} MB"
+                    f["size_bytes"] = size_b
+                except Exception:
+                    f["size_formatted"] = "--"
+                    f["size_bytes"] = 0
+
+                f_time = f.get("updated_at") or f.get("created_at") or ""
+                is_new = False
+                if f_time:
+                    try:
+                        dt = datetime.fromisoformat(f_time.replace("Z", "+00:00"))
+                        if abs(now_ts - dt.timestamp()) < 86400:
+                            is_new = True
+                    except Exception:
+                        pass
+                f["is_new"] = is_new
+                f["is_from_drive"] = bool(f.get("drive_file_id") in recent_drive_ids)
+
+            self._send_json(file_list)
             return
 
         if path == "/api/config":
@@ -1333,15 +1805,13 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 new_drive_id = record.get("drive_file_id")
 
-                # Nếu file đã có trên Drive và DriveManager sẵn sàng, di chuyển sang thư mục mới
+                # Di chuyển file trên Drive nếu sẵn sàng
                 if self.drive_manager and self.drive_manager.is_configured() and record.get("drive_file_id"):
                     try:
-                        # 1. Tìm hoặc tạo cây thư mục mới
                         target_folder_id = self.drive_manager.resolve_folder_hierarchy(
                             subject=new_subject,
                             document_type=new_type,
                         )
-                        # 2. Cập nhật vị trí cha của file trên Drive
                         service = self.drive_manager.get_service()
                         file_meta = service.files().get(
                             fileId=record["drive_file_id"],
@@ -1359,7 +1829,6 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     except Exception as exc:
                         logger.warning("Không thể di chuyển file Drive tự động: %s", exc)
 
-                # Cập nhật trong SQLite
                 self.database.update_classification(
                     record_id=record_id,
                     subject=new_subject,
@@ -1382,6 +1851,14 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 with open(self.config_path, "w", encoding="utf-8") as f:
                     json.dump(current_cfg, f, indent=2, ensure_ascii=False)
 
+                # Cập nhật worker nếu có
+                worker = getattr(DashboardRequestHandler, "auto_sync_worker", None)
+                if worker:
+                    enabled = body.get("auto_sync_drive")
+                    mins = body.get("drive_sync_interval_minutes")
+                    secs = int(mins) * 60 if mins is not None else None
+                    worker.update_settings(enabled=enabled, interval_seconds=secs)
+
                 self._send_json({"ok": True})
                 return
             except Exception as exc:
@@ -1402,17 +1879,20 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/sync-down":
             from src.sync import sync_from_drive_to_local
             try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                root_folder = Path(cfg["root_folder"])
-                classifier = getattr(DashboardRequestHandler, "classifier", None)
-
-                downloaded = sync_from_drive_to_local(
-                    drive_manager=DashboardRequestHandler.drive_manager,
-                    database=DashboardRequestHandler.database,
-                    root_folder=root_folder,
-                    classifier=classifier,
-                )
+                worker = getattr(DashboardRequestHandler, "auto_sync_worker", None)
+                if worker:
+                    downloaded = worker.trigger_now()
+                else:
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                    root_folder = Path(cfg["root_folder"])
+                    classifier = getattr(DashboardRequestHandler, "classifier", None)
+                    downloaded = sync_from_drive_to_local(
+                        drive_manager=DashboardRequestHandler.drive_manager,
+                        database=DashboardRequestHandler.database,
+                        root_folder=root_folder,
+                        classifier=classifier,
+                    )
                 self._send_json({"ok": True, "count": len(downloaded), "files": downloaded})
                 return
             except Exception as exc:
@@ -1437,6 +1917,7 @@ def start_web_server(
     config_path: Path | str = "config.json",
     scan_callback: Optional[Any] = None,
     classifier: Optional[Any] = None,
+    auto_sync_worker: Optional[Any] = None,
 ) -> ThreadedHTTPServer:
     """Khởi động Web Dashboard Server trong một luồng riêng biệt."""
     DashboardRequestHandler.database = database
@@ -1444,6 +1925,7 @@ def start_web_server(
     DashboardRequestHandler.config_path = Path(config_path).resolve()
     DashboardRequestHandler.scan_callback = scan_callback
     DashboardRequestHandler.classifier = classifier
+    DashboardRequestHandler.auto_sync_worker = auto_sync_worker
 
     server = ThreadedHTTPServer(("0.0.0.0", port), DashboardRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="WebDashboardServer")
