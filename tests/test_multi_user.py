@@ -470,5 +470,59 @@ def test_multi_user_end_to_end_logout_leak_prevention(tmp_path: Path):
         server.shutdown()
 
 
+def test_student_select_major_and_folder_provisioning(tmp_path: Path):
+    from src.database import Database
+    from src.web_server import start_web_server
+    import urllib.request
+    import json
+
+    db = Database(tmp_path / "onboard_test.db")
+    db.initialize()
+    root_folder = tmp_path / "Mon_Hoc"
+    root_folder.mkdir(parents=True, exist_ok=True)
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(root_folder), "root_account_email": "xuanngocit@gmail.com"}, f)
+
+    port = 19202
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # 1. Sinh viên đăng nhập lần đầu
+        login_payload = json.dumps({"email": "lan_anh@univ.edu", "name": "Lan Anh"}).encode("utf-8")
+        req = urllib.request.Request(f"{base_url}/auth/test-login", data=login_payload, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            cookie = resp.headers.get("Set-Cookie")
+
+        # 2. Sinh viên gửi yêu cầu chọn chuyên ngành Quản trị kinh doanh
+        majors = db.get_all_majors()
+        qtkd = next(m for m in majors if m["code"] == "QTKD")
+        select_payload = json.dumps({"major_id": qtkd["id"]}).encode("utf-8")
+        req_select = urllib.request.Request(f"{base_url}/api/user/select-major", data=select_payload, headers={"Content-Type": "application/json", "Cookie": cookie}, method="POST")
+        with urllib.request.urlopen(req_select) as resp:
+            assert resp.status == 200
+            res_data = json.loads(resp.read().decode("utf-8"))
+            assert res_data["ok"] is True
+            assert res_data["major"]["code"] == "QTKD"
+
+        # 3. Xác minh cấu trúc thư mục 4 cấp con được sinh tự động trên ổ đĩa
+        user_storage = root_folder.parent / "Users_Storage" / "lan_anh_at_univ_edu"
+        major_dir = user_storage / qtkd["folder_name"]
+        assert major_dir.exists()
+
+        # Kiểm tra ít nhất 1 môn học của ngành có đủ 4 thư mục con
+        subjects = list(major_dir.iterdir())
+        assert len(subjects) > 0
+        first_sub = subjects[0]
+        assert (first_sub / "01_Giao_Trinh").exists()
+        assert (first_sub / "02_Slide").exists()
+        assert (first_sub / "03_Tai_Lieu_Tham_Khao").exists()
+        assert (first_sub / "04_On_Thi").exists()
+    finally:
+        server.shutdown()
+
+
+
 
 

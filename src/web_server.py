@@ -1810,6 +1810,36 @@ def get_html_dashboard() -> str:
     </div>
   </div>
 
+  <!-- Modal Onboarding Chọn Chuyên Ngành Học Thuật -->
+  <div class="modal-backdrop" id="onboardingModal" style="display:none; z-index: 1100;">
+    <div class="modal-box" style="max-width: 680px; width: 92vw;">
+      <div class="modal-header">
+        <div>
+          <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>🎓</span> Chọn Chuyên Ngành Đào Tạo Thạc Sĩ
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+            Chào mừng bạn! Hãy chọn chuyên ngành để hệ thống tự động chuẩn bị không gian học tập và cấu trúc thư mục chuẩn.
+          </div>
+        </div>
+      </div>
+      <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+        <input type="text" id="onboardingMajorSearch" class="form-control" placeholder="🔍 Tìm kiếm nhanh chuyên ngành (vd: Quản trị kinh doanh, Hệ thống thông tin...)" oninput="filterOnboardingMajors()" style="margin-bottom: 14px;">
+        <div id="onboardingMajorsList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">
+          <!-- Danh sách thẻ chuyên ngành được render động bằng JS -->
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <div id="onboardingSelectedHint" style="font-size: 0.82rem; color: var(--text-secondary);">
+          Chưa chọn chuyên ngành
+        </div>
+        <button id="btnConfirmOnboarding" class="btn btn-primary" onclick="confirmStudentMajorSelection()" disabled>
+          🚀 Bắt đầu học tập
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Sửa tay phân loại -->
   <div class="modal-backdrop" id="editModal">
     <div class="modal-box">
@@ -2175,6 +2205,10 @@ def get_html_dashboard() -> str:
 
           await loadStats();
           await loadFiles();
+
+          if (currentUser && !currentUser.major_id) {
+            openOnboardingModal();
+          }
         } else {
           currentUser = null;
           if (banner) banner.style.display = 'none';
@@ -2645,6 +2679,110 @@ def get_html_dashboard() -> str:
         showToast('Đã lưu cài đặt.');
         closeSettingsModal();
       } catch (e) { alert('Lỗi: ' + e); }
+    }
+
+    // ==================== Onboarding Modal Logic ====================
+    let allOnboardingMajors = [];
+    let selectedOnboardingMajorId = null;
+
+    async function openOnboardingModal() {
+      const modal = document.getElementById('onboardingModal');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      selectedOnboardingMajorId = null;
+      const confirmBtn = document.getElementById('btnConfirmOnboarding');
+      if (confirmBtn) confirmBtn.disabled = true;
+      document.getElementById('onboardingSelectedHint').textContent = 'Chưa chọn chuyên ngành';
+
+      try {
+        const res = await fetch('/api/majors');
+        const data = await res.json();
+        if (data.ok && data.majors) {
+          allOnboardingMajors = data.majors;
+          renderOnboardingMajors(allOnboardingMajors);
+        }
+      } catch (e) {
+        console.error('Lỗi nạp chuyên ngành:', e);
+      }
+    }
+
+    function closeOnboardingModal() {
+      const modal = document.getElementById('onboardingModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function renderOnboardingMajors(majors) {
+      const container = document.getElementById('onboardingMajorsList');
+      if (!container) return;
+      if (!majors || majors.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-dim); padding:20px; text-align:center;">Không tìm thấy chuyên ngành phù hợp.</div>';
+        return;
+      }
+      container.innerHTML = majors.map(m => {
+        const isSelected = selectedOnboardingMajorId === m.id;
+        return `
+          <div class="card card-hover" style="cursor:pointer; padding:12px 14px; border:1px solid ${isSelected ? 'var(--accent-purple)' : 'var(--border-subtle)'}; background:${isSelected ? 'rgba(168, 85, 247, 0.1)' : 'var(--bg-surface)'}; border-radius:8px; transition:all 0.2s;" onclick="selectMajorCard(${m.id}, '${m.name.replace(/'/g, "\\'")}')">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+              <span style="font-weight:600; font-size:0.9rem; color:${isSelected ? 'var(--accent-purple)' : 'var(--text-primary)'};">${m.name}</span>
+              <span class="badge" style="background:var(--bg-subtle); color:var(--text-secondary); font-size:0.7rem; font-family:'JetBrains Mono',monospace;">${m.code}</span>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">${m.description || 'Chương trình đào tạo Thạc sĩ'}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterOnboardingMajors() {
+      const q = (document.getElementById('onboardingMajorSearch').value || '').trim().toLowerCase();
+      const filtered = allOnboardingMajors.filter(m => 
+        m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q) || (m.description && m.description.toLowerCase().includes(q))
+      );
+      renderOnboardingMajors(filtered);
+    }
+
+    function selectMajorCard(id, name) {
+      selectedOnboardingMajorId = id;
+      renderOnboardingMajors(allOnboardingMajors);
+      const hint = document.getElementById('onboardingSelectedHint');
+      if (hint) hint.innerHTML = `Đã chọn: <b style="color:var(--accent-purple);">${name}</b>`;
+      const btn = document.getElementById('btnConfirmOnboarding');
+      if (btn) btn.disabled = false;
+    }
+
+    async function confirmStudentMajorSelection() {
+      if (!selectedOnboardingMajorId) return;
+      const btn = document.getElementById('btnConfirmOnboarding');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Đang khởi tạo thư mục...';
+      }
+      try {
+        const res = await fetch('/api/user/select-major', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ major_id: selectedOnboardingMajorId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (currentUser) {
+            currentUser.major_id = selectedOnboardingMajorId;
+            currentUser.major = data.major;
+          }
+          closeOnboardingModal();
+          showToast(`Đã thiết lập chuyên ngành ${data.major.name} và khởi tạo 4 thư mục con!`);
+          await loadStats();
+          await loadFiles();
+        } else {
+          alert('Lỗi: ' + (data.error || 'Không thể chọn chuyên ngành'));
+        }
+      } catch (e) {
+        alert('Lỗi kết nối: ' + e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🚀 Bắt đầu học tập';
+        }
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -3327,6 +3465,56 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 "user_email": user_email,
             })
             return
+
+        if path == "/api/user/select-major":
+            if not current_user or not self.database:
+                self._send_json({"ok": False, "error": "Vui lòng đăng nhập tài khoản"}, 401)
+                return
+
+            major_id = body.get("major_id")
+            if not major_id:
+                self._send_json({"ok": False, "error": "Vui lòng chọn chuyên ngành"}, 400)
+                return
+
+            try:
+                major_id_int = int(major_id)
+                major = self.database.get_major_by_id(major_id_int)
+                if not major:
+                    self._send_json({"ok": False, "error": "Chuyên ngành không tồn tại"}, 404)
+                    return
+
+                # Cập nhật major_id cho user trong DB
+                self.database.set_user_major(current_user["email"], major_id_int)
+                current_user["major_id"] = major_id_int
+
+                # Tự động tạo cây thư mục 4 cấp con chuẩn mực
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                config_root = cfg.get("root_folder", "")
+                user_storage = get_user_storage_folder(current_user, config_root)
+                major_dir = user_storage / major["folder_name"]
+                major_dir.mkdir(parents=True, exist_ok=True)
+
+                subjects = self.database.get_subjects_by_major(major_id_int)
+                for sub in subjects:
+                    sub_dir = major_dir / sub["folder_name"]
+                    (sub_dir / "01_Giao_Trinh").mkdir(parents=True, exist_ok=True)
+                    (sub_dir / "02_Slide").mkdir(parents=True, exist_ok=True)
+                    (sub_dir / "03_Tai_Lieu_Tham_Khao").mkdir(parents=True, exist_ok=True)
+                    (sub_dir / "04_On_Thi").mkdir(parents=True, exist_ok=True)
+
+                self._send_json({
+                    "ok": True,
+                    "major": major,
+                    "subjects_count": len(subjects),
+                    "storage_path": str(major_dir),
+                })
+                return
+            except Exception as exc:
+                logger.error("Lỗi khi chọn chuyên ngành: %s", exc, exc_info=True)
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
+
 
         if path == "/api/admin/majors":
             if not self._is_admin(current_user):
