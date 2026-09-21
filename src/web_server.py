@@ -3335,6 +3335,63 @@ def get_user_drive_manager(
     return None, False, "Chưa kết nối Drive riêng (Lưu tại máy)"
 
 
+def infer_file_classification(
+    filename: str,
+    user: Optional[Dict[str, Any]] = None,
+    database: Optional[Database] = None,
+) -> Tuple[str, str]:
+    """Tự động suy luận môn học và loại tài liệu từ tên file khi upload trực tiếp."""
+    fn_lower = filename.lower()
+    subject = "Tài liệu chung"
+    doc_type = "Tài liệu tham khảo"
+
+    if user and user.get("major_id") and database:
+        try:
+            subjects = database.get_subjects_by_major(user["major_id"])
+            for s in subjects:
+                s_name = s.get("name", "")
+                kw_list = [s_name.lower(), s.get("code", "").lower(), s.get("folder_name", "").lower()]
+                try:
+                    kws = json.loads(s.get("keywords", "[]"))
+                    if isinstance(kws, list):
+                        kw_list.extend([k.lower() for k in kws])
+                except Exception:
+                    pass
+                if any(k in fn_lower for k in kw_list if k):
+                    subject = s_name
+                    break
+        except Exception:
+            pass
+
+    if subject == "Tài liệu chung":
+        if any(k in fn_lower for k in ["triết", "triet", "mac", "lenin"]):
+            subject = "Triết học"
+        elif any(k in fn_lower for k in ["toán", "toan", "dữ liệu", "du_lieu", "data"]):
+            subject = "Toán khoa học dữ liệu"
+        elif any(k in fn_lower for k in ["cơ sở dữ liệu", "co_so_du_lieu", "csdl", "database", "sql"]):
+            subject = "Cơ sở dữ liệu"
+        elif any(k in fn_lower for k in ["nghiên cứu", "nghien_cuu", "phương pháp nghiên cứu", "ppnc"]):
+            subject = "Phương pháp nghiên cứu"
+        elif any(k in fn_lower for k in ["ghi chú", "ghi_chu", "note", "phuong_phap_ghi_chu"]):
+            subject = "Phương pháp ghi chú"
+        elif any(k in fn_lower for k in ["marketing", "mkt"]):
+            subject = "Marketing căn bản"
+        elif any(k in fn_lower for k in ["chiến lược", "chien_luoc", "strategy"]):
+            subject = "Quản trị chiến lược"
+
+    ext = Path(filename).suffix.lower()
+    if any(k in fn_lower for k in ["giao-trinh", "giao_trinh", "giaotrinh", "giáo trình", "textbook", "sach", "book"]):
+        doc_type = "Giáo trình"
+    elif any(k in fn_lower for k in ["ôn", "on ", "on_", "on-", "đề cương", "de cuong", "decuong", "đề thi", "thi", "exam"]):
+        doc_type = "Ôn thi"
+    elif ext in [".pptx", ".ppt"] or any(k in fn_lower for k in ["slide", "bài giảng", "bai giang", "baigiang", "lecture"]):
+        doc_type = "Slide"
+    else:
+        doc_type = "Tài liệu tham khảo"
+
+    return subject, doc_type
+
+
 class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
     """Handler xử lý API và giao diện Web Dashboard Multi-User."""
 
@@ -3787,13 +3844,11 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 subject = body.get("subject")
                 doc_type = body.get("document_type")
                 if not subject or not doc_type:
-                    if DashboardRequestHandler.classifier:
-                        info = DashboardRequestHandler.classifier.classify_path(Path(filename))
-                        subject = subject or info.get("subject", "Tài liệu chung")
-                        doc_type = doc_type or info.get("document_type", "Tài liệu tham khảo")
-                    else:
-                        subject = subject or "Tài liệu chung"
-                        doc_type = doc_type or "Tài liệu tham khảo"
+                    inferred_sub, inferred_type = infer_file_classification(
+                        filename, current_user, self.database
+                    )
+                    subject = subject or inferred_sub
+                    doc_type = doc_type or inferred_type
 
                 # Lưu file vào thư mục lưu trữ CỦA TỪNG USER (Cách ly hoàn toàn)
                 with open(self.config_path, "r", encoding="utf-8") as f:

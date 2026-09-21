@@ -262,6 +262,33 @@ def test_upload_strictly_requires_auth(tmp_path: Path):
             html = page_resp.read().decode("utf-8")
             assert "syncLockCard" in html
             assert "Tính năng yêu cầu định danh tài khoản" in html
+
+        # Đăng nhập và upload ảnh từ điện thoại mà không cần gửi subject/document_type
+        login_req = urllib.request.Request(
+            f"{base_url}/auth/test-login",
+            data=json.dumps({"email": "mobile_user@univ.edu", "name": "Mobile User"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(login_req) as login_resp:
+            cookie = login_resp.headers.get("Set-Cookie").split(";")[0]
+
+        import base64
+        fake_img = base64.b64encode(b"fake image bytes").decode("utf-8")
+        upload_img_payload = json.dumps({
+            "filename": "IMG_Slide_Triet_Hoc_01.jpg",
+            "content_base64": fake_img
+        }).encode("utf-8")
+        up_req = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=upload_img_payload,
+            headers={"Content-Type": "application/json", "Cookie": cookie},
+            method="POST"
+        )
+        with urllib.request.urlopen(up_req) as up_resp:
+            up_data = json.loads(up_resp.read().decode("utf-8"))
+            assert up_data["ok"] is True
+            assert up_data["subject"] == "Triết học"
+            assert up_data["document_type"] == "Slide"
     finally:
         server.shutdown()
 
