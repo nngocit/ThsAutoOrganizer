@@ -508,8 +508,81 @@ def get_html_dashboard() -> str:
     .onetap-name { font-size: 0.82rem; font-weight: 600; color: #fff; }
     .onetap-email { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+    /* ==================== AI STUDY HUB CSS ==================== */
+    .ai-filter-pill {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .ai-filter-pill:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .ai-filter-pill.active {
+      color: #10B981;
+      background: rgba(16, 185, 129, 0.15);
+      font-weight: 600;
+    }
+    .insight-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .insight-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+    }
+    .citations-drawer {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      margin-top: 10px;
+    }
+    .quiz-option-btn {
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 0.84rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .quiz-option-btn:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: var(--bg-card-hover);
+    }
+    .quiz-option-btn.correct {
+      background: rgba(16, 185, 129, 0.2) !important;
+      border-color: #10B981 !important;
+      color: #A7F3D0 !important;
+      font-weight: 600;
+    }
+    .quiz-option-btn.wrong {
+      background: rgba(239, 68, 68, 0.2) !important;
+      border-color: #EF4444 !important;
+      color: #FECACA !important;
+    }
+
     /* ==================== VIEW 1: HOMEPAGE VIEW ==================== */
     .view-content {
+
       padding: 32px 36px 60px;
       max-width: 1400px;
       width: 100%;
@@ -1387,10 +1460,16 @@ def get_html_dashboard() -> str:
           <span class="nav-icon">ℹ️</span>
           <span class="nav-label">Giới thiệu</span>
         </a>
+        <a href="javascript:void(0)" class="nav-item" id="navStudyHub" onclick="showView('studyHub')">
+          <span class="nav-icon">🧠</span>
+          <span class="nav-label">AI Study Hub</span>
+          <span class="nav-badge-ver" style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">Plus</span>
+        </a>
         <a href="javascript:void(0)" class="nav-item" id="navItemAdmin" onclick="showView('admin')" style="display: none;">
           <span class="nav-icon">⚙️</span>
           <span class="nav-label">Quản trị Đào tạo</span>
         </a>
+
         <div class="nav-item" style="opacity: 0.5; cursor: default; margin-top: auto;">
           <span class="nav-icon">📜</span>
           <span class="nav-label">Phiên bản</span>
@@ -1954,11 +2033,124 @@ def get_html_dashboard() -> str:
                 </tbody>
               </table>
             </div>
+        </div>
+      </div>
+
+      <!-- VIEW 4: AI STUDY HUB VIEW (GOOGLE NOTEBOOKLM PLUS INTEGRATION) -->
+      <div id="studyHubView" class="view-content" style="display: none; padding: 24px 28px;">
+        <span id="tab-study-hub" style="display: none;"></span>
+        <!-- Header -->
+        <div style="margin-bottom: 24px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 42px; height: 42px; border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; border: 1px solid rgba(16, 185, 129, 0.3);">🧠</div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h1 style="font-size: 1.35rem; font-weight: 700; color: var(--text-primary); margin: 0; letter-spacing: -0.5px;">AI Study Hub</h1>
+                <span id="nlmStatusBadge" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 9999px; background: rgba(113, 113, 122, 0.2); color: var(--text-secondary); border: 1px solid var(--border-subtle); display: inline-flex; align-items: center; gap: 5px;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: #71717A;"></span> Đang kiểm tra kết nối...
+                </span>
+              </div>
+              <div style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 2px;">
+                Bộ não nghiên cứu Thạc sĩ kết nối Google NotebookLM Plus – Trắc nghiệm Quiz, Tóm tắt bài giảng & Trích dẫn số trang chính xác.
+              </div>
+            </div>
           </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="btn btn-secondary" onclick="syncPendingFilesToNLM()" style="font-size: 0.78rem; border: 1px solid var(--border-subtle); padding: 6px 12px;">
+              🔄 Nạp lại tệp chờ sync
+            </button>
+            <button class="btn btn-primary" onclick="openNewInsightModal()" style="font-size: 0.78rem; padding: 6px 14px; background: #10B981; border: none;">
+              + Thêm ghi chú/Quiz
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Research Box (Hỏi đáp nhanh NotebookLM) -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 24px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">⚡ Hỏi đáp siêu tốc với Gemini 1.5 Pro trong NotebookLM</span>
+              <span style="font-size: 0.75rem; color: var(--text-dim);">(Tự động trích dẫn Citations nguồn)</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <select id="quickQueryCourseSelect" class="form-control" style="width: 220px; font-size: 0.82rem;"></select>
+            <input type="text" id="quickPromptInput" class="form-control" placeholder="Đặt câu hỏi nghiên cứu (ví dụ: Nêu 3 luận điểm trọng tâm của NQ 27 kèm số trang)..." style="flex: 1; min-width: 280px; font-size: 0.82rem;">
+            <button class="btn btn-primary" id="btn-quick-query" onclick="executeQuickQuery()" style="font-size: 0.82rem; padding: 6px 18px; background: #10B981; border: none;">Gửi câu hỏi</button>
+          </div>
+          <div id="quickQueryResultBox" style="display: none; margin-top: 14px; padding: 16px; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.6;">
+            <div id="quickQueryAnswerText" style="color: var(--text-primary); white-space: pre-wrap;"></div>
+            <div id="quickQueryCitationsBox" class="citations-box" style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 0.78rem; color: var(--text-secondary);"></div>
+            <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+              <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px;" onclick="saveQuickQueryAsInsight()">💾 Lưu vào Hub</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 20px;">
+          <!-- Course Dropdown Filter -->
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 500;">Môn học:</label>
+            <select id="ai-course-filter" class="form-control" onchange="filterStudyHubInsights()" style="width: 240px; font-size: 0.82rem;">
+              <option value="">-- Tất cả môn học --</option>
+            </select>
+          </div>
+
+          <!-- Type Filters -->
+          <div id="ai-type-filter" style="display: flex; gap: 6px; background: var(--bg-surface); padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+            <button class="ai-filter-pill active" onclick="setInsightTypeFilter('', this)">Tất cả</button>
+            <button class="ai-filter-pill" onclick="setInsightTypeFilter('quiz', this)">🎯 Trắc nghiệm Quiz</button>
+            <button class="ai-filter-pill" onclick="setInsightTypeFilter('summary', this)">📝 Tóm tắt</button>
+            <button class="ai-filter-pill" onclick="setInsightTypeFilter('outline', this)">📑 Đề cương</button>
+            <button class="ai-filter-pill" onclick="setInsightTypeFilter('qa', this)">💡 Q&A Citations</button>
+          </div>
+        </div>
+
+        <!-- Insights Grid Cards -->
+        <div id="ai-insights-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px;">
+          <!-- Render by JS -->
         </div>
       </div>
     </div>
   </div>
+
+  <!-- MODAL: INTERACTIVE QUIZ PLAYER -->
+  <div id="quiz-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); width: 90%; max-width: 640px; max-height: 85vh; overflow-y: auto; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px;">
+        <div>
+          <h3 id="quizModalTitle" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Luyện tập Trắc nghiệm</h3>
+          <div id="quizModalSubtitle" style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;"></div>
+        </div>
+        <button onclick="closeQuizModal()" style="background: none; border: none; font-size: 1.25rem; color: var(--text-dim); cursor: pointer;">✕</button>
+      </div>
+      <div id="quizQuestionsContainer"></div>
+      <div id="quizResultSummary" style="display: none; margin-top: 16px; padding: 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); text-align: center; color: #10B981; font-weight: 600;"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: NEW INSIGHT -->
+  <div id="newInsightModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); width: 90%; max-width: 580px; padding: 24px;">
+      <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 0 0 16px 0;">Thêm Bài Học / Quiz Mới</h3>
+      <select id="modalInsightSubject" class="form-control" style="margin-bottom: 10px; font-size: 0.82rem;"></select>
+      <select id="modalInsightType" class="form-control" style="margin-bottom: 10px; font-size: 0.82rem;">
+        <option value="summary">📝 Tóm tắt bài giảng</option>
+        <option value="quiz">🎯 Bộ câu hỏi Quiz (JSON)</option>
+        <option value="outline">📑 Đề cương ôn tập</option>
+        <option value="qa">💡 Q&A Nghiên cứu</option>
+      </select>
+      <input type="text" id="modalInsightTitle" class="form-control" placeholder="Tiêu đề..." style="margin-bottom: 10px; font-size: 0.82rem;">
+      <textarea id="modalInsightContent" class="form-control" placeholder="Nội dung bài viết (Markdown hoặc định dạng Quiz JSON)..." style="height: 120px; margin-bottom: 10px; font-size: 0.82rem; font-family: 'JetBrains Mono', monospace;"></textarea>
+      <input type="text" id="modalInsightCitations" class="form-control" placeholder="Trích dẫn nguồn (ví dụ: Slide 01 trang 12; Giáo trình mục 3.2)..." style="margin-bottom: 16px; font-size: 0.82rem;">
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn btn-secondary" onclick="closeNewInsightModal()">Hủy</button>
+        <button class="btn btn-primary" onclick="submitNewInsight()" style="background: #10B981; border: none;">Lưu vào Hub</button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Modal Đăng nhập / Chọn tài khoản sinh viên -->
   <div class="modal-backdrop" id="loginModal">
@@ -2167,38 +2359,56 @@ def get_html_dashboard() -> str:
       setTimeout(() => { t.style.display = 'none'; }, 3500);
     }
 
-    /* View Navigation (Homepage vs Workspace vs Admin) */
+    /* View Navigation (Homepage vs Workspace vs Admin vs Study Hub) */
     function showView(viewName) {
       closeMobileSidebar();
       currentActiveView = viewName;
       const homeEl = document.getElementById('homepageView');
       const workEl = document.getElementById('workspaceView');
       const adminEl = document.getElementById('adminView');
+      const studyEl = document.getElementById('studyHubView');
       const navH = document.getElementById('navHome');
       const navW = document.getElementById('navWorkspace');
+      const navS = document.getElementById('navStudyHub');
       const navA = document.getElementById('navItemAdmin');
 
       if (viewName === 'home') {
         if (homeEl) homeEl.style.display = 'block';
         if (workEl) workEl.style.display = 'none';
         if (adminEl) adminEl.style.display = 'none';
+        if (studyEl) studyEl.style.display = 'none';
         if (navH) navH.classList.add('active');
         if (navW) navW.classList.remove('active');
+        if (navS) navS.classList.remove('active');
         if (navA) navA.classList.remove('active');
       } else if (viewName === 'admin') {
         if (homeEl) homeEl.style.display = 'none';
         if (workEl) workEl.style.display = 'none';
         if (adminEl) adminEl.style.display = 'block';
+        if (studyEl) studyEl.style.display = 'none';
         if (navH) navH.classList.remove('active');
         if (navW) navW.classList.remove('active');
+        if (navS) navS.classList.remove('active');
         if (navA) navA.classList.add('active');
         loadAdminMajors();
+      } else if (viewName === 'studyHub') {
+        if (homeEl) homeEl.style.display = 'none';
+        if (workEl) workEl.style.display = 'none';
+        if (adminEl) adminEl.style.display = 'none';
+        if (studyEl) studyEl.style.display = 'block';
+        if (navH) navH.classList.remove('active');
+        if (navW) navW.classList.remove('active');
+        if (navS) navS.classList.add('active');
+        if (navA) navA.classList.remove('active');
+        initStudyHub();
       } else {
         if (homeEl) homeEl.style.display = 'none';
         if (workEl) workEl.style.display = 'block';
         if (adminEl) adminEl.style.display = 'none';
+        if (studyEl) studyEl.style.display = 'none';
         if (navH) navH.classList.remove('active');
         if (navW) navW.classList.add('active');
+        if (navS) navS.classList.remove('active');
         if (navA) navA.classList.remove('active');
         
         const unauth = document.getElementById('unauthenticatedState');
@@ -2217,6 +2427,415 @@ def get_html_dashboard() -> str:
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    /* ==================== AI STUDY HUB JS LOGIC ==================== */
+    let currentInsightTypeFilter = '';
+    let allStudyHubInsights = [];
+    let currentQuickQueryResult = null;
+
+    async function initStudyHub() {
+      await checkNLMStatus();
+      await loadStudyHubCourses();
+      await loadStudyHubInsights();
+    }
+
+    async function checkNLMStatus() {
+      const badge = document.getElementById('nlmStatusBadge');
+      if (!badge) return;
+      try {
+        const res = await fetch('/api/notebooklm/status');
+        const data = await res.json();
+        if (data.ok && data.status) {
+          if (data.status.authenticated) {
+            badge.innerHTML = '<span style="width: 6px; height: 6px; border-radius: 50%; background: #10B981;"></span> NotebookLM Plus: Sẵn sàng (' + (data.status.version || 'Connected') + ')';
+            badge.style.color = '#10B981';
+            badge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            badge.style.background = 'rgba(16, 185, 129, 0.1)';
+          } else if (data.status.installed) {
+            badge.innerHTML = '<span style="width: 6px; height: 6px; border-radius: 50%; background: #F59E0B;"></span> Cần đăng nhập: chạy `nlm login`';
+            badge.style.color = '#F59E0B';
+            badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+            badge.style.background = 'rgba(245, 158, 11, 0.1)';
+          } else {
+            badge.innerHTML = '<span style="width: 6px; height: 6px; border-radius: 50%; background: #EF4444;"></span> Chưa cài `notebooklm-mcp-cli`';
+            badge.style.color = '#EF4444';
+            badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          }
+        }
+      } catch (e) {
+        badge.innerHTML = '⚠️ Lỗi kiểm tra NotebookLM';
+      }
+    }
+
+    async function loadStudyHubCourses() {
+      const filterSelect = document.getElementById('ai-course-filter');
+      const quickSelect = document.getElementById('quickQueryCourseSelect');
+      const modalSelect = document.getElementById('modalInsightSubject');
+      if (!filterSelect) return;
+
+      try {
+        let subjects = [];
+        if (currentUser && currentUser.major_id) {
+          const res = await fetch(`/api/majors/${currentUser.major_id}/subjects`);
+          const d = await res.json();
+          if (d.ok) subjects = d.subjects;
+        } else {
+          const res = await fetch('/api/majors');
+          const d = await res.json();
+          if (d.ok && d.majors && d.majors.length > 0) {
+            const sres = await fetch(`/api/majors/${d.majors[0].id}/subjects`);
+            const sd = await sres.json();
+            if (sd.ok) subjects = sd.subjects;
+          }
+        }
+
+        let filterHtml = '<option value="">-- Tất cả môn học --</option>';
+        let optionsHtml = '';
+        subjects.forEach(s => {
+          optionsHtml += `<option value="${s.id}">${escapeHtml(s.name)} (${escapeHtml(s.code)})</option>`;
+          filterHtml += `<option value="${s.id}">${escapeHtml(s.name)}</option>`;
+        });
+
+        filterSelect.innerHTML = filterHtml;
+        if (quickSelect) quickSelect.innerHTML = optionsHtml;
+        if (modalSelect) modalSelect.innerHTML = optionsHtml;
+      } catch (e) {
+        console.error('Lỗi tải môn học cho Study Hub:', e);
+      }
+    }
+
+    async function loadStudyHubInsights() {
+      const grid = document.getElementById('ai-insights-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: var(--text-muted);">Đang tải dữ liệu từ Hub...</div>';
+
+      try {
+        const courseId = document.getElementById('ai-course-filter')?.value || '';
+        let url = `/api/ai/insights?limit=100`;
+        if (courseId) url += `&subject_id=${courseId}`;
+        if (currentInsightTypeFilter) url += `&type=${currentInsightTypeFilter}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.ok) {
+          allStudyHubInsights = data.insights || [];
+          renderInsightsGrid(allStudyHubInsights);
+        } else {
+          grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--accent-red);">Lỗi: ${data.error}</div>`;
+        }
+      } catch (e) {
+        grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--accent-red);">Lỗi kết nối: ${e}</div>`;
+      }
+    }
+
+    function renderInsightsGrid(insights) {
+      const grid = document.getElementById('ai-insights-grid');
+      if (!grid) return;
+
+      if (!insights || insights.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; padding: 48px 20px; background: var(--bg-surface); border: 1px dashed var(--border-subtle); border-radius: var(--radius-md);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">🧠</div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Chưa có bài học hoặc Quiz nào</div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary); max-width: 460px; margin: 0 auto 16px;">
+              Bạn có thể hỏi đáp siêu tốc ở khung trên hoặc yêu cầu AntiGravity Agent qua prompt: "@notebooklm Hãy tóm tắt..." để tự động lưu bài vào đây.
+            </div>
+            <button class="btn btn-primary" onclick="openNewInsightModal()" style="font-size: 0.8rem; background: #10B981; border: none;">+ Thêm bài đầu tiên</button>
+          </div>
+        `;
+        return;
+      }
+
+      const typeBadges = {
+        quiz: { label: '🎯 Trắc nghiệm Quiz', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
+        summary: { label: '📝 Tóm tắt bài giảng', color: '#6366F1', bg: 'rgba(99, 102, 241, 0.15)' },
+        outline: { label: '📑 Đề cương ôn tập', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)' },
+        qa: { label: '💡 Q&A Citations', color: '#06B6D4', bg: 'rgba(6, 182, 212, 0.15)' },
+      };
+
+      grid.innerHTML = insights.map(item => {
+        const badge = typeBadges[item.insight_type] || { label: item.insight_type, color: '#A1A1AA', bg: 'rgba(255,255,255,0.08)' };
+        let citationsHtml = '';
+        if (item.citations) {
+          try {
+            const parsedCitations = typeof item.citations === 'string' ? JSON.parse(item.citations) : item.citations;
+            if (Array.isArray(parsedCitations) && parsedCitations.length > 0) {
+              const cItems = parsedCitations.map(c => `<li>${escapeHtml(typeof c === 'object' ? (c.source || c.text || JSON.stringify(c)) : String(c))}</li>`).join('');
+              citationsHtml = `
+                <details class="citations-drawer" style="cursor: pointer;">
+                  <summary style="font-weight: 600; color: var(--text-secondary);">📎 Trích dẫn nguồn (${parsedCitations.length} dẫn chứng)</summary>
+                  <ul style="margin: 8px 0 0 16px; padding: 0; line-height: 1.5;">${cItems}</ul>
+                </details>
+              `;
+            }
+          } catch(e) {
+            citationsHtml = `<div class="citations-drawer">📎 Trích dẫn: ${escapeHtml(item.citations)}</div>`;
+          }
+        }
+
+        const isQuiz = item.insight_type === 'quiz';
+        return `
+          <div class="insight-card">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;">
+                <span style="font-size: 0.72rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600; background: ${badge.bg}; color: ${badge.color};">
+                  ${badge.label}
+                </span>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">
+                  ${item.subject_name ? escapeHtml(item.subject_name) : ''}
+                </span>
+              </div>
+              <h3 style="font-size: 0.98rem; font-weight: 700; color: var(--text-primary); margin: 0 0 8px 0; line-height: 1.4;">
+                ${escapeHtml(item.title)}
+              </h3>
+              <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; max-height: 140px; overflow-y: auto; white-space: pre-wrap; font-family: ${isQuiz ? "'JetBrains Mono', monospace" : "inherit"};">
+                ${escapeHtml(item.content.length > 300 ? item.content.slice(0, 300) + '...' : item.content)}
+              </div>
+              ${citationsHtml}
+            </div>
+
+            <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 0.72rem; color: var(--text-dim);">${item.created_at ? item.created_at.slice(0, 10) : ''}</span>
+              <div style="display: flex; gap: 6px;">
+                ${isQuiz ? `<button class="btn btn-primary" onclick="launchQuizPlayer(${item.id})" style="font-size: 0.75rem; padding: 3px 10px; background: #10B981; border: none;">🎯 Luyện tập Quiz</button>` : ''}
+                <button class="btn btn-secondary" onclick="deleteStudyHubInsight(${item.id})" style="font-size: 0.75rem; padding: 3px 8px; color: var(--accent-red); border-color: var(--border-subtle);">Xóa</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterStudyHubInsights() {
+      loadStudyHubInsights();
+    }
+
+    function setInsightTypeFilter(type, btn) {
+      currentInsightTypeFilter = type;
+      document.querySelectorAll('#ai-type-filter .ai-filter-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      loadStudyHubInsights();
+    }
+
+    async function executeQuickQuery() {
+      const courseSelect = document.getElementById('quickQueryCourseSelect');
+      const promptInput = document.getElementById('quickPromptInput');
+      const btn = document.getElementById('btn-quick-query');
+      const resultBox = document.getElementById('quickQueryResultBox');
+      const ansText = document.getElementById('quickQueryAnswerText');
+      const citeBox = document.getElementById('quickQueryCitationsBox');
+
+      if (!promptInput.value.trim()) {
+        alert('Vui lòng nhập câu hỏi nghiên cứu');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Đang truy vấn...';
+      resultBox.style.display = 'block';
+      ansText.textContent = 'Gemini 1.5 Pro đang phân tích tài liệu trong NotebookLM...';
+      citeBox.innerHTML = '';
+
+      try {
+        const res = await fetch('/api/ai/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subject_id: courseSelect.value || 1,
+            prompt: promptInput.value.trim()
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          ansText.textContent = data.answer || 'Không có câu trả lời.';
+          if (data.citations && data.citations.length > 0) {
+            citeBox.innerHTML = '<b>Trích dẫn Citations:</b><br>' + data.citations.map(c => `• ${escapeHtml(c.text || JSON.stringify(c))}`).join('<br>');
+          }
+          currentQuickQueryResult = {
+            subject_id: courseSelect.value || 1,
+            title: promptInput.value.trim().slice(0, 60),
+            content: data.answer,
+            citations: JSON.stringify(data.citations || []),
+            type: 'qa'
+          };
+        } else {
+          ansText.textContent = 'Lỗi truy vấn: ' + (data.error || 'Thao tác không thành công');
+        }
+      } catch (e) {
+        ansText.textContent = 'Lỗi kết nối: ' + e;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Gửi câu hỏi';
+      }
+    }
+
+    async function saveQuickQueryAsInsight() {
+      if (!currentQuickQueryResult) return;
+      try {
+        const res = await fetch('/api/ai/insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentQuickQueryResult)
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Đã lưu kết quả tra cứu vào AI Study Hub!');
+          loadStudyHubInsights();
+        }
+      } catch (e) {
+        alert('Lỗi lưu: ' + e);
+      }
+    }
+
+    function openNewInsightModal() {
+      document.getElementById('newInsightModal').style.display = 'flex';
+    }
+    function closeNewInsightModal() {
+      document.getElementById('newInsightModal').style.display = 'none';
+    }
+
+    async function submitNewInsight() {
+      const subject_id = document.getElementById('modalInsightSubject').value;
+      const type = document.getElementById('modalInsightType').value;
+      const title = document.getElementById('modalInsightTitle').value.trim();
+      const content = document.getElementById('modalInsightContent').value.trim();
+      const citations = document.getElementById('modalInsightCitations').value.trim();
+
+      if (!title || !content) {
+        alert('Vui lòng nhập đầy đủ tiêu đề và nội dung');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/ai/insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subject_id: subject_id ? parseInt(subject_id) : 1,
+            type,
+            title,
+            content,
+            citations: citations ? [citations] : []
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          closeNewInsightModal();
+          showToast('Đã thêm bài học vào Hub!');
+          loadStudyHubInsights();
+        } else {
+          alert('Lỗi: ' + data.error);
+        }
+      } catch (e) {
+        alert('Lỗi kết nối: ' + e);
+      }
+    }
+
+    async function deleteStudyHubInsight(id) {
+      if (!confirm('Bạn có chắc muốn xóa bài này?')) return;
+      try {
+        const res = await fetch(`/api/ai/insights/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Đã xóa bài học');
+          loadStudyHubInsights();
+        }
+      } catch (e) {
+        alert('Lỗi: ' + e);
+      }
+    }
+
+    async function syncPendingFilesToNLM() {
+      try {
+        const res = await fetch('/api/notebooklm/sync-pending', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Đã nạp lại ${data.requeued || 0} tệp vào hàng đợi nạp nguồn!`);
+        } else {
+          alert('Lỗi: ' + (data.error || 'Không thể đồng bộ'));
+        }
+      } catch (e) {
+        alert('Lỗi: ' + e);
+      }
+    }
+
+    /* Interactive Quiz Player */
+    function launchQuizPlayer(insightId) {
+      const item = allStudyHubInsights.find(i => i.id === insightId);
+      if (!item) return;
+
+      document.getElementById('quizModalTitle').textContent = item.title;
+      document.getElementById('quizModalSubtitle').textContent = item.subject_name || '';
+      const container = document.getElementById('quizQuestionsContainer');
+      const resultBox = document.getElementById('quizResultSummary');
+      resultBox.style.display = 'none';
+
+      let questions = [];
+      try {
+        questions = JSON.parse(item.content);
+        if (!Array.isArray(questions)) questions = [questions];
+      } catch (e) {
+        container.innerHTML = `<div style="color: var(--accent-red);">Nội dung bài viết chưa phải định dạng Quiz JSON chuẩn: <pre style="font-size:0.75rem; color:var(--text-secondary); margin-top:8px;">${escapeHtml(item.content)}</pre></div>`;
+        document.getElementById('quiz-modal').style.display = 'flex';
+        return;
+      }
+
+      container.innerHTML = questions.map((q, qIndex) => {
+        const qText = q.q || q.question || `Câu hỏi ${qIndex + 1}`;
+        const options = q.options || q.choices || [];
+        const correct = q.ans || q.answer || q.correct || '';
+
+        const optHtml = options.map((opt, oIndex) => {
+          const optLetter = String.fromCharCode(65 + oIndex);
+          return `
+            <button class="quiz-option-btn" onclick="handleQuizAnswer(this, '${escapeHtml(optLetter)}', '${escapeHtml(String(correct))}', ${qIndex})">
+              <b>${optLetter}.</b> ${escapeHtml(opt)}
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <div style="margin-bottom: 20px; padding: 14px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 10px;">
+              Câu ${qIndex + 1}: ${escapeHtml(qText)}
+            </div>
+            <div class="quiz-options-list">${optHtml}</div>
+            ${q.explain ? `<div id="explain-${qIndex}" style="display: none; margin-top: 8px; font-size: 0.78rem; color: var(--text-secondary); padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 4px;">💡 Giải thích: ${escapeHtml(q.explain)}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('quiz-modal').style.display = 'flex';
+    }
+
+    function handleQuizAnswer(btn, chosenLetter, correctAns, qIndex) {
+      const parent = btn.closest('.quiz-options-list');
+      if (!parent) return;
+      parent.querySelectorAll('.quiz-option-btn').forEach(b => {
+        b.disabled = true;
+        b.style.cursor = 'default';
+      });
+
+      const isCorrect = chosenLetter.trim().toUpperCase() === correctAns.trim().toUpperCase();
+      if (isCorrect) {
+        btn.classList.add('correct');
+      } else {
+        btn.classList.add('wrong');
+        parent.querySelectorAll('.quiz-option-btn').forEach(b => {
+          if (b.textContent.trim().startsWith(correctAns.trim().toUpperCase() + '.')) {
+            b.classList.add('correct');
+          }
+        });
+      }
+
+      const explainEl = document.getElementById(`explain-${qIndex}`);
+      if (explainEl) explainEl.style.display = 'block';
+    }
+
+    function closeQuizModal() {
+      document.getElementById('quiz-modal').style.display = 'none';
+    }
+
 
     function switchSubTab(tabName) {
       const tabDocs = document.getElementById('subtabDocs');

@@ -700,6 +700,35 @@ def test_ai_insights_rest_api(tmp_path: Path):
         server.shutdown()
 
 
+def test_ai_study_hub_ui_elements(tmp_path: Path):
+    """Kiểm tra giao diện Tab '🧠 AI Study Hub' phong cách Obsidian có mặt trong trang chủ."""
+    from src.database import Database
+    from src.web_server import start_web_server
+    import urllib.request
+
+    db = Database(tmp_path / "ui_test.db")
+    db.initialize()
+    port = 19132
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(tmp_path / "Mon_Hoc")}, f)
+
+    server = start_web_server(port=port, database=db, config_path=cfg_path)
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/")
+        with urllib.request.urlopen(req) as resp:
+            html = resp.read().decode("utf-8")
+            assert 'id="tab-study-hub"' in html or 'tab-study-hub' in html
+            assert "AI Study Hub" in html
+            assert 'id="ai-course-filter"' in html
+            assert 'id="ai-type-filter"' in html
+            assert 'id="quiz-modal"' in html or 'class="quiz-card"' in html or 'quiz-player' in html
+            assert 'citations' in html.lower()
+    finally:
+        server.shutdown()
+
+
+
 
 
 
