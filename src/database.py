@@ -137,6 +137,42 @@ class Database:
         CREATE INDEX IF NOT EXISTS idx_sessions_email ON sessions(user_email);
         """
 
+        create_table_ai_insights = """
+        CREATE TABLE IF NOT EXISTS ai_insights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+            insight_type TEXT NOT NULL CHECK(insight_type IN ('quiz', 'summary', 'outline', 'qa')),
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            citations TEXT,
+            created_by TEXT DEFAULT 'agent',
+            created_at TEXT NOT NULL
+        );
+        """
+        create_index_ai_insights_subject = """
+        CREATE INDEX IF NOT EXISTS idx_ai_insights_subject ON ai_insights(subject_id);
+        """
+        create_index_ai_insights_type = """
+        CREATE INDEX IF NOT EXISTS idx_ai_insights_type ON ai_insights(insight_type);
+        """
+
+        create_table_notebooklm_sync_log = """
+        CREATE TABLE IF NOT EXISTS notebooklm_sync_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id INTEGER REFERENCES files(id) ON DELETE SET NULL,
+            subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+            file_path TEXT NOT NULL,
+            notebooklm_id TEXT,
+            status TEXT NOT NULL CHECK(status IN ('pending', 'syncing', 'synced', 'failed', 'skipped')),
+            error_message TEXT,
+            synced_at TEXT,
+            created_at TEXT NOT NULL
+        );
+        """
+        create_index_nlm_sync_status = """
+        CREATE INDEX IF NOT EXISTS idx_nlm_sync_status ON notebooklm_sync_log(status);
+        """
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(create_table_users)
@@ -145,6 +181,11 @@ class Database:
             cursor.execute(create_table_subjects)
             cursor.execute(create_table_sessions)
             cursor.execute(create_index_sessions_email)
+            cursor.execute(create_table_ai_insights)
+            cursor.execute(create_index_ai_insights_subject)
+            cursor.execute(create_index_ai_insights_type)
+            cursor.execute(create_table_notebooklm_sync_log)
+            cursor.execute(create_index_nlm_sync_status)
 
             # Migration an toàn nếu bảng cũ chưa có các cột mới
             try:
@@ -159,6 +200,11 @@ class Database:
 
             try:
                 cursor.execute("ALTER TABLE users ADD COLUMN major_id INTEGER;")
+            except Exception:
+                pass  # Cột đã tồn tại
+
+            try:
+                cursor.execute("ALTER TABLE subjects ADD COLUMN notebooklm_id TEXT;")
             except Exception:
                 pass  # Cột đã tồn tại
 
@@ -714,5 +760,141 @@ class Database:
                 (major_id, now, email.strip()),
             )
             conn.commit()
+
+    # ==================== NotebookLM & AI Insights ====================
+
+    def update_subject_notebooklm_id(self, subject_id: int, notebooklm_id: str) -> None:
+        """Cập nhật ID sổ tay NotebookLM tương ứng với môn học."""
+        now = current_iso_time()
+        sql = "UPDATE subjects SET notebooklm_id = ?, updated_at = ? WHERE id = ?;"
+        with self._get_connection() as conn:
+            conn.execute(sql, (notebooklm_id.strip(), now, subject_id))
+            conn.commit()
+
+    def get_subject_notebooklm_id(self, subject_id: int) -> Optional[str]:
+        """Lấy ID sổ tay NotebookLM của môn học."""
+        sql = "SELECT notebooklm_id FROM subjects WHERE id = ? LIMIT 1;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (subject_id,))
+            row = cursor.fetchone()
+            return row["notebooklm_id"] if row and row["notebooklm_id"] else None
+
+    def update_course_notebooklm_id(self, course_id: int, notebooklm_id: str) -> None:
+        """Alias cho update_subject_notebooklm_id."""
+        self.update_subject_notebooklm_id(course_id, notebooklm_id)
+
+    def get_course_notebooklm_id(self, course_id: int) -> Optional[str]:
+        """Alias cho get_subject_notebooklm_id."""
+        return self.get_subject_notebooklm_id(course_id)
+
+    def get_subject_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Tìm môn học theo tên (không phân biệt hoa thường)."""
+        sql = "SELECT * FROM subjects WHERE LOWER(name) = LOWER(?) LIMIT 1;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (name.strip(),))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def save_ai_insight(
+        self,
+        subject_id: int,
+        insight_type: str,
+        title: str,
+        content: str,
+        citations: Optional[str] = None,
+        created_by: str = "agent",
+    ) -> int:
+        """Lưu bài phân tích, Quiz, Tóm tắt hoặc Q&A từ NotebookLM."""
+        now = current_iso_time()
+        sql = """
+        INSERT INTO ai_insights (subject_id, insight_type, title, content, citations, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                sql,
+                (subject_id, insight_type, title.strip(), content, citations, created_by, now),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_ai_insights(
+        self,
+        subject_id: Optional[int] = None,
+        insight_type: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Lấy danh sách các bài phân tích / insights, hỗ trợ lọc theo môn học và thể loại."""
+        sql = """
+        SELECT i.*, s.name as subject_name, s.code as subject_code
+        FROM ai_insights i
+        LEFT JOIN subjects s ON i.subject_id = s.id
+        WHERE 1=1
+        """
+        params: List[Any] = []
+        if subject_id is not None:
+            sql += " AND i.subject_id = ?"
+            params.append(subject_id)
+        if insight_type is not None:
+            sql += " AND i.insight_type = ?"
+            params.append(insight_type)
+
+        sql += " ORDER BY i.id DESC LIMIT ?;"
+        params.append(limit)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def delete_ai_insight(self, insight_id: int) -> bool:
+        """Xóa một insight theo ID."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM ai_insights WHERE id = ?;", (insight_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def log_notebooklm_sync(
+        self,
+        subject_id: int,
+        file_path: str,
+        notebooklm_id: Optional[str],
+        status: str,
+        file_id: Optional[int] = None,
+        error_message: Optional[str] = None,
+    ) -> int:
+        """Ghi nhật ký nạp nguồn tệp vào NotebookLM."""
+        now = current_iso_time()
+        synced_at = now if status == "synced" else None
+        sql = """
+        INSERT INTO notebooklm_sync_log (file_id, subject_id, file_path, notebooklm_id, status, error_message, synced_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                sql,
+                (file_id, subject_id, file_path, notebooklm_id, status, error_message, synced_at, now),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_notebooklm_sync_logs(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Lấy danh sách nhật ký đồng bộ NotebookLM mới nhất."""
+        sql = """
+        SELECT l.*, s.name as subject_name
+        FROM notebooklm_sync_log l
+        LEFT JOIN subjects s ON l.subject_id = s.id
+        ORDER BY l.id DESC LIMIT ?;
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (limit,))
+            return [dict(r) for r in cursor.fetchall()]
+
 
 

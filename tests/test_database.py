@@ -211,3 +211,57 @@ def test_database_session_lifecycle(tmp_path):
     # Xóa session
     db.delete_session(session_token)
     assert db.get_session_user(session_token) is None
+
+
+def test_notebooklm_schema_and_methods(tmp_path: Path):
+    """Kiểm tra schema và các methods cho NotebookLM và AI insights."""
+    db = Database(tmp_path / "test_nlm.db")
+    db.initialize()
+
+    # Tạo chuyên ngành và môn học mẫu
+    majors = db.get_all_majors()
+    httt = next(m for m in majors if m["code"] == "HTTT")
+    subjects = db.get_subjects_by_major(httt["id"])
+    subject = subjects[0]
+    subject_id = subject["id"]
+
+    # 1. Test update & get subject notebooklm_id
+    assert db.get_subject_notebooklm_id(subject_id) is None
+    db.update_subject_notebooklm_id(subject_id, "nlm_nb_12345")
+    assert db.get_subject_notebooklm_id(subject_id) == "nlm_nb_12345"
+    assert db.get_course_notebooklm_id(subject_id) == "nlm_nb_12345"
+
+    # 2. Test save & get ai_insights
+    insight_id = db.save_ai_insight(
+        subject_id=subject_id,
+        insight_type="quiz",
+        title="Trắc nghiệm Chương 1",
+        content='[{"q": "Q1", "options": ["A", "B"], "ans": "A"}]',
+        citations='[{"source": "Giao_trinh.pdf", "page": 12}]',
+        created_by="agent"
+    )
+    assert insight_id > 0
+    insights = db.get_ai_insights(subject_id=subject_id)
+    assert len(insights) == 1
+    assert insights[0]["title"] == "Trắc nghiệm Chương 1"
+    assert insights[0]["insight_type"] == "quiz"
+    assert "Giao_trinh.pdf" in insights[0]["citations"]
+
+    # 3. Test delete insight
+    deleted = db.delete_ai_insight(insight_id)
+    assert deleted is True
+    assert len(db.get_ai_insights(subject_id=subject_id)) == 0
+
+    # 4. Test log sync
+    log_id = db.log_notebooklm_sync(
+        subject_id=subject_id,
+        file_path="C:/docs/slide1.pdf",
+        notebooklm_id="nlm_nb_12345",
+        status="synced"
+    )
+    assert log_id > 0
+    logs = db.get_notebooklm_sync_logs()
+    assert len(logs) == 1
+    assert logs[0]["status"] == "synced"
+    assert logs[0]["file_path"] == "C:/docs/slide1.pdf"
+
