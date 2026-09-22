@@ -2077,8 +2077,8 @@ def get_html_dashboard() -> str:
         <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 24px;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">⚡ Hỏi đáp siêu tốc với Gemini 1.5 Pro trong NotebookLM</span>
-              <span style="font-size: 0.75rem; color: var(--text-dim);">(Tự động trích dẫn Citations nguồn)</span>
+              <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">⚡ Hỏi đáp tài liệu với Google NotebookLM Plus</span>
+              <span style="font-size: 0.75rem; color: var(--text-dim);">(Bộ não Gemini đọc tài liệu và trích dẫn Citations nguồn)</span>
             </div>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -2649,9 +2649,9 @@ def get_html_dashboard() -> str:
       }
 
       btn.disabled = true;
-      btn.textContent = 'Đang truy vấn...';
+      btn.textContent = '⏳ Đang phân tích...';
       resultBox.style.display = 'block';
-      ansText.textContent = 'Gemini 1.5 Pro đang phân tích tài liệu trong NotebookLM...';
+      ansText.textContent = '⏳ Google NotebookLM đang đọc tài liệu giáo trình và tổng hợp trích dẫn (thường mất 10-20 giây)...';
       citeBox.innerHTML = '';
 
       try {
