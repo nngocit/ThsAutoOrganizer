@@ -2042,6 +2042,7 @@ def get_html_dashboard() -> str:
             </div>
         </div>
       </div>
+      </div>
 
       <!-- VIEW 4: AI STUDY HUB VIEW (GOOGLE NOTEBOOKLM PLUS INTEGRATION) -->
       <div id="studyHubView" class="view-content" style="display: none; padding: 24px 28px;">
@@ -2358,6 +2359,16 @@ def get_html_dashboard() -> str:
     let currentQuickFilter = 'ALL';
     let currentActiveView = 'home';
     let defaultRootFolder = '';
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     function showToast(msg) {
       const t = document.getElementById('toastMsg');
@@ -4397,15 +4408,20 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
         return None
 
     def _send_json(self, data: Any, status: int = 200, set_cookie: Optional[str] = None) -> None:
-        content = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(content)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        if set_cookie:
-            self.send_header("Set-Cookie", set_cookie)
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            content = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            if set_cookie:
+                self.send_header("Set-Cookie", set_cookie)
+            self.end_headers()
+            self.wfile.write(content)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass
+        except Exception as exc:
+            logger.debug("Lỗi gửi phản hồi JSON: %s", exc)
 
     def _is_admin(self, current_user: Optional[Dict[str, Any]]) -> bool:
         """Kiểm tra xem người dùng hiện tại có phải là Admin hệ thống không."""

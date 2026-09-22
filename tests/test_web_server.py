@@ -759,3 +759,29 @@ def test_web_server_config_path_fallback_from_any_cwd(tmp_path: Path, monkeypatc
     finally:
         server.shutdown()
 
+
+def test_study_hub_dom_structure_and_escape_html():
+    """Kiểm tra studyHubView là view độc lập cấp 1 trực tiếp trong main-area và có escapeHtml."""
+    from bs4 import BeautifulSoup
+    from src.web_server import get_html_dashboard
+
+    html = get_html_dashboard()
+    soup = BeautifulSoup(html, "html.parser")
+
+    # 1. Kiểm tra parent của studyHubView và adminView đều là ths-main-area
+    sh = soup.find(id="studyHubView")
+    assert sh is not None, "Phải tìm thấy studyHubView"
+    assert "ths-main-area" in sh.parent.get("class", []), "studyHubView phải là con trực tiếp của ths-main-area"
+
+    admin_view = soup.find(id="adminView")
+    assert admin_view is not None, "Phải tìm thấy adminView"
+    assert "ths-main-area" in admin_view.parent.get("class", []), "adminView phải là con trực tiếp của ths-main-area"
+    assert sh not in admin_view.descendants, "studyHubView KHÔNG ĐƯỢC lồng bên trong adminView"
+
+    # 2. Kiểm tra tổng số thẻ mở và đóng div phải tuyệt đối cân bằng
+    open_divs = html.count("<div")
+    close_divs = html.count("</div>")
+    assert open_divs == close_divs, f"Số thẻ mở ({open_divs}) và đóng ({close_divs}) phải bằng nhau"
+
+    # 3. Kiểm tra định nghĩa hàm escapeHtml
+    assert "function escapeHtml(" in html, "Hàm escapeHtml phải được định nghĩa trong mã JavaScript"

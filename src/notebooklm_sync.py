@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 import re
 import subprocess
+import time
 from typing import Any, Dict, List, Optional
 
 from src.database import Database
@@ -41,6 +42,8 @@ class NotebookLMSyncManager:
         self.database = database
         self.executable = executable
         self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="nlm_sync")
+        self._status_cache: Optional[Dict[str, Any]] = None
+        self._status_cache_time: float = 0.0
 
     def _run_cli(self, args: List[str], timeout: int = 60) -> subprocess.CompletedProcess:
         """Thực thi lệnh CLI an toàn với UTF-8 và timeout."""
@@ -54,26 +57,36 @@ class NotebookLMSyncManager:
             timeout=timeout,
         )
 
-    def check_cli_status(self) -> Dict[str, Any]:
-        """Kiểm tra tình trạng cài đặt và phiên đăng nhập của NotebookLM CLI."""
+    def check_cli_status(self, force_refresh: bool = False) -> Dict[str, Any]:
+        """Kiểm tra tình trạng cài đặt và phiên đăng nhập của NotebookLM CLI (kèm bộ đệm 30s)."""
+        now = time.time()
+        if not force_refresh and self._status_cache and (now - self._status_cache_time < 30.0):
+            return dict(self._status_cache)
+
         try:
             res = self._run_cli(["--version"], timeout=5)
             installed = res.returncode == 0
             version = res.stdout.strip() if installed else ""
         except FileNotFoundError:
-            return {
+            result = {
                 "installed": False,
                 "version": "",
                 "authenticated": False,
                 "error": "CLI chưa được cài đặt. Hãy chạy 'pip install notebooklm-mcp-cli' hoặc cài đặt qua uv.",
             }
+            self._status_cache = result
+            self._status_cache_time = now
+            return result
         except Exception as e:
-            return {
+            result = {
                 "installed": False,
                 "version": "",
                 "authenticated": False,
                 "error": str(e),
             }
+            self._status_cache = result
+            self._status_cache_time = now
+            return result
 
         # Kiểm tra trạng thái đăng nhập
         authenticated = False
@@ -83,12 +96,15 @@ class NotebookLMSyncManager:
         except Exception:
             authenticated = False
 
-        return {
+        result = {
             "installed": installed,
             "version": version,
             "authenticated": authenticated,
             "error": None if authenticated else "Chưa đăng nhập. Hãy mở terminal và chạy lệnh 'nlm login'.",
         }
+        self._status_cache = result
+        self._status_cache_time = now
+        return result
 
     def ensure_notebook_for_course(self, course_name: str, course_id: int) -> Optional[str]:
         """Lấy ID sổ tay tương ứng với môn học.
