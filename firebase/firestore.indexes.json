@@ -1,0 +1,37 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "files",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "subject", "order": "ASCENDING"},
+        {"fieldPath": "created_at", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "files",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "created_at", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "ai_insights",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "course_id", "order": "ASCENDING"},
+        {"fieldPath": "insight_type", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "archived_files",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "hard_delete_at", "order": "ASCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,0 +1,17 @@
+{
+  "name": "ths-auto-organizer-workers",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev src/index.js --port 8787",
+    "deploy": "wrangler deploy src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.80.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Người dùng chỉ có thể đọc/ghi dữ liệu của chính mình
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Task queues — chỉ server (Workers) được ghi, Python agent đọc qua Worker API
+    match /nlm_task_queue/{taskId} {
+      allow read, write: if false;
+    }
+    match /drive_task_queue/{taskId} {
+      allow read, write: if false;
+    }
+    match /archived_files/{docId} {
+      allow read, write: if false;
+    }
+
+    // Audit log xóa vĩnh viễn — chỉ server ghi
+    match /file_deletion_logs/{logId} {
+      allow read, write: if false;
+    }
+  }
+}

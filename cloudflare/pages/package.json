@@ -1,0 +1,12 @@
+{
+  "name": "ths-auto-organizer-pages",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx -y serve src -l 3000",
+    "deploy": "npx wrangler pages deploy src --project-name=ths-organizer"
+  },
+  "devDependencies": {
+    "wrangler": "^3.80.0"
+  }
+}
