@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "notebooklm": {
+      "command": "nlm",
+      "args": ["mcp"]
+    }
+  }
+}
