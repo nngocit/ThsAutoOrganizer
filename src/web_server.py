@@ -4320,6 +4320,26 @@ def infer_file_classification(
     return subject, doc_type
 
 
+def _resolve_config_file(config_path: Path | str = "config.json") -> Path:
+    """Resolve đường dẫn config.json chuẩn xác:
+    1. Nếu là đường dẫn tuyệt đối và tồn tại -> dùng luôn.
+    2. Nếu tồn tại ở CWD -> dùng file tại CWD.
+    3. Nếu tồn tại ở project root (_project_root / path) -> dùng file ở project root.
+    4. Nếu file 'config.json' tồn tại ở _project_root -> fallback về project root.
+    5. Fallback: trả về path resolved.
+    """
+    p = Path(config_path)
+    if p.is_absolute() and p.is_file():
+        return p
+    if p.is_file():
+        return p.resolve()
+    if (_project_root / p).is_file():
+        return (_project_root / p).resolve()
+    if (_project_root / "config.json").is_file():
+        return (_project_root / "config.json").resolve()
+    return p.resolve()
+
+
 class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
     """Handler xử lý API và giao diện Web Dashboard Multi-User."""
 
@@ -4330,6 +4350,24 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
     classifier: Optional[PathClassifier] = None
     auto_sync_worker: Optional[Any] = None
     nlm_sync_manager: Optional[NotebookLMSyncManager] = None
+
+    @classmethod
+    def get_effective_config_path(cls) -> Path:
+        """Lấy đường dẫn config.json hữu dụng nhất."""
+        return _resolve_config_file(cls.config_path)
+
+    def _read_config(self) -> Dict[str, Any]:
+        """Đọc file cấu hình an toàn, không bao giờ ném FileNotFoundError."""
+        target_path = self.get_effective_config_path()
+        if not target_path.is_file():
+            logger.warning("Không tìm thấy file config tại '%s', sử dụng cấu hình mặc định", target_path)
+            return {"root_folder": "", "root_account_email": "xuanngocit@gmail.com"}
+        try:
+            with open(target_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            logger.warning("Lỗi khi đọc file config tại '%s': %s", target_path, exc)
+            return {"root_folder": "", "root_account_email": "xuanngocit@gmail.com"}
 
     def log_message(self, format: str, *args: Any) -> None:
         pass
@@ -4374,13 +4412,8 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
         if not current_user:
             return False
         user_email = current_user.get("email", "").strip().lower()
-        root_email = "xuanngocit@gmail.com"
-        try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-                root_email = cfg.get("root_account_email", "xuanngocit@gmail.com")
-        except Exception:
-            pass
+        cfg = self._read_config()
+        root_email = cfg.get("root_account_email", "xuanngocit@gmail.com")
         return user_email == root_email.strip().lower()
 
     def do_GET(self) -> None:
@@ -4399,8 +4432,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/me":
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+            cfg = self._read_config()
             config_root = cfg.get("root_folder", "")
 
             user_dm, drive_connected, drive_account = get_user_drive_manager(
@@ -4564,8 +4596,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
             subjects = sorted(list({r["subject"] for r in file_list if r.get("subject")}))
 
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+            cfg = self._read_config()
             config_root = cfg.get("root_folder", "")
             user_folder_path = str(get_user_storage_folder(current_user, config_root))
 
@@ -4632,16 +4663,16 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/config":
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                self._send_json(cfg)
-            except Exception as exc:
-                self._send_json({"error": str(exc)}, 500)
+            cfg = self._read_config()
+            self._send_json(cfg)
             return
 
         if path == "/api/logs":
             log_file = Path("logs/app.log")
+            if not log_file.is_file():
+                cand = _project_root / "logs" / "app.log"
+                if cand.is_file():
+                    log_file = cand
             if log_file.is_file():
                 try:
                     with open(log_file, "r", encoding="utf-8", errors="replace") as f:
@@ -4841,8 +4872,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 sub_doc_folder = doc_folder_map.get(doc_type, "02_Slide" if doc_type == "Slide" else doc_type)
 
                 # Lưu file vào thư mục lưu trữ CỦA TỪNG USER (Cách ly hoàn toàn)
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
+                cfg = self._read_config()
                 config_root = cfg.get("root_folder", "")
                 user_folder = get_user_storage_folder(current_user, config_root)
 
@@ -4978,10 +5008,11 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/config":
             try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    current_cfg = json.load(f)
+                cfg_path = self.get_effective_config_path()
+                current_cfg = self._read_config()
                 current_cfg.update(body)
-                with open(self.config_path, "w", encoding="utf-8") as f:
+                cfg_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(cfg_path, "w", encoding="utf-8") as f:
                     json.dump(current_cfg, f, indent=2, ensure_ascii=False)
                 self._send_json({"ok": True})
                 return
@@ -5004,8 +5035,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             folder_path = body.get("folder_path") if isinstance(body, dict) else None
             user_email = current_user.get("email") if current_user else "default@user"
 
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+            cfg = self._read_config()
             config_root = cfg.get("root_folder", "")
 
             if current_user and folder_path and self.database:
@@ -5064,8 +5094,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 current_user["major_id"] = major_id_int
 
                 # Tự động tạo cây thư mục 4 cấp con chuẩn mực
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
+                cfg = self._read_config()
                 config_root = cfg.get("root_folder", "")
                 user_storage = get_user_storage_folder(current_user, config_root)
                 major_dir = user_storage / major["folder_name"]
@@ -5265,7 +5294,7 @@ def start_web_server(
     """Khởi động Web Dashboard Server trong một luồng riêng biệt."""
     DashboardRequestHandler.database = database
     DashboardRequestHandler.drive_manager = drive_manager
-    DashboardRequestHandler.config_path = Path(config_path).resolve()
+    DashboardRequestHandler.config_path = _resolve_config_file(config_path)
     DashboardRequestHandler.scan_callback = scan_callback
     DashboardRequestHandler.classifier = classifier
     DashboardRequestHandler.auto_sync_worker = auto_sync_worker
@@ -5290,10 +5319,19 @@ def start_web_server(
 if __name__ == "__main__":
     import os
     logging.basicConfig(level=logging.INFO)
-    db = Database("data/files.db")
+    db_path = _project_root / "data" / "files.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db = Database(str(db_path))
     db.initialize()
-    dm = DriveManager()
-    server = start_web_server(8080, db, dm)
+    dm = DriveManager(
+        credentials_file=_project_root / "credentials.json",
+        token_file=_project_root / "token.json",
+    )
+    cfg_file = _resolve_config_file("config.json")
+    server = start_web_server(8080, db, dm, config_path=cfg_file)
     print("Dashboard started at http://localhost:8080. Press Enter to exit.")
-    input()
+    try:
+        input()
+    except (KeyboardInterrupt, EOFError):
+        pass
     server.shutdown()

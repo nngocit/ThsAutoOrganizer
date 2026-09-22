@@ -728,15 +728,34 @@ def test_ai_study_hub_ui_elements(tmp_path: Path):
         server.shutdown()
 
 
+def test_web_server_config_path_fallback_from_any_cwd(tmp_path: Path, monkeypatch):
+    """Kiểm tra start_web_server tự động fallback config.json về project root khi CWD thay đổi."""
+    from src.database import Database
+    from src.web_server import start_web_server
+    import urllib.request
+    import json
 
+    db = Database(tmp_path / "fallback_test.db")
+    db.initialize()
+    port = 19133
 
+    # Đổi CWD sang thư mục tạm không có file config.json
+    monkeypatch.chdir(tmp_path)
 
+    # Chạy start_web_server với config_path mặc định "config.json"
+    server = start_web_server(port=port, database=db, config_path="config.json")
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/me")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "drive_connected" in data
 
-
-
-
-
-
-
-
+        stats_req = urllib.request.Request(f"http://127.0.0.1:{port}/api/stats")
+        with urllib.request.urlopen(stats_req) as resp:
+            assert resp.status == 200
+            stats = json.loads(resp.read().decode("utf-8"))
+            assert "total_files" in stats
+    finally:
+        server.shutdown()
 
