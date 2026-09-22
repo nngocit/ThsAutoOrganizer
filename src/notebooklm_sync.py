@@ -199,7 +199,7 @@ class NotebookLMSyncManager:
 
         # Thực thi thêm nguồn
         try:
-            res = self._run_cli(["source", "add", nb_id, str(file_path)], timeout=60)
+            res = self._run_cli(["source", "add", nb_id, "--file", str(file_path)], timeout=120)
             if res.returncode == 0:
                 logger.info(f"Nạp thành công {file_path} vào Notebook {nb_id}")
                 self.database.log_notebooklm_sync(
@@ -254,7 +254,7 @@ class NotebookLMSyncManager:
     def query_notebook(self, notebook_id: str, prompt: str) -> Dict[str, Any]:
         """Truy vấn sổ tay trên NotebookLM và trích xuất câu trả lời kèm Citations."""
         try:
-            res = self._run_cli(["query", notebook_id, prompt], timeout=60)
+            res = self._run_cli(["query", "notebook", notebook_id, prompt, "--json"], timeout=120)
             if res.returncode != 0:
                 return {
                     "success": False,
@@ -264,19 +264,36 @@ class NotebookLMSyncManager:
                 }
 
             stdout = res.stdout.strip()
-            # Trích xuất citations
+            answer = stdout
             citations: List[Dict[str, Any]] = []
-            citation_matches = re.findall(
-                r"\[(?:Citations?|Trích dẫn|Source):\s*([^\]]+)\]",
-                stdout,
-                re.IGNORECASE,
-            )
-            for cm in citation_matches:
-                citations.append({"text": cm.strip()})
+
+            # Thử parse JSON trả về từ nlm CLI
+            try:
+                data = json.loads(stdout)
+                if isinstance(data, dict):
+                    answer = data.get("answer", stdout)
+                    raw_c = data.get("citations", {})
+                    if isinstance(raw_c, dict):
+                        for k, v in raw_c.items():
+                            citations.append({"text": f"{k}: {v}"})
+                    elif isinstance(raw_c, list):
+                        for item in raw_c:
+                            citations.append({"text": str(item)})
+                    for s in data.get("sources_used", []):
+                        citations.append({"source": str(s)})
+            except Exception:
+                # Nếu không phải JSON thuần, fallback regex
+                citation_matches = re.findall(
+                    r"\[(?:Citations?|Trích dẫn|Source):\s*([^\]]+)\]",
+                    stdout,
+                    re.IGNORECASE,
+                )
+                for cm in citation_matches:
+                    citations.append({"text": cm.strip()})
 
             return {
                 "success": True,
-                "answer": stdout,
+                "answer": answer,
                 "citations": citations,
                 "error": None,
             }

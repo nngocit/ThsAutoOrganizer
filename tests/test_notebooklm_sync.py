@@ -1,6 +1,7 @@
 """Unit tests cho module đồng bộ NotebookLM ngầm (src/notebooklm_sync.py)."""
 
 from pathlib import Path
+import json
 import time
 from unittest.mock import MagicMock, patch
 
@@ -123,13 +124,30 @@ def test_query_notebook(tmp_path: Path):
     db.initialize()
     manager = NotebookLMSyncManager(database=db)
 
+    # 1. Test với JSON output chuẩn từ CLI 0.11.6
     with patch("subprocess.run") as mock_run:
-        mock_stdout = "Dưới đây là 3 luận điểm chính:\n1. Điểm 1\n2. Điểm 2\n[Citations: Triet_hoc.pdf, p. 15]"
-        mock_run.return_value = MagicMock(returncode=0, stdout=mock_stdout, stderr="")
+        json_output = json.dumps({
+            "answer": "Dưới đây là 3 luận điểm chính:\n1. Điểm 1\n2. Điểm 2",
+            "citations": {"1": "Triet_hoc.pdf:15"},
+            "sources_used": ["Triet_hoc.pdf"],
+        })
+        mock_run.return_value = MagicMock(returncode=0, stdout=json_output, stderr="")
         res = manager.query_notebook("nb_123", "Nêu các luận điểm chính")
         assert res["success"] is True
         assert "Dưới đây là 3 luận điểm chính" in res["answer"]
-        assert len(res["citations"]) >= 1
+        assert len(res["citations"]) >= 2
+        # Kiểm tra args chuẩn
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ["nlm", "query", "notebook", "nb_123", "Nêu các luận điểm chính", "--json"]
+
+    # 2. Test fallback với text thuần
+    with patch("subprocess.run") as mock_run:
+        mock_stdout = "Dưới đây là tóm tắt [Citations: Doc.pdf p.1]"
+        mock_run.return_value = MagicMock(returncode=0, stdout=mock_stdout, stderr="")
+        res = manager.query_notebook("nb_123", "Tóm tắt")
+        assert res["success"] is True
+        assert "Dưới đây là tóm tắt" in res["answer"]
+        assert len(res["citations"]) == 1
 
 
 def test_enqueue_sync_background(tmp_path: Path):
