@@ -597,6 +597,110 @@ def test_upload_triggers_notebooklm_enqueue(tmp_path: Path):
         server.shutdown()
 
 
+def test_ai_insights_rest_api(tmp_path: Path):
+    """Kiểm tra các REST API endpoints cho AI Study Hub và NotebookLM."""
+    from unittest.mock import MagicMock
+    from src.notebooklm_sync import NotebookLMSyncManager
+
+    db_path = tmp_path / "api_test.db"
+    database = Database(db_path=db_path)
+    database.initialize()
+
+    majors = database.get_all_majors()
+    httt = next(m for m in majors if m["code"] == "HTTT")
+    subjects = database.get_subjects_by_major(httt["id"])
+    subject = subjects[0]
+    subject_id = subject["id"]
+
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(tmp_path / "Mon_Hoc")}, f)
+
+    port = 19131
+    mock_nlm = MagicMock(spec=NotebookLMSyncManager)
+    mock_nlm.check_cli_status.return_value = {"installed": True, "authenticated": True, "version": "0.2.0"}
+    mock_nlm.query_notebook.return_value = {
+        "success": True,
+        "answer": "Tóm tắt chương 1",
+        "citations": [{"text": "Giao_trinh.pdf p.1"}],
+    }
+
+    server = start_web_server(
+        port=port,
+        database=database,
+        config_path=cfg_path,
+        nlm_sync_manager=mock_nlm,
+    )
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # 1. GET /api/notebooklm/status
+        status_req = urllib.request.Request(f"{base_url}/api/notebooklm/status")
+        with urllib.request.urlopen(status_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+            assert data["status"]["installed"] is True
+
+        # 2. POST /api/ai/insights
+        insight_payload = {
+            "subject_id": subject_id,
+            "type": "quiz",
+            "title": "Trắc nghiệm CSDL",
+            "content": '[{"q": "Khóa chính là gì?"}]',
+            "citations": '[{"source": "CSDL.pdf"}]',
+        }
+        post_req = urllib.request.Request(
+            f"{base_url}/api/ai/insights",
+            data=json.dumps(insight_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(post_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+            insight_id = data["id"]
+            assert insight_id > 0
+
+        # 3. GET /api/ai/insights
+        get_req = urllib.request.Request(f"{base_url}/api/ai/insights?subject_id={subject_id}")
+        with urllib.request.urlopen(get_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+            assert len(data["insights"]) == 1
+            assert data["insights"][0]["title"] == "Trắc nghiệm CSDL"
+
+        # 4. POST /api/ai/query
+        query_payload = {"subject_id": subject_id, "prompt": "Tóm tắt nội dung chính"}
+        query_req = urllib.request.Request(
+            f"{base_url}/api/ai/query",
+            data=json.dumps(query_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(query_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+            assert "Tóm tắt chương 1" in data["answer"]
+
+        # 5. DELETE /api/ai/insights/<id>
+        del_req = urllib.request.Request(
+            f"{base_url}/api/ai/insights/{insight_id}",
+            method="DELETE",
+        )
+        with urllib.request.urlopen(del_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+
+        # 6. Verify empty
+        with urllib.request.urlopen(get_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert len(data["insights"]) == 0
+
+    finally:
+        server.shutdown()
+
+
+
 
 
 

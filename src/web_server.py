@@ -4067,9 +4067,39 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True, "majors": majors})
             return
 
+        if path == "/api/notebooklm/status":
+            if self.nlm_sync_manager:
+                status = self.nlm_sync_manager.check_cli_status()
+                self._send_json({"ok": True, "status": status})
+            else:
+                self._send_json({
+                    "ok": True,
+                    "status": {
+                        "installed": False,
+                        "authenticated": False,
+                        "version": "",
+                        "error": "NotebookLMSyncManager chưa được cấu hình",
+                    }
+                })
+            return
+
+        if path == "/api/ai/insights":
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            subj_id = int(query_params["subject_id"][0]) if "subject_id" in query_params else None
+            ins_type = query_params["type"][0] if "type" in query_params else None
+            limit = int(query_params["limit"][0]) if "limit" in query_params else 50
+            insights = self.database.get_ai_insights(subject_id=subj_id, insight_type=ins_type, limit=limit) if self.database else []
+            self._send_json({"ok": True, "insights": insights})
+            return
+
+        if path == "/api/notebooklm/sync-logs":
+            logs = self.database.get_notebooklm_sync_logs() if self.database else []
+            self._send_json({"ok": True, "logs": logs})
+            return
 
         self.send_response(404)
         self.end_headers()
+
 
     def do_POST(self) -> None:
         parsed_url = urllib.parse.urlparse(self.path)
@@ -4489,9 +4519,105 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(exc)}, 500)
             return
 
+        if path == "/api/ai/insights":
+            try:
+                subj_id = body.get("subject_id") or body.get("course_id")
+                ins_type = body.get("insight_type") or body.get("type", "qa")
+                title = body.get("title", "").strip()
+                content = body.get("content", "")
+                citations = body.get("citations")
+                created_by = body.get("created_by", "agent")
+                if isinstance(citations, (list, dict)):
+                    citations = json.dumps(citations, ensure_ascii=False)
+                if not subj_id or not title or not content:
+                    self._send_json({"ok": False, "error": "Thiếu subject_id, title hoặc content"}, 400)
+                    return
+                ins_id = self.database.save_ai_insight(
+                    subject_id=int(subj_id),
+                    insight_type=ins_type,
+                    title=title,
+                    content=content,
+                    citations=citations,
+                    created_by=created_by,
+                ) if self.database else 0
+                self._send_json({"ok": True, "id": ins_id})
+                return
+            except Exception as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
+
+        if path == "/api/ai/query":
+            try:
+                subj_id = body.get("subject_id") or body.get("course_id")
+                prompt = body.get("prompt", "").strip()
+                if not subj_id or not prompt:
+                    self._send_json({"ok": False, "error": "Thiếu subject_id hoặc prompt"}, 400)
+                    return
+
+                if not self.nlm_sync_manager:
+                    self._send_json({"ok": False, "error": "NotebookLM chưa được cấu hình"}, 500)
+                    return
+
+                nb_id = self.database.get_subject_notebooklm_id(int(subj_id)) if self.database else None
+                if not nb_id and self.database:
+                    with self.database._get_connection() as conn:
+                        row = conn.execute("SELECT name FROM subjects WHERE id = ?", (subj_id,)).fetchone()
+                        sname = row["name"] if row else "Môn học"
+                    nb_id = self.nlm_sync_manager.ensure_notebook_for_course(sname, int(subj_id))
+
+                if not nb_id:
+                    self._send_json({"ok": False, "error": f"Không tìm thấy Sổ tay NotebookLM cho môn học #{subj_id}"}, 404)
+                    return
+
+                res = self.nlm_sync_manager.query_notebook(nb_id, prompt)
+                self._send_json({"ok": res.get("success", False), **res})
+                return
+            except Exception as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
+
+        if path == "/api/notebooklm/sync-pending":
+            if not self.nlm_sync_manager or not self.database:
+                self._send_json({"ok": False, "error": "Dịch vụ chưa sẵn sàng"}, 500)
+                return
+            try:
+                logs = self.database.get_notebooklm_sync_logs(limit=100)
+                failed_logs = [l for l in logs if l.get("status") in ("failed", "pending")]
+                count = 0
+                for fl in failed_logs:
+                    self.nlm_sync_manager.enqueue_sync(
+                        file_path=fl["file_path"],
+                        course_name=fl.get("subject_name", ""),
+                        course_id=fl["subject_id"],
+                        file_id=fl.get("file_id"),
+                    )
+                    count += 1
+                self._send_json({"ok": True, "requeued": count})
+                return
+            except Exception as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
 
         self.send_response(404)
         self.end_headers()
+
+    def do_DELETE(self) -> None:
+        """Handler cho các HTTP DELETE requests."""
+        parsed_url = urllib.parse.urlparse(self.path)
+        path = parsed_url.path
+        if path.startswith("/api/ai/insights/"):
+            try:
+                insight_id = int(path.split("/")[-1])
+                deleted = self.database.delete_ai_insight(insight_id) if self.database else False
+                self._send_json({"ok": deleted})
+                return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
+
+        self.send_response(404)
+        self.end_headers()
+
 
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
