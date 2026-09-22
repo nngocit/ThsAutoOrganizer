@@ -112,7 +112,7 @@ class NotebookLMSyncManager:
         Nếu chưa có trong CSDL, tìm kiếm trên NotebookLM hoặc tạo mới rồi lưu cache vào CSDL.
         """
         cached_id = self.database.get_subject_notebooklm_id(course_id)
-        if cached_id:
+        if cached_id and cached_id.strip() and cached_id != "notebook_id":
             return cached_id
 
         # Kiểm tra danh sách sổ tay hiện có trên NotebookLM
@@ -120,16 +120,20 @@ class NotebookLMSyncManager:
             list_res = self._run_cli(["notebook", "list"], timeout=15)
             if list_res.returncode == 0:
                 stdout = list_res.stdout
-                # Tìm kiếm theo tên môn học (match JSON hoặc văn bản dạng 'ID - Name')
+                # Tìm kiếm theo tên môn học (match JSON title/name hoặc văn bản)
                 try:
                     data = json.loads(stdout)
                     if isinstance(data, list):
+                        c_clean = re.sub(r"[^a-zA-Z0-9]", "", course_name).lower()
                         for item in data:
-                            if isinstance(item, dict) and item.get("name", "").strip().lower() == course_name.strip().lower():
-                                nb_id = item.get("id")
-                                if nb_id:
-                                    self.database.update_subject_notebooklm_id(course_id, nb_id)
-                                    return nb_id
+                            if isinstance(item, dict):
+                                title = item.get("title") or item.get("name", "")
+                                t_clean = re.sub(r"[^a-zA-Z0-9]", "", title).lower()
+                                if c_clean == t_clean or (len(c_clean) > 3 and (c_clean in t_clean or t_clean in c_clean)):
+                                    nb_id = item.get("id")
+                                    if nb_id:
+                                        self.database.update_subject_notebooklm_id(course_id, nb_id)
+                                        return nb_id
                 except Exception:
                     pass
 

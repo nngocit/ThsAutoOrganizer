@@ -5230,7 +5230,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     return
 
                 nb_id = self.database.get_subject_notebooklm_id(int(subj_id)) if self.database else None
-                if not nb_id and self.database:
+                if (not nb_id or nb_id == "notebook_id") and self.database:
                     with self.database._get_connection() as conn:
                         row = conn.execute("SELECT name FROM subjects WHERE id = ?", (subj_id,)).fetchone()
                         sname = row["name"] if row else "Môn học"
@@ -5241,6 +5241,19 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     return
 
                 res = self.nlm_sync_manager.query_notebook(nb_id, prompt)
+
+                # Cơ chế Self-Healing: nếu Sổ tay bị NOT_FOUND do ID trên Google thay đổi/bị xóa
+                if not res.get("success") and "NOT_FOUND" in str(res.get("error", "")):
+                    logger.warning("Sổ tay %s bị NOT_FOUND trên Google. Đang tự động phục hồi tìm kiếm lại...", nb_id)
+                    if self.database:
+                        self.database.update_subject_notebooklm_id(int(subj_id), None)
+                        with self.database._get_connection() as conn:
+                            row = conn.execute("SELECT name FROM subjects WHERE id = ?", (subj_id,)).fetchone()
+                            sname = row["name"] if row else "Môn học"
+                        new_nb_id = self.nlm_sync_manager.ensure_notebook_for_course(sname, int(subj_id))
+                        if new_nb_id and new_nb_id != nb_id:
+                            res = self.nlm_sync_manager.query_notebook(new_nb_id, prompt)
+
                 self._send_json({"ok": res.get("success", False), **res})
                 return
             except Exception as exc:
