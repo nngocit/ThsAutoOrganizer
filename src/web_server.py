@@ -31,6 +31,7 @@ from src.classifier import PathClassifier
 from src.database import Database, STATUS_UPLOADED, STATUS_SAVED_LOCAL, STATUS_DUPLICATE, STATUS_ERROR
 from src.drive import DriveManager
 from src.processor import calculate_sha256
+from src.notebooklm_sync import NotebookLMSyncManager
 
 logger = logging.getLogger("ThsAutoOrganizer.web")
 
@@ -3702,6 +3703,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
     scan_callback: Optional[Any] = None
     classifier: Optional[PathClassifier] = None
     auto_sync_worker: Optional[Any] = None
+    nlm_sync_manager: Optional[NotebookLMSyncManager] = None
 
     def log_message(self, format: str, *args: Any) -> None:
         pass
@@ -4239,6 +4241,20 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     user_email=user_email,
                 )
 
+                # Tự động kích hoạt nạp ngầm vào Google NotebookLM
+                if self.nlm_sync_manager and self.database:
+                    try:
+                        subj_record = self.database.get_subject_by_name(subject)
+                        subj_id = subj_record["id"] if subj_record else 1
+                        self.nlm_sync_manager.enqueue_sync(
+                            file_path=str(dest_path),
+                            course_name=subject,
+                            course_id=subj_id,
+                            file_id=rec_id,
+                        )
+                    except Exception as nlm_err:
+                        logger.warning("Không thể kích hoạt nạp ngầm NotebookLM: %s", nlm_err)
+
                 self._send_json({
                     "ok": True,
                     "id": rec_id,
@@ -4250,6 +4266,7 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     "saved_path": str(dest_path),
                 })
                 return
+
             except Exception as exc:
                 logger.error("Lỗi xử lý API upload: %s", exc, exc_info=True)
                 self._send_json({"ok": False, "error": str(exc)}, 500)
@@ -4491,6 +4508,7 @@ def start_web_server(
     scan_callback: Optional[Any] = None,
     classifier: Optional[Any] = None,
     auto_sync_worker: Optional[Any] = None,
+    nlm_sync_manager: Optional[NotebookLMSyncManager] = None,
 ) -> ThreadedHTTPServer:
     """Khởi động Web Dashboard Server trong một luồng riêng biệt."""
     DashboardRequestHandler.database = database
@@ -4499,12 +4517,14 @@ def start_web_server(
     DashboardRequestHandler.scan_callback = scan_callback
     DashboardRequestHandler.classifier = classifier
     DashboardRequestHandler.auto_sync_worker = auto_sync_worker
+    DashboardRequestHandler.nlm_sync_manager = nlm_sync_manager
 
     server = ThreadedHTTPServer(("0.0.0.0", port), DashboardRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="WebDashboardServer")
     thread.start()
     logger.info("Web Dashboard Studio đang chạy tại: http://localhost:%d", port)
     return server
+
 
 
 if __name__ == "__main__":

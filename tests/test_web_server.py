@@ -532,6 +532,72 @@ def test_option_1_mandatory_subject_banner_and_upload(tmp_path: Path):
         server.shutdown()
 
 
+def test_upload_triggers_notebooklm_enqueue(tmp_path: Path):
+    """Kiểm tra upload tài liệu tự động kích hoạt nạp nguồn NotebookLM qua enqueue_sync."""
+    import base64
+    from unittest.mock import MagicMock
+    from src.notebooklm_sync import NotebookLMSyncManager
+
+    db_path = tmp_path / "nlm_test.db"
+    database = Database(db_path=db_path)
+    database.initialize()
+
+    cfg_path = tmp_path / "cfg.json"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump({"root_folder": str(tmp_path / "Mon_Hoc")}, f)
+
+    port = 19130
+    mock_nlm = MagicMock(spec=NotebookLMSyncManager)
+
+
+    server = start_web_server(
+        port=port,
+        database=database,
+        config_path=tmp_path / "cfg.json",
+        nlm_sync_manager=mock_nlm,
+    )
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        # Đăng nhập
+        login_req = urllib.request.Request(
+            f"{base_url}/auth/test-login",
+            data=json.dumps({"email": "nlm_user@univ.edu", "name": "NLM User"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(login_req) as resp:
+            cookie = resp.headers.get("Set-Cookie").split(";")[0]
+
+
+        # Upload file PDF bài giảng
+        fake_content = base64.b64encode(b"%PDF-1.4 dummy pdf content").decode("utf-8")
+        payload = {
+            "filename": "Giao_Trinh_CSDL.pdf",
+            "content_base64": fake_content,
+            "subject": "Cơ sở dữ liệu",
+            "subject_folder": "Co_So_Du_Lieu",
+            "document_type": "Giáo trình",
+        }
+        upload_req = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Cookie": cookie},
+            method="POST",
+        )
+        with urllib.request.urlopen(upload_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["ok"] is True
+
+        # Kiểm tra mock_nlm.enqueue_sync đã được gọi
+        assert mock_nlm.enqueue_sync.called
+        call_args = mock_nlm.enqueue_sync.call_args[1]
+        assert "Giao_Trinh_CSDL.pdf" in call_args["file_path"]
+        assert call_args["course_name"] == "Cơ sở dữ liệu"
+    finally:
+        server.shutdown()
+
+
+
 
 
 
