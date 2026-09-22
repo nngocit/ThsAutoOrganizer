@@ -21,11 +21,18 @@ import os
 from pathlib import Path
 import secrets
 import socketserver
+import sys
 import threading
 import time
 import urllib.parse
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+
+# Đảm bảo thư mục gốc dự án luôn có mặt trong sys.path khi chạy trực tiếp file
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 
 from src.classifier import PathClassifier
 from src.database import Database, STATUS_UPLOADED, STATUS_SAVED_LOCAL, STATUS_DUPLICATE, STATUS_ERROR
@@ -5262,7 +5269,15 @@ def start_web_server(
     DashboardRequestHandler.scan_callback = scan_callback
     DashboardRequestHandler.classifier = classifier
     DashboardRequestHandler.auto_sync_worker = auto_sync_worker
+    if nlm_sync_manager is None and database is not None:
+        try:
+            nlm_sync_manager = NotebookLMSyncManager(database=database)
+        except Exception as _e:
+            logger.warning("Không thể tự khởi tạo NotebookLMSyncManager: %s", _e)
+
     DashboardRequestHandler.nlm_sync_manager = nlm_sync_manager
+
+
 
     server = ThreadedHTTPServer(("0.0.0.0", port), DashboardRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="WebDashboardServer")
