@@ -397,3 +397,78 @@ class DriveManager:
                         })
 
         return materials
+
+    def get_or_create_archive_folder(self) -> Optional[str]:
+        """Lấy (hoặc tạo) folder '_Archive_Trash_90Days/' dưới root của Drive.
+
+        Đây là nơi đệm của các file bị xóa mềm trong Step 2 của Cascade Delete.
+
+        Returns:
+            Folder ID trên Google Drive, hoặc None nếu lỗi.
+        """
+        service = self._get_service()
+        archive_name = "_Archive_Trash_90Days"
+
+        # Tìm trong cache trước
+        cache_key = (archive_name, self.root_folder_id)
+        if cache_key in self._folder_cache:
+            return self._folder_cache[cache_key]
+
+        try:
+            parent_id = self.root_folder_id or "root"
+            q = (
+                f"name='{archive_name}' and mimeType='{FOLDER_MIME_TYPE}' "
+                f"and '{parent_id}' in parents and trashed=false"
+            )
+            resp = service.files().list(q=q, fields="files(id,name)", pageSize=1).execute()
+            files = resp.get("files", [])
+            if files:
+                folder_id = files[0]["id"]
+                self._folder_cache[cache_key] = folder_id
+                return folder_id
+
+            # Tạo mới nếu chưa có
+            meta = {
+                "name": archive_name,
+                "mimeType": FOLDER_MIME_TYPE,
+                "parents": [parent_id],
+            }
+            folder = service.files().create(body=meta, fields="id").execute()
+            folder_id = folder["id"]
+            self._folder_cache[cache_key] = folder_id
+            logger.info("Đã tạo folder '%s' trên Drive (ID: %s)", archive_name, folder_id)
+            return folder_id
+        except Exception as e:
+            logger.error("Không thể tạo hoặc tìm folder '%s' trên Drive: %s", archive_name, e)
+            return None
+
+    def move_file(self, file_id: str, target_folder_id: str) -> bool:
+        """Di chuyển file sang folder khác trên Google Drive (không tải lại).
+
+        Dùng trong Step 2 của Cascade Delete để dời file vào _Archive_Trash_90Days/.
+
+        Args:
+            file_id: Drive File ID cần di chuyển.
+            target_folder_id: Drive Folder ID đích.
+
+        Returns:
+            True nếu thành công.
+        """
+        service = self._get_service()
+        try:
+            # Lấy parent hiện tại
+            file_meta = service.files().get(fileId=file_id, fields="parents").execute()
+            current_parents = ",".join(file_meta.get("parents", []))
+
+            # Di chuyển: remove parent cũ, add parent mới
+            service.files().update(
+                fileId=file_id,
+                addParents=target_folder_id,
+                removeParents=current_parents,
+                fields="id, parents",
+            ).execute()
+            logger.info("Đã di chuyển file %s -> folder %s", file_id, target_folder_id)
+            return True
+        except Exception as e:
+            logger.error("Không thể di chuyển file %s sang folder %s: %s", file_id, target_folder_id, e)
+            return False

@@ -173,6 +173,87 @@ class Database:
         CREATE INDEX IF NOT EXISTS idx_nlm_sync_status ON notebooklm_sync_log(status);
         """
 
+        create_table_ai_chat_sessions = """
+        CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+            conversation_id TEXT,
+            title TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+        create_index_chat_sessions_subject = """
+        CREATE INDEX IF NOT EXISTS idx_ai_chat_sessions_subject ON ai_chat_sessions(subject_id);
+        """
+        create_index_chat_sessions_conv = """
+        CREATE INDEX IF NOT EXISTS idx_ai_chat_sessions_conv ON ai_chat_sessions(conversation_id);
+        """
+
+        create_table_ai_chat_messages = """
+        CREATE TABLE IF NOT EXISTS ai_chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+            content TEXT NOT NULL,
+            citations TEXT,
+            created_at TEXT NOT NULL
+        );
+        """
+        create_index_chat_messages_session = """
+        CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_session ON ai_chat_messages(session_id);
+        """
+
+        # Bảng nguồn Deep Research cần kiểm duyệt (3 trạng thái: unreviewed/approved/rejected)
+        create_table_web_research_sources = """
+        CREATE TABLE IF NOT EXISTS web_research_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+            source_url TEXT,
+            source_title TEXT,
+            nlm_source_id TEXT,
+            drive_file_id TEXT,
+            local_path TEXT,
+            review_status TEXT NOT NULL DEFAULT 'unreviewed'
+                CHECK(review_status IN ('unreviewed', 'approved', 'rejected')),
+            reviewed_by TEXT,
+            reviewed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+        create_index_web_research_status = """
+        CREATE INDEX IF NOT EXISTS idx_web_research_status
+            ON web_research_sources(review_status);
+        """
+        create_index_web_research_subject = """
+        CREATE INDEX IF NOT EXISTS idx_web_research_subject
+            ON web_research_sources(subject_id);
+        """
+
+        # Bảng nhật ký xóa vĩnh viễn (Step 4 của Cascade Delete 4 bước)
+        create_table_file_deletion_logs = """
+        CREATE TABLE IF NOT EXISTS file_deletion_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id INTEGER,
+            original_path TEXT,
+            drive_file_id TEXT,
+            nlm_source_id TEXT,
+            subject TEXT,
+            deleted_by TEXT,
+            soft_deleted_at TEXT NOT NULL,
+            scheduled_hard_delete_at TEXT NOT NULL,
+            hard_deleted_at TEXT,
+            backup_link TEXT,
+            created_at TEXT NOT NULL
+        );
+        """
+        create_index_deletion_logs_schedule = """
+        CREATE INDEX IF NOT EXISTS idx_deletion_logs_schedule
+            ON file_deletion_logs(scheduled_hard_delete_at)
+            WHERE hard_deleted_at IS NULL;
+        """
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(create_table_users)
@@ -186,6 +267,16 @@ class Database:
             cursor.execute(create_index_ai_insights_type)
             cursor.execute(create_table_notebooklm_sync_log)
             cursor.execute(create_index_nlm_sync_status)
+            cursor.execute(create_table_ai_chat_sessions)
+            cursor.execute(create_index_chat_sessions_subject)
+            cursor.execute(create_index_chat_sessions_conv)
+            cursor.execute(create_table_ai_chat_messages)
+            cursor.execute(create_index_chat_messages_session)
+            cursor.execute(create_table_web_research_sources)
+            cursor.execute(create_index_web_research_status)
+            cursor.execute(create_index_web_research_subject)
+            cursor.execute(create_table_file_deletion_logs)
+            cursor.execute(create_index_deletion_logs_schedule)
 
             # Migration an toàn nếu bảng cũ chưa có các cột mới
             try:
@@ -895,6 +986,295 @@ class Database:
             cursor = conn.cursor()
             cursor.execute(sql, (limit,))
             return [dict(r) for r in cursor.fetchall()]
+
+    def create_chat_session(
+        self,
+        subject_id: int,
+        title: str,
+        conversation_id: Optional[str] = None,
+    ) -> int:
+        """Tạo một phiên hội thoại chat mới cho môn học."""
+        now = current_iso_time()
+        sql = """
+        INSERT INTO ai_chat_sessions (subject_id, conversation_id, title, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (subject_id, conversation_id, title.strip(), now, now))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_chat_sessions(self, subject_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Lấy danh sách các phiên hội thoại, sắp xếp theo thời gian cập nhật mới nhất."""
+        sql = """
+        SELECT s.*, sub.name as subject_name, sub.code as subject_code,
+               (SELECT COUNT(*) FROM ai_chat_messages m WHERE m.session_id = s.id) as message_count
+        FROM ai_chat_sessions s
+        LEFT JOIN subjects sub ON s.subject_id = sub.id
+        WHERE 1=1
+        """
+        params: List[Any] = []
+        if subject_id is not None:
+            sql += " AND s.subject_id = ?"
+            params.append(subject_id)
+        sql += " ORDER BY s.updated_at DESC, s.id DESC;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def get_chat_session(self, session_id: int) -> Optional[Dict[str, Any]]:
+        """Lấy chi tiết một phiên hội thoại."""
+        sql = "SELECT * FROM ai_chat_sessions WHERE id = ?;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (session_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_chat_session_by_conversation_id(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Tìm phiên hội thoại theo conversation_id của Google NotebookLM."""
+        sql = "SELECT * FROM ai_chat_sessions WHERE conversation_id = ?;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (conversation_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def update_chat_session(
+        self,
+        session_id: int,
+        conversation_id: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> bool:
+        """Cập nhật conversation_id hoặc tiêu đề của phiên hội thoại."""
+        now = current_iso_time()
+        sets = ["updated_at = ?"]
+        params: List[Any] = [now]
+        if conversation_id is not None:
+            sets.append("conversation_id = ?")
+            params.append(conversation_id)
+        if title is not None:
+            sets.append("title = ?")
+            params.append(title.strip())
+        params.append(session_id)
+        sql = f"UPDATE ai_chat_sessions SET {', '.join(sets)} WHERE id = ?;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_chat_session(self, session_id: int) -> bool:
+        """Xóa một phiên hội thoại và tất cả tin nhắn liên quan (CASCADE)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM ai_chat_messages WHERE session_id = ?;", (session_id,))
+            cursor.execute("DELETE FROM ai_chat_sessions WHERE id = ?;", (session_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def save_chat_message(
+        self,
+        session_id: int,
+        role: str,
+        content: str,
+        citations: Optional[str] = None,
+    ) -> int:
+        """Lưu một tin nhắn chat (user/assistant) vào phiên hội thoại."""
+        now = current_iso_time()
+        sql = """
+        INSERT INTO ai_chat_messages (session_id, role, content, citations, created_at)
+        VALUES (?, ?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (session_id, role, content, citations, now))
+            cursor.execute("UPDATE ai_chat_sessions SET updated_at = ? WHERE id = ?;", (now, session_id))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_chat_messages(self, session_id: int) -> List[Dict[str, Any]]:
+        """Lấy toàn bộ tin nhắn trong một phiên hội thoại theo thứ tự thời gian."""
+        sql = "SELECT * FROM ai_chat_messages WHERE session_id = ? ORDER BY id ASC;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (session_id,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    # ==================== Web Research Source Review (3 states) ====================
+
+    def add_web_research_source(
+        self,
+        subject_id: int,
+        source_url: Optional[str] = None,
+        source_title: Optional[str] = None,
+        nlm_source_id: Optional[str] = None,
+        drive_file_id: Optional[str] = None,
+        local_path: Optional[str] = None,
+    ) -> int:
+        """Thêm nguồn Deep Research mới với trạng thái 'unreviewed' (Thẻ Vàng)."""
+        now = current_iso_time()
+        sql = """
+        INSERT INTO web_research_sources
+            (subject_id, source_url, source_title, nlm_source_id, drive_file_id, local_path,
+             review_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'unreviewed', ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (subject_id, source_url, source_title, nlm_source_id,
+                                 drive_file_id, local_path, now, now))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_web_research_sources(
+        self,
+        subject_id: Optional[int] = None,
+        review_status: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Lấy danh sách nguồn Deep Research (có thể lọc theo môn học và trạng thái)."""
+        conditions: List[str] = []
+        params: List[Any] = []
+        if subject_id is not None:
+            conditions.append("subject_id = ?")
+            params.append(subject_id)
+        if review_status is not None:
+            conditions.append("review_status = ?")
+            params.append(review_status)
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        sql = f"SELECT * FROM web_research_sources {where} ORDER BY id DESC LIMIT ?;"
+        params.append(limit)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def review_web_research_source(
+        self,
+        source_id: int,
+        new_status: str,
+        reviewed_by: Optional[str] = None,
+    ) -> bool:
+        """Cập nhật trạng thái kiểm duyệt nguồn Deep Research.
+
+        Args:
+            source_id: ID bản ghi nguồn.
+            new_status: 'approved' (Thẻ Xanh) hoặc 'rejected'.
+            reviewed_by: Email người duyệt.
+
+        Returns:
+            True nếu cập nhật thành công.
+        """
+        if new_status not in ("approved", "rejected"):
+            raise ValueError(f"Trạng thái không hợp lệ: '{new_status}'. Chỉ chấp nhận 'approved' hoặc 'rejected'.")
+        now = current_iso_time()
+        sql = """
+        UPDATE web_research_sources
+        SET review_status = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
+        WHERE id = ?;
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (new_status, reviewed_by, now, now, source_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_web_research_source(self, source_id: int) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin chi tiết một nguồn Deep Research theo ID."""
+        sql = "SELECT * FROM web_research_sources WHERE id = ? LIMIT 1;"
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (source_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    # ==================== Cascade Delete 4 bước — Nhật ký xóa ====================
+
+    def log_soft_delete(
+        self,
+        file_id: Optional[int],
+        original_path: Optional[str],
+        drive_file_id: Optional[str],
+        nlm_source_id: Optional[str],
+        subject: Optional[str],
+        deleted_by: Optional[str] = None,
+        hard_delete_days: int = 90,
+    ) -> int:
+        """Ghi nhận Soft Delete (Step 2-3 của Cascade Delete) và lên lịch Hard Delete sau N ngày.
+
+        Returns:
+            ID bản ghi nhật ký.
+        """
+        now = current_iso_time()
+        scheduled = (datetime.now(timezone.utc) + timedelta(days=hard_delete_days)).isoformat()
+        sql = """
+        INSERT INTO file_deletion_logs
+            (file_id, original_path, drive_file_id, nlm_source_id, subject, deleted_by,
+             soft_deleted_at, scheduled_hard_delete_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (file_id, original_path, drive_file_id, nlm_source_id,
+                                 subject, deleted_by, now, scheduled, now))
+            conn.commit()
+            return cursor.lastrowid
+
+    def mark_hard_deleted(self, log_id: int, backup_link: Optional[str] = None) -> None:
+        """Đánh dấu Hard Delete hoàn tất (Step 4) và lưu Backup Link vào nhật ký."""
+        now = current_iso_time()
+        sql = """
+        UPDATE file_deletion_logs
+        SET hard_deleted_at = ?, backup_link = ?
+        WHERE id = ?;
+        """
+        with self._get_connection() as conn:
+            conn.execute(sql, (now, backup_link, log_id))
+            conn.commit()
+
+    def get_due_for_hard_delete(self) -> List[Dict[str, Any]]:
+        """Lấy danh sách file đã hết thời gian đệm 90 ngày, cần Hard Delete."""
+        now = current_iso_time()
+        sql = """
+        SELECT * FROM file_deletion_logs
+        WHERE hard_deleted_at IS NULL
+          AND scheduled_hard_delete_at <= ?
+        ORDER BY scheduled_hard_delete_at ASC;
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (now,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def update_files_nlm_source_id(self, record_id: int, nlm_source_id: str) -> None:
+        """Lưu NotebookLM source ID vào bản ghi file để dùng cho cascade delete."""
+        now = current_iso_time()
+        # Lưu vào notebooklm_sync_log (cột notebooklm_id)
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE notebooklm_sync_log SET notebooklm_id = ?, synced_at = ?, status = 'synced' WHERE file_id = ?;",
+                (nlm_source_id, now, record_id),
+            )
+            conn.commit()
+
+    def get_nlm_source_id_for_file(self, record_id: int) -> Optional[str]:
+        """Lấy NotebookLM source ID của một file từ sync log."""
+        sql = """
+        SELECT notebooklm_id FROM notebooklm_sync_log
+        WHERE file_id = ? AND notebooklm_id IS NOT NULL
+        ORDER BY id DESC LIMIT 1;
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (record_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
 
 
 

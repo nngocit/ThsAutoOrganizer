@@ -22,6 +22,7 @@ from src.classifier import PathClassifier
 from src.database import Database
 from src.drive import DriveManager
 from src.processor import FileProcessor, is_file_stable
+from src.notebooklm_sync import NotebookLMSyncManager
 
 # Logger chính của ứng dụng
 logger = logging.getLogger("ThsAutoOrganizer")
@@ -285,7 +286,8 @@ def main() -> None:
             "trích xuất nội dung và lưu SQLite. Hãy tải credentials.json từ Google Cloud Console."
         )
 
-    # 4. Khởi tạo FileProcessor
+    # 4. Khởi tạo NotebookLM Sync Manager & FileProcessor
+    nlm_sync_manager = NotebookLMSyncManager(database=database)
     processor = FileProcessor(
         classifier=classifier,
         database=database,
@@ -293,6 +295,7 @@ def main() -> None:
         min_file_size_bytes=int(config.get("min_file_size_bytes", 1000)),
         supported_extensions=config.get("supported_extensions"),
         extract_content=True,
+        notebooklm_sync_manager=nlm_sync_manager,
     )
 
     # 5. Khởi tạo Hàng đợi & Worker Thread

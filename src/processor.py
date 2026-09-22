@@ -109,6 +109,7 @@ class FileProcessor:
         min_file_size_bytes: int = 1000,
         supported_extensions: Optional[List[str]] = None,
         extract_content: bool = True,
+        notebooklm_sync_manager: Optional[Any] = None,
     ) -> None:
         self.classifier = classifier
         self.database = database
@@ -118,6 +119,7 @@ class FileProcessor:
             ext.lower() for ext in (supported_extensions or DEFAULT_SUPPORTED_EXTENSIONS)
         ]
         self.extract_content = extract_content
+        self.notebooklm_sync_manager = notebooklm_sync_manager
 
     def _get_drive_manager_for_user(self, user_email: str) -> Optional[DriveManager]:
         """Lấy DriveManager phù hợp với tài khoản người dùng."""
@@ -238,10 +240,34 @@ class FileProcessor:
 
         return subject, doc_type
 
+    # Tên các thư mục đầu ra (output-only) — Inflow watcher KHÔNG được quét ngược
+    _NO_INFLOW_DIR_MARKERS = (
+        "04_Ket_Qua_Xuat_Ban",
+        "04_ket_qua_xuat_ban",
+        "artifacts",             # data/artifacts/ dùng cho download Studio
+        "_Archive_Trash_90Days", # khu vực đệm xóa an toàn
+    )
+
+    def _is_output_path(self, path: Path) -> bool:
+        """Trả True nếu file nằm trong thư mục đầu ra (output-only), cần chặn inflow vòng lặp."""
+        for part in path.parts:
+            if part in self._NO_INFLOW_DIR_MARKERS:
+                return True
+        return False
+
     def should_process_file(self, file_path: Path | str) -> bool:
         """Kiểm tra sơ bộ file có đủ điều kiện xử lý hay không."""
         path = Path(file_path).resolve()
         name = path.name
+
+        # ==== NO-LOOP GUARD: chặn vòng lặp vô tận với thư mục đầu ra ====
+        # Files trong 04_Ket_Qua_Xuat_Ban, data/artifacts, _Archive_Trash_90Days
+        # là OUTPUT — tuyệt đối không được nạp ngược vào pipeline Inflow.
+        if self._is_output_path(path):
+            logger.debug(
+                "[No-Loop Guard] Bỏ qua file đầu ra (is_output): %s", path
+            )
+            return False
 
         # Bỏ qua các file tạm của Office và hệ thống
         if (
@@ -422,6 +448,7 @@ class FileProcessor:
             msg = f"Tài khoản '{user_email}' chưa kết nối Google Drive riêng. File đã được lưu an toàn tại máy."
             logger.info(msg)
             self.database.update_status(record_id, status=STATUS_SAVED_LOCAL)
+            self._trigger_notebooklm_sync(path, subject, record_id)
             return ProcessingResult(
                 file_path=str(path),
                 sha256=file_sha256,
@@ -449,6 +476,7 @@ class FileProcessor:
                 status=STATUS_UPLOADED,
                 drive_file_id=drive_file_id,
             )
+            self._trigger_notebooklm_sync(path, subject, record_id)
             return ProcessingResult(
                 file_path=str(path),
                 sha256=file_sha256,
@@ -484,3 +512,24 @@ class FileProcessor:
                 error=err_msg,
                 extracted_text_len=extracted_text_len,
             )
+
+    def _trigger_notebooklm_sync(self, file_path: Path, subject: Optional[str], record_id: int) -> None:
+        """Kích hoạt nạp nguồn ngầm vào NotebookLM không gây nghẽn."""
+        if not self.notebooklm_sync_manager or not subject:
+            return
+        try:
+            subj_id = 1
+            if self.database:
+                subj_rec = self.database.get_subject_by_name(subject)
+                if subj_rec and subj_rec.get("id"):
+                    subj_id = subj_rec["id"]
+            self.notebooklm_sync_manager.enqueue_sync(
+                file_path=str(file_path),
+                course_name=subject,
+                course_id=subj_id,
+                file_id=record_id,
+            )
+            logger.info("[Auto-Add Source] Đã kích hoạt nạp ngầm vào NotebookLM cho '%s' (Môn: %s)", file_path.name, subject)
+        except Exception as exc:
+            logger.warning("Không thể kích hoạt auto-add source NotebookLM: %s", exc)
+

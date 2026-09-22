@@ -2073,24 +2073,79 @@ def get_html_dashboard() -> str:
           </div>
         </div>
 
-        <!-- Quick Research Box (Hỏi đáp nhanh NotebookLM) -->
-        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <!-- Multi-turn AI Study Chat Thread & Studio Artifacts -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+          <!-- Top Bar: Course Select, Sync Button, Status -->
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                💬 Khung Chat Đa Phiên (Google NotebookLM Plus)
+              </span>
+              <span style="font-size: 0.75rem; color: var(--text-dim);">(Ghi nhớ ngữ cảnh hội thoại, Citations & Tự động lưu lịch sử)</span>
+            </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">⚡ Hỏi đáp tài liệu với Google NotebookLM Plus</span>
-              <span style="font-size: 0.75rem; color: var(--text-dim);">(Bộ não Gemini đọc tài liệu và trích dẫn Citations nguồn)</span>
+              <select id="quickQueryCourseSelect" class="form-control" onchange="onChatCourseChanged()" style="width: 220px; font-size: 0.82rem;"></select>
+              <button class="btn btn-secondary" onclick="syncAllFromNotebookLM()" id="btn-sync-all" style="font-size: 0.78rem; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border-subtle);">
+                📥 Đồng bộ Lịch sử & Slide từ NotebookLM
+              </button>
             </div>
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <select id="quickQueryCourseSelect" class="form-control" style="width: 220px; font-size: 0.82rem;"></select>
-            <input type="text" id="quickPromptInput" class="form-control" placeholder="Đặt câu hỏi nghiên cứu (ví dụ: Nêu 3 luận điểm trọng tâm của NQ 27 kèm số trang)..." style="flex: 1; min-width: 280px; font-size: 0.82rem;">
-            <button class="btn btn-primary" id="btn-quick-query" onclick="executeQuickQuery()" style="font-size: 0.82rem; padding: 6px 18px; background: #10B981; border: none;">Gửi câu hỏi</button>
+
+          <!-- Studio Artifacts Banner (Slide Decks, Reports...) -->
+          <div id="studioArtifactsBanner" style="display: none; margin-bottom: 14px; padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm); font-size: 0.82rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
+                <span style="font-size: 1.1rem;">📊</span>
+                <span id="studioArtifactsText" style="font-weight: 600;">Có file Slide Deck PowerPoint sẵn sàng tải về!</span>
+              </div>
+              <div id="studioArtifactsActions" style="display: flex; gap: 8px;"></div>
+            </div>
           </div>
-          <div id="quickQueryResultBox" style="display: none; margin-top: 14px; padding: 16px; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.6;">
-            <div id="quickQueryAnswerText" style="color: var(--text-primary); white-space: pre-wrap;"></div>
-            <div id="quickQueryCitationsBox" class="citations-box" style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 0.78rem; color: var(--text-secondary);"></div>
-            <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
-              <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px;" onclick="saveQuickQueryAsInsight()">💾 Lưu vào Hub</button>
+
+          <!-- 2-Column Chat Layout: Left Sidebar (Sessions) + Right Pane (Messages Stream) -->
+          <div style="display: flex; gap: 14px; min-height: 480px; max-height: 600px;">
+            <!-- Left: Sessions Sidebar -->
+            <div style="width: 240px; flex-shrink: 0; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); display: flex; flex-direction: column; overflow: hidden;">
+              <div style="padding: 10px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Phiên hội thoại</span>
+                <button class="btn btn-primary" onclick="createNewChatSession()" style="font-size: 0.72rem; padding: 3px 8px; background: #10B981; border: none;">+ Mới</button>
+              </div>
+              <div id="chatSessionsList" style="flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px;">
+                <!-- Rendered by JS -->
+              </div>
+            </div>
+
+            <!-- Right: Chat Area -->
+            <div style="flex: 1; display: flex; flex-direction: column; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden;">
+              <!-- Chat Header -->
+              <div style="padding: 10px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-subtle); display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div id="activeChatTitle" style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);">Đang tải cuộc trò chuyện...</div>
+                  <div id="activeChatSubtitle" style="font-size: 0.72rem; color: var(--text-secondary);">Google NotebookLM Plus (Gemini)</div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" onclick="deleteCurrentChatSession()" style="font-size: 0.72rem; padding: 3px 8px; color: #EF4444; border: 1px solid rgba(239,68,68,0.3);">🗑️ Xóa phiên này</button>
+                </div>
+              </div>
+
+              <!-- Messages Stream (Scrollable) -->
+              <div id="chatMessagesStream" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: var(--bg-surface);">
+                <!-- Messages rendered by JS -->
+              </div>
+
+              <!-- Input Area at Bottom -->
+              <div style="padding: 12px 14px; border-top: 1px solid var(--border-subtle); background: var(--bg-subtle);">
+                <div style="display: flex; gap: 10px;">
+                  <textarea id="quickPromptInput" rows="2" class="form-control" placeholder="Đặt câu hỏi thảo luận, tạo slide, bảng biểu... (Enter để gửi, Shift+Enter để xuống dòng)..." style="flex: 1; resize: none; font-size: 0.84rem; line-height: 1.5;" oninput="onPromptInputTyped(this)" onkeydown="handlePromptKeyDown(event)"></textarea>
+                  <button class="btn btn-primary" id="btn-quick-query" onclick="sendChatMessage()" style="font-size: 0.82rem; padding: 0 20px; background: #10B981; border: none; height: auto; display: flex; align-items: center; justify-content: center;">
+                    Gửi
+                  </button>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 0.72rem; color: var(--text-dim);">
+                  <span>💡 Tự động lưu nháp: Yên tâm F5 hoặc chuyển tab không bị mất nội dung.</span>
+                  <span id="chatSendStatusText"></span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2450,11 +2505,15 @@ def get_html_dashboard() -> str:
     let currentInsightTypeFilter = '';
     let allStudyHubInsights = [];
     let currentQuickQueryResult = null;
+    let currentChatSessionId = null;
+    let currentChatSessions = [];
 
     async function initStudyHub() {
       await checkNLMStatus();
       await loadStudyHubCourses();
       await loadStudyHubInsights();
+      await onChatCourseChanged();
+      restoreChatDraft();
     }
 
     async function checkNLMStatus() {
@@ -2515,7 +2574,13 @@ def get_html_dashboard() -> str:
         });
 
         filterSelect.innerHTML = filterHtml;
-        if (quickSelect) quickSelect.innerHTML = optionsHtml;
+        if (quickSelect) {
+          quickSelect.innerHTML = optionsHtml;
+          const savedCourse = localStorage.getItem('studyHub_last_course');
+          if (savedCourse && quickSelect.querySelector(`option[value="${savedCourse}"]`)) {
+            quickSelect.value = savedCourse;
+          }
+        }
         if (modalSelect) modalSelect.innerHTML = optionsHtml;
       } catch (e) {
         console.error('Lỗi tải môn học cho Study Hub:', e);
@@ -2635,55 +2700,423 @@ def get_html_dashboard() -> str:
       loadStudyHubInsights();
     }
 
-    async function executeQuickQuery() {
-      const courseSelect = document.getElementById('quickQueryCourseSelect');
+    function restoreChatDraft() {
+      const draft = localStorage.getItem('studyHub_draft_query');
+      const input = document.getElementById('quickPromptInput');
+      if (draft && input) {
+        input.value = draft;
+      }
+    }
+
+    function onPromptInputTyped(textarea) {
+      localStorage.setItem('studyHub_draft_query', textarea.value);
+    }
+
+    function handlePromptKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChatMessage();
+      }
+    }
+
+    async function onChatCourseChanged() {
+      const quickSelect = document.getElementById('quickQueryCourseSelect');
+      if (!quickSelect) return;
+      const courseId = quickSelect.value;
+      if (courseId) {
+        localStorage.setItem('studyHub_last_course', courseId);
+      }
+      await loadStudioArtifacts(courseId);
+      await loadChatSessions(courseId, true);
+    }
+
+    async function loadStudioArtifacts(courseId) {
+      const banner = document.getElementById('studioArtifactsBanner');
+      const bannerText = document.getElementById('studioArtifactsText');
+      const bannerActions = document.getElementById('studioArtifactsActions');
+      if (!banner) return;
+      if (!courseId) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/ai/artifacts?subject_id=${courseId}`);
+        const data = await res.json();
+        if (data.ok && data.artifacts && data.artifacts.length > 0) {
+          const dlArtifacts = data.artifacts.filter(a => a.download_url);
+          if (dlArtifacts.length > 0) {
+            banner.style.display = 'block';
+            const first = dlArtifacts[0];
+            bannerText.innerHTML = `<b>Slide Deck PowerPoint có sẵn:</b> ${escapeHtml(first.title)}`;
+            bannerActions.innerHTML = dlArtifacts.map(a => 
+              `<a href="${a.download_url}" class="btn btn-primary" style="font-size: 0.76rem; padding: 5px 12px; background: #3B82F6; color: white; text-decoration: none; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;" download="${escapeHtml(a.filename)}">
+                📥 Tải ${escapeHtml(a.filename || 'Slide.pptx')}
+              </a>`
+            ).join(' ');
+          } else {
+            banner.style.display = 'none';
+          }
+        } else {
+          banner.style.display = 'none';
+        }
+      } catch (e) {
+        banner.style.display = 'none';
+      }
+    }
+
+    async function loadChatSessions(courseId, selectFirst = true) {
+      const listEl = document.getElementById('chatSessionsList');
+      if (!listEl) return;
+      if (!courseId) {
+        const quickSelect = document.getElementById('quickQueryCourseSelect');
+        courseId = quickSelect ? quickSelect.value : null;
+      }
+      if (!courseId) {
+        listEl.innerHTML = '<div style="padding: 12px; font-size: 0.75rem; color: var(--text-dim); text-align: center;">Vui lòng chọn môn học</div>';
+        return;
+      }
+
+      listEl.innerHTML = '<div style="padding: 12px; font-size: 0.75rem; color: var(--text-dim); text-align: center;">Đang tải danh sách...</div>';
+      try {
+        const res = await fetch(`/api/ai/chat/sessions?subject_id=${courseId}`);
+        const data = await res.json();
+        currentChatSessions = (data.ok && data.sessions) ? data.sessions : [];
+
+        if (currentChatSessions.length === 0) {
+          listEl.innerHTML = '<div style="padding: 12px; font-size: 0.75rem; color: var(--text-dim); text-align: center;">Chưa có cuộc trò chuyện nào.<br><span style="font-size: 0.7rem;">Bấm + Mới hoặc gửi câu hỏi để bắt đầu.</span></div>';
+          renderEmptyChatState();
+          return;
+        }
+
+        let html = '';
+        currentChatSessions.forEach(s => {
+          const isActive = s.id === currentChatSessionId;
+          const bg = isActive ? 'rgba(16, 185, 129, 0.15)' : 'transparent';
+          const border = isActive ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent';
+          const dateStr = s.updated_at ? s.updated_at.slice(5, 16).replace('T', ' ') : '';
+          html += `
+            <div onclick="selectChatSession(${s.id})" style="padding: 8px 10px; border-radius: 6px; background: ${bg}; border: ${border}; cursor: pointer; transition: all 0.15s ease;" class="chat-session-item">
+              <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHtml(s.title || 'Cuộc trò chuyện')}
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 0.7rem; color: var(--text-dim);">
+                <span>💬 ${s.message_count || 0} tin nhắn</span>
+                <span>${dateStr}</span>
+              </div>
+            </div>
+          `;
+        });
+        listEl.innerHTML = html;
+
+        if (selectFirst) {
+          const savedSessionId = parseInt(localStorage.getItem('studyHub_last_session'));
+          const targetSession = currentChatSessions.find(s => s.id === savedSessionId) || currentChatSessions[0];
+          selectChatSession(targetSession.id);
+        }
+      } catch (e) {
+        listEl.innerHTML = `<div style="padding: 12px; font-size: 0.75rem; color: #EF4444;">Lỗi tải: ${escapeHtml(e.message || e)}</div>`;
+      }
+    }
+
+    function renderEmptyChatState() {
+      currentChatSessionId = null;
+      document.getElementById('activeChatTitle').textContent = 'Cuộc trò chuyện mới';
+      document.getElementById('activeChatSubtitle').textContent = 'Google NotebookLM Plus (Gemini)';
+      document.getElementById('chatMessagesStream').innerHTML = `
+        <div style="text-align: center; padding: 40px 20px; color: var(--text-dim);">
+          <div style="font-size: 2.2rem; margin-bottom: 12px;">🧠</div>
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Bắt đầu thảo luận với Google NotebookLM Plus</div>
+          <div style="font-size: 0.8rem; max-width: 420px; margin: 0 auto; line-height: 1.5;">
+            Hỏi đáp giáo trình, tạo Slide thuyết trình PowerPoint, làm trắc nghiệm Quiz hoặc tóm tắt tài liệu theo từng chủ đề.
+          </div>
+        </div>
+      `;
+    }
+
+    async function selectChatSession(sessionId) {
+      currentChatSessionId = sessionId;
+      localStorage.setItem('studyHub_last_session', sessionId);
+
+      document.querySelectorAll('#chatSessionsList .chat-session-item').forEach((el, idx) => {
+        if (currentChatSessions[idx] && currentChatSessions[idx].id === sessionId) {
+          el.style.background = 'rgba(16, 185, 129, 0.15)';
+          el.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+        } else {
+          el.style.background = 'transparent';
+          el.style.border = '1px solid transparent';
+        }
+      });
+
+      const session = currentChatSessions.find(s => s.id === sessionId);
+      if (session) {
+        document.getElementById('activeChatTitle').textContent = session.title || 'Cuộc trò chuyện';
+        document.getElementById('activeChatSubtitle').textContent = `Sổ tay NotebookLM: ${session.conversation_id ? session.conversation_id.slice(0, 8) + '...' : 'Tự động tạo'}`;
+      }
+
+      const streamEl = document.getElementById('chatMessagesStream');
+      streamEl.innerHTML = '<div style="text-align: center; padding: 20px; font-size: 0.8rem; color: var(--text-dim);">⏳ Đang tải tin nhắn...</div>';
+
+      try {
+        const res = await fetch(`/api/ai/chat/messages?session_id=${sessionId}`);
+        const data = await res.json();
+        if (data.ok && data.messages) {
+          renderChatMessages(data.messages);
+        } else {
+          streamEl.innerHTML = `<div style="color: #EF4444; padding: 20px;">Không thể tải tin nhắn: ${escapeHtml(data.error || 'Lỗi')}</div>`;
+        }
+      } catch (e) {
+        streamEl.innerHTML = `<div style="color: #EF4444; padding: 20px;">Lỗi kết nối: ${escapeHtml(e.message || e)}</div>`;
+      }
+    }
+
+    function renderChatMessages(messages) {
+      const streamEl = document.getElementById('chatMessagesStream');
+      if (!messages || messages.length === 0) {
+        renderEmptyChatState();
+        return;
+      }
+
+      let html = '';
+      messages.forEach(m => {
+        const isUser = m.role === 'user';
+        if (isUser) {
+          html += `
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+              <div style="max-width: 80%; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px 12px 2px 12px; padding: 10px 14px; font-size: 0.84rem; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap;">
+                ${escapeHtml(m.content)}
+              </div>
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: #10B981; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; color: white; flex-shrink: 0;">
+                👤
+              </div>
+            </div>
+          `;
+        } else {
+          let parsedCitations = [];
+          if (m.citations) {
+            try {
+              parsedCitations = typeof m.citations === 'string' ? JSON.parse(m.citations) : m.citations;
+            } catch (e) {}
+          }
+
+          let citationsHtml = '';
+          if (parsedCitations && parsedCitations.length > 0) {
+            citationsHtml = `
+              <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-secondary);">
+                <b>📌 Trích dẫn nguồn:</b><br>
+                ${parsedCitations.map(c => `• ${escapeHtml(c.text || c.source || JSON.stringify(c))}`).join('<br>')}
+              </div>
+            `;
+          }
+
+          html += `
+            <div style="display: flex; gap: 10px;">
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0;">
+                🧠
+              </div>
+              <div style="max-width: 85%; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: 2px 12px 12px 12px; padding: 12px 16px; font-size: 0.85rem; color: var(--text-primary); line-height: 1.6;">
+                <div style="font-size: 0.75rem; font-weight: 700; color: #3B82F6; margin-bottom: 6px;">Google NotebookLM Plus</div>
+                <div style="white-space: pre-wrap; font-family: inherit;">${formatMarkdownText(m.content)}</div>
+                ${citationsHtml}
+              </div>
+            </div>
+          `;
+        }
+      });
+
+      streamEl.innerHTML = html;
+      streamEl.scrollTop = streamEl.scrollHeight;
+    }
+
+    function formatMarkdownText(text) {
+      if (!text) return '';
+      let escaped = escapeHtml(text);
+      escaped = escaped.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+      escaped = escaped.replace(/\\*([^*]+)\\*/g, '<em>$1</em>');
+      escaped = escaped.replace(/^###\\s+([^\\n]+)/gm, '<h4 style="margin: 8px 0 4px 0; font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">$1</h4>');
+      escaped = escaped.replace(/^##\\s+([^\\n]+)/gm, '<h3 style="margin: 10px 0 6px 0; font-weight: 700; font-size: 1rem; color: var(--text-primary);">$1</h3>');
+      escaped = escaped.replace(/^#\\s+([^\\n]+)/gm, '<h2 style="margin: 12px 0 8px 0; font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">$1</h2>');
+      escaped = escaped.replace(/^---$/gm, '<hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 10px 0;">');
+      escaped = escaped.replace(/^>\\s+([^\\n]+)/gm, '<blockquote style="border-left: 3px solid #10B981; padding-left: 10px; margin: 6px 0; color: var(--text-secondary); background: rgba(16,185,129,0.05); font-style: italic;">$1</blockquote>');
+      return escaped;
+    }
+
+    async function sendChatMessage() {
+      const quickSelect = document.getElementById('quickQueryCourseSelect');
       const promptInput = document.getElementById('quickPromptInput');
       const btn = document.getElementById('btn-quick-query');
-      const resultBox = document.getElementById('quickQueryResultBox');
-      const ansText = document.getElementById('quickQueryAnswerText');
-      const citeBox = document.getElementById('quickQueryCitationsBox');
+      const statusText = document.getElementById('chatSendStatusText');
+      const streamEl = document.getElementById('chatMessagesStream');
 
-      if (!promptInput.value.trim()) {
-        alert('Vui lòng nhập câu hỏi nghiên cứu');
+      const promptText = promptInput.value.trim();
+      if (!promptText) {
+        alert('Vui lòng nhập câu hỏi thảo luận');
+        return;
+      }
+
+      const courseId = quickSelect ? quickSelect.value : null;
+      if (!courseId) {
+        alert('Vui lòng chọn môn học');
         return;
       }
 
       btn.disabled = true;
-      btn.textContent = '⏳ Đang phân tích...';
-      resultBox.style.display = 'block';
-      ansText.textContent = '⏳ Google NotebookLM đang đọc tài liệu giáo trình và tổng hợp trích dẫn (thường mất 10-20 giây)...';
-      citeBox.innerHTML = '';
+      btn.textContent = '⏳';
+      statusText.textContent = '⏳ Đang truy vấn Google NotebookLM Plus (Gemini)...';
+
+      const userBubble = `
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <div style="max-width: 80%; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px 12px 2px 12px; padding: 10px 14px; font-size: 0.84rem; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap;">
+            ${escapeHtml(promptText)}
+          </div>
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: #10B981; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; color: white; flex-shrink: 0;">
+            👤
+          </div>
+        </div>
+      `;
+      const typingIndicator = `
+        <div id="activeTypingIndicator" style="display: flex; gap: 10px;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0;">
+            🧠
+          </div>
+          <div style="max-width: 85%; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: 2px 12px 12px 12px; padding: 12px 16px; font-size: 0.82rem; color: var(--text-secondary);">
+            ⏳ Google NotebookLM đang đọc tài liệu và phân tích ngữ cảnh...
+          </div>
+        </div>
+      `;
+
+      streamEl.insertAdjacentHTML('beforeend', userBubble + typingIndicator);
+      streamEl.scrollTop = streamEl.scrollHeight;
+
+      promptInput.value = '';
+      localStorage.removeItem('studyHub_draft_query');
 
       try {
-        const res = await fetch('/api/ai/query', {
+        const res = await fetch('/api/ai/chat/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            subject_id: courseSelect.value || 1,
-            prompt: promptInput.value.trim()
+            session_id: currentChatSessionId,
+            subject_id: parseInt(courseId),
+            prompt: promptText
           })
         });
         const data = await res.json();
+
+        const typingEl = document.getElementById('activeTypingIndicator');
+        if (typingEl) typingEl.remove();
+
         if (data.ok) {
-          ansText.textContent = data.answer || 'Không có câu trả lời.';
+          currentChatSessionId = data.session_id;
+          localStorage.setItem('studyHub_last_session', data.session_id);
+
+          let citationsHtml = '';
           if (data.citations && data.citations.length > 0) {
-            citeBox.innerHTML = '<b>Trích dẫn Citations:</b><br>' + data.citations.map(c => `• ${escapeHtml(c.text || JSON.stringify(c))}`).join('<br>');
+            citationsHtml = `
+              <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-secondary);">
+                <b>📌 Trích dẫn nguồn:</b><br>
+                ${data.citations.map(c => `• ${escapeHtml(c.text || c.source || JSON.stringify(c))}`).join('<br>')}
+              </div>
+            `;
           }
-          currentQuickQueryResult = {
-            subject_id: courseSelect.value || 1,
-            title: promptInput.value.trim().slice(0, 60),
-            content: data.answer,
-            citations: JSON.stringify(data.citations || []),
-            type: 'qa'
-          };
+
+          const botBubble = `
+            <div style="display: flex; gap: 10px;">
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0;">
+                🧠
+              </div>
+              <div style="max-width: 85%; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: 2px 12px 12px 12px; padding: 12px 16px; font-size: 0.85rem; color: var(--text-primary); line-height: 1.6;">
+                <div style="font-size: 0.75rem; font-weight: 700; color: #3B82F6; margin-bottom: 6px;">Google NotebookLM Plus</div>
+                <div style="white-space: pre-wrap; font-family: inherit;">${formatMarkdownText(data.answer)}</div>
+                ${citationsHtml}
+              </div>
+            </div>
+          `;
+          streamEl.insertAdjacentHTML('beforeend', botBubble);
+          streamEl.scrollTop = streamEl.scrollHeight;
+
+          await loadChatSessions(courseId, false);
+          await loadStudioArtifacts(courseId);
         } else {
-          ansText.textContent = 'Lỗi truy vấn: ' + (data.error || 'Thao tác không thành công');
+          const errBubble = `
+            <div style="color: #EF4444; padding: 10px; font-size: 0.8rem; background: rgba(239,68,68,0.1); border-radius: 6px;">
+              ⚠️ Lỗi: ${escapeHtml(data.error || 'Không thể phản hồi')}
+            </div>
+          `;
+          streamEl.insertAdjacentHTML('beforeend', errBubble);
         }
       } catch (e) {
-        ansText.textContent = 'Lỗi kết nối: ' + e;
+        const typingEl = document.getElementById('activeTypingIndicator');
+        if (typingEl) typingEl.remove();
+        streamEl.insertAdjacentHTML('beforeend', `<div style="color: #EF4444; padding: 10px;">Lỗi kết nối: ${escapeHtml(e.message || e)}</div>`);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Gửi câu hỏi';
+        btn.textContent = 'Gửi';
+        statusText.textContent = '';
+      }
+    }
+
+    function createNewChatSession() {
+      currentChatSessionId = null;
+      localStorage.removeItem('studyHub_last_session');
+      renderEmptyChatState();
+      document.getElementById('quickPromptInput').focus();
+    }
+
+    async function deleteCurrentChatSession() {
+      if (!currentChatSessionId) {
+        alert('Không có phiên nào đang chọn để xóa');
+        return;
+      }
+      if (!confirm('Bạn có chắc muốn xóa vĩnh viễn phiên trò chuyện này cùng toàn bộ tin nhắn?')) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/ai/chat/sessions/${currentChatSessionId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Đã xóa phiên trò chuyện');
+          currentChatSessionId = null;
+          localStorage.removeItem('studyHub_last_session');
+          await loadChatSessions(null, true);
+        } else {
+          alert('Không thể xóa: ' + (data.error || 'Lỗi server'));
+        }
+      } catch (e) {
+        alert('Lỗi: ' + e);
+      }
+    }
+
+    async function syncAllFromNotebookLM() {
+      const quickSelect = document.getElementById('quickQueryCourseSelect');
+      const btn = document.getElementById('btn-sync-all');
+      const courseId = quickSelect ? quickSelect.value : null;
+      if (!courseId) {
+        alert('Vui lòng chọn môn học cần đồng bộ');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Đang đồng bộ...';
+      try {
+        const res = await fetch('/api/ai/chat/sync-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject_id: parseInt(courseId) })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Đã đồng bộ thành công dữ liệu từ Google NotebookLM Plus!');
+          await loadStudioArtifacts(courseId);
+          await loadChatSessions(courseId, true);
+        } else {
+          alert('Lỗi đồng bộ: ' + (data.error || 'Thao tác không thành công'));
+        }
+      } catch (e) {
+        alert('Lỗi kết nối: ' + e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📥 Đồng bộ Lịch sử & Slide từ NotebookLM';
       }
     }
 
@@ -4770,6 +5203,84 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True, "logs": logs})
             return
 
+        if path == "/api/ai/chat/sessions":
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            subj_id = int(query_params["subject_id"][0]) if "subject_id" in query_params else None
+            sessions = self.database.get_chat_sessions(subject_id=subj_id) if self.database else []
+            self._send_json({"ok": True, "sessions": sessions})
+            return
+
+        if path == "/api/ai/chat/messages":
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            if "session_id" not in query_params or not self.database:
+                self._send_json({"ok": False, "error": "Thiếu session_id"}, 400)
+                return
+            try:
+                sid = int(query_params["session_id"][0])
+                messages = self.database.get_chat_messages(sid)
+                session_info = self.database.get_chat_session(sid)
+                self._send_json({"ok": True, "session": session_info, "messages": messages})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+            return
+
+        if path == "/api/ai/artifacts":
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            subj_id = int(query_params["subject_id"][0]) if "subject_id" in query_params else None
+            if not subj_id or not self.database or not self.nlm_sync_manager:
+                self._send_json({"ok": True, "artifacts": []})
+                return
+            nb_id = self.database.get_subject_notebooklm_id(int(subj_id))
+            if not nb_id or nb_id == "notebook_id":
+                self._send_json({"ok": True, "artifacts": []})
+                return
+            art_dir = _project_root / "data" / "artifacts"
+            art_dir.mkdir(parents=True, exist_ok=True)
+
+            disk_artifacts = []
+            for f in art_dir.glob("slide_deck_*.pptx"):
+                disk_artifacts.append({
+                    "id": f.stem.replace("slide_deck_", ""),
+                    "type": "slide_deck",
+                    "status": "completed",
+                    "title": "Slide Deck PowerPoint: Luận điểm NQ 27 (1 trang)",
+                    "instructions": "Slide thuyết trình đã tạo từ NotebookLM",
+                    "download_url": f"/api/ai/artifacts/download?file={f.name}",
+                    "local_path": str(f),
+                    "filename": f.name,
+                })
+
+            if not disk_artifacts:
+                try:
+                    artifacts = self.nlm_sync_manager.sync_studio_artifacts(nb_id, download_dir=art_dir)
+                    disk_artifacts = artifacts
+                except Exception as _err:
+                    logger.warning("Lỗi sync studio artifacts: %s", _err)
+
+            self._send_json({"ok": True, "artifacts": disk_artifacts})
+            return
+
+        if path == "/api/ai/artifacts/download":
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            fname = query_params.get("file", [""])[0]
+            if not fname or "/" in fname or "\\" in fname or ".." in fname:
+                self._send_json({"ok": False, "error": "Tên file không hợp lệ"}, 400)
+                return
+            fpath = (_project_root / "data" / "artifacts" / fname).resolve()
+            if not fpath.exists() or not fpath.is_file():
+                self._send_json({"ok": False, "error": "File không tồn tại"}, 404)
+                return
+            mime = "application/vnd.openxmlformats-officedocument.presentationml.presentation" if fname.endswith(".pptx") else "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+            self.send_header("Content-Length", str(fpath.stat().st_size))
+            self.end_headers()
+            with open(fpath, "rb") as f_in:
+                while chunk := f_in.read(65536):
+                    self.wfile.write(chunk)
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -5282,6 +5793,203 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(exc)}, 500)
                 return
 
+        if path == "/api/ai/chat/sessions":
+            subj_id = body.get("subject_id") or body.get("course_id")
+            title = (body.get("title") or "Cuộc trò chuyện mới").strip()
+            if not subj_id or not self.database:
+                self._send_json({"ok": False, "error": "Thiếu subject_id"}, 400)
+                return
+            sid = self.database.create_chat_session(subject_id=int(subj_id), title=title)
+            self._send_json({"ok": True, "session_id": sid})
+            return
+
+        if path == "/api/ai/chat/send":
+            session_id = body.get("session_id")
+            subj_id = body.get("subject_id")
+            prompt = (body.get("prompt") or "").strip()
+            if not prompt:
+                self._send_json({"ok": False, "error": "Thiếu nội dung câu hỏi"}, 400)
+                return
+            if not self.database or not self.nlm_sync_manager:
+                self._send_json({"ok": False, "error": "Dịch vụ chưa sẵn sàng"}, 500)
+                return
+
+            session = self.database.get_chat_session(int(session_id)) if session_id else None
+            if not session:
+                if not subj_id:
+                    self._send_json({"ok": False, "error": "Thiếu subject_id hoặc session_id"}, 400)
+                    return
+                sid = self.database.create_chat_session(subject_id=int(subj_id), title=prompt[:60])
+                session = self.database.get_chat_session(sid)
+            else:
+                sid = session["id"]
+                subj_id = session["subject_id"]
+
+            user_msg_id = self.database.save_chat_message(sid, role="user", content=prompt)
+
+            nb_id = self.database.get_subject_notebooklm_id(int(subj_id))
+            if not nb_id or nb_id == "notebook_id":
+                with self.database._get_connection() as conn:
+                    row = conn.execute("SELECT name FROM subjects WHERE id = ?", (subj_id,)).fetchone()
+                    sname = row["name"] if row else "Môn học"
+                nb_id = self.nlm_sync_manager.ensure_notebook_for_course(sname, int(subj_id))
+
+            conv_id = session.get("conversation_id")
+            res = self.nlm_sync_manager.query_notebook(nb_id, prompt, conversation_id=conv_id)
+
+            returned_cid = res.get("conversation_id")
+            if returned_cid and returned_cid != conv_id:
+                self.database.update_chat_session(sid, conversation_id=returned_cid)
+
+            ans = res.get("answer") or res.get("error") or "Không có phản hồi từ NotebookLM"
+            citations_json = json.dumps(res.get("citations", []), ensure_ascii=False)
+            bot_msg_id = self.database.save_chat_message(sid, role="assistant", content=ans, citations=citations_json)
+
+            self._send_json({
+                "ok": res.get("success", False),
+                "session_id": sid,
+                "conversation_id": returned_cid or conv_id,
+                "answer": ans,
+                "citations": res.get("citations", []),
+                "user_msg_id": user_msg_id,
+                "bot_msg_id": bot_msg_id,
+                "error": res.get("error"),
+            })
+            return
+
+        if path == "/api/ai/chat/sync-all":
+            subj_id = body.get("subject_id")
+            if not subj_id or not self.database or not self.nlm_sync_manager:
+                self._send_json({"ok": False, "error": "Thiếu thông tin môn học"}, 400)
+                return
+            nb_id = self.database.get_subject_notebooklm_id(int(subj_id))
+            if not nb_id or nb_id == "notebook_id":
+                with self.database._get_connection() as conn:
+                    row = conn.execute("SELECT name FROM subjects WHERE id = ?", (subj_id,)).fetchone()
+                    sname = row["name"] if row else "Môn học"
+                nb_id = self.nlm_sync_manager.ensure_notebook_for_course(sname, int(subj_id))
+
+            chat_sync = self.nlm_sync_manager.sync_chats_from_notebook(nb_id, int(subj_id))
+            art_dir = _project_root / "data" / "artifacts"
+            artifacts = self.nlm_sync_manager.sync_studio_artifacts(nb_id, download_dir=art_dir)
+            self._send_json({
+                "ok": True,
+                "chat_sync": chat_sync,
+                "artifacts": artifacts,
+            })
+            return
+
+        # ==== Nạp nguồn thủ công vào NotebookLM (nút 'Nạp vào NotebookLM') ====
+        if path == "/api/nlm/source/add":
+            file_id = body.get("file_id")
+            subject_id = body.get("subject_id")
+            if not file_id or not self.database or not self.nlm_sync_manager:
+                self._send_json({"ok": False, "error": "Thiếu file_id"}, 400)
+                return
+            try:
+                rec = self.database.get_record(int(file_id))
+                if not rec:
+                    self._send_json({"ok": False, "error": "Không tìm thấy file"}, 404)
+                    return
+                subj = rec.get("subject", "")
+                sid = int(subject_id) if subject_id else 1
+                if self.database:
+                    subj_rec = self.database.get_subject_by_name(subj)
+                    if subj_rec:
+                        sid = subj_rec["id"]
+                self.nlm_sync_manager.enqueue_sync(
+                    file_path=rec.get("path", ""),
+                    course_name=subj,
+                    course_id=sid,
+                    file_id=int(file_id),
+                )
+                self._send_json({"ok": True, "message": "Đã đẩy vào hàng đợi nạp NotebookLM"})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+            return
+
+        # ==== Xóa nguồn khỏi NotebookLM (nút 'Xóa khỏi NotebookLM') ====
+        if path == "/api/nlm/source/remove":
+            file_id = body.get("file_id")
+            notebook_id = body.get("notebook_id")
+            nlm_source_id = body.get("nlm_source_id")
+            file_name = body.get("file_name")
+            subject_id = body.get("subject_id")
+            if not self.nlm_sync_manager:
+                self._send_json({"ok": False, "error": "NLM sync manager chưa sẵn sàng"}, 503)
+                return
+            if not notebook_id and subject_id and self.database:
+                notebook_id = self.database.get_subject_notebooklm_id(int(subject_id))
+            if not notebook_id:
+                self._send_json({"ok": False, "error": "Không tìm được notebook_id cho môn học này"}, 400)
+                return
+            self.nlm_sync_manager.enqueue_remove_source(
+                notebook_id=notebook_id,
+                source_id=nlm_source_id,
+                file_name=file_name,
+                subject_id=int(subject_id) if subject_id else None,
+            )
+            self._send_json({"ok": True, "message": "Đã đẩy lệnh xóa nguồn khỏi NotebookLM"})
+            return
+
+        # ==== Cascade Delete 4 bước an toàn ====
+        if path == "/api/files/cascade-delete":
+            file_id = body.get("file_id")
+            if not file_id or not self.database:
+                self._send_json({"ok": False, "error": "Thiếu file_id"}, 400)
+                return
+            try:
+                rec = self.database.get_record(int(file_id))
+                if not rec:
+                    self._send_json({"ok": False, "error": "Không tìm thấy file"}, 404)
+                    return
+                user = self._get_current_user()
+                subject_id = body.get("subject_id")
+                notebook_id = body.get("notebook_id")
+                if not notebook_id and subject_id and self.database:
+                    notebook_id = self.database.get_subject_notebooklm_id(int(subject_id))
+                if self.nlm_sync_manager:
+                    self.nlm_sync_manager.enqueue_cascade_delete(
+                        file_record=rec,
+                        notebook_id=notebook_id,
+                        drive_manager=self.drive_manager,
+                        deleted_by=user.get("email") if user else None,
+                    )
+                self._send_json({"ok": True, "message": "Đã kích hoạt Cascade Delete 4 bước"})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+            return
+
+        # ==== Kiểm duyệt nguồn Deep Research (3 trạng thái) ====
+        if path == "/api/nlm/sources/review":
+            source_id = body.get("source_id")
+            new_status = body.get("status")  # 'approved' hoặc 'rejected'
+            if not source_id or not new_status or not self.database:
+                self._send_json({"ok": False, "error": "Thiếu source_id hoặc status"}, 400)
+                return
+            try:
+                user = self._get_current_user()
+                reviewed_by = user.get("email") if user else None
+                ok = self.database.review_web_research_source(int(source_id), new_status, reviewed_by)
+                # Nếu rejected -> gỡ khỏi NLM nếu có nlm_source_id
+                if new_status == "rejected" and ok and self.nlm_sync_manager:
+                    src_rec = self.database.get_web_research_source(int(source_id))
+                    if src_rec and src_rec.get("nlm_source_id") and src_rec.get("nlm_source_id"):
+                        subj_id = src_rec.get("subject_id")
+                        nb_id = self.database.get_subject_notebooklm_id(subj_id) if subj_id else None
+                        if nb_id:
+                            self.nlm_sync_manager.enqueue_remove_source(
+                                notebook_id=nb_id,
+                                source_id=src_rec["nlm_source_id"],
+                                subject_id=subj_id,
+                            )
+                self._send_json({"ok": ok})
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, 400)
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -5294,6 +6002,46 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 insight_id = int(path.split("/")[-1])
                 deleted = self.database.delete_ai_insight(insight_id) if self.database else False
                 self._send_json({"ok": deleted})
+                return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
+
+        if path.startswith("/api/ai/chat/sessions/"):
+            try:
+                sid = int(path.split("/")[-1])
+                deleted = self.database.delete_chat_session(sid) if self.database else False
+                self._send_json({"ok": deleted})
+                return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
+
+        # ==== Xóa file theo 4-bước Cascade Delete an toàn (alias DELETE endpoint) ====
+        if path.startswith("/api/files/") and path.endswith("/cascade-delete"):
+            try:
+                parts = path.rstrip("/cascade-delete").split("/")
+                file_id = int(parts[-1]) if parts[-1].isdigit() else None
+                if not file_id or not self.database:
+                    self._send_json({"ok": False, "error": "Thiếu file_id"}, 400)
+                    return
+                rec = self.database.get_record(file_id)
+                if not rec:
+                    self._send_json({"ok": False, "error": "Không tìm thấy file"}, 404)
+                    return
+                subject_id = rec.get("subject")
+                nb_id = None
+                if subject_id and self.database:
+                    subj_rec = self.database.get_subject_by_name(str(subject_id))
+                    if subj_rec:
+                        nb_id = self.database.get_subject_notebooklm_id(subj_rec["id"])
+                if self.nlm_sync_manager:
+                    self.nlm_sync_manager.enqueue_cascade_delete(
+                        file_record=rec,
+                        notebook_id=nb_id,
+                        drive_manager=self.drive_manager,
+                    )
+                self._send_json({"ok": True, "message": "Cascade Delete 4 bước đã được kích hoạt"})
                 return
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
