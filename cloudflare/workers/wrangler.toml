@@ -13,3 +13,4 @@ crons = ["0 2 * * *"]
 # FIREBASE_SERVICE_ACCOUNT  — JSON string của Firebase service account key
 # GOOGLE_CLIENT_ID          — OAuth 2.0 Web Client ID
 # GOOGLE_CLIENT_SECRET      — OAuth 2.0 Web Client Secret
+# AGENT_SECRET              — Shared secret cho Python local agent (X-Agent-Secret header)
