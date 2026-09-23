@@ -1,0 +1,220 @@
+/* cloudflare/pages/src/css/main.css — Obsidian theme tokens, layout, typography (<200 lines) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ============================
+   Design Tokens — Obsidian Minimalist
+   ============================ */
+:root {
+  /* Colors */
+  --bg:          #111113;
+  --bg-card:     #18181B;
+  --bg-elevated: #1F1F23;
+  --border:      rgba(255,255,255,0.08);
+  --text:        #F4F4F5;
+  --text-muted:  #A1A1AA;
+  --text-dim:    #71717A;
+  --accent:      #A855F7;
+  --accent-glow: rgba(168,85,247,0.3);
+  --accent-dim:  #7C3AED;
+  --success:     #22C55E;
+  --warning:     #F59E0B;
+  --danger:      #EF4444;
+  --info:        #3B82F6;
+
+  /* Spacing */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
+  --sp-8: 32px; --sp-10: 40px;
+
+  /* Radius */
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 24px;
+
+  /* Transition */
+  --t-fast: 150ms ease; --t-med: 250ms ease; --t-slow: 400ms ease;
+
+  /* Shadow */
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+}
+
+/* ============================
+   Reset & Base
+   ============================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; transition: color var(--t-fast); }
+a:hover { color: #D8B4FE; }
+
+img { max-width: 100%; display: block; }
+
+/* ============================
+   Layout
+   ============================ */
+.app-shell {
+  display: grid;
+  grid-template-rows: 60px 1fr;
+  min-height: 100vh;
+}
+
+.app-main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--sp-6);
+  width: 100%;
+}
+
+/* ============================
+   Topbar
+   ============================ */
+.topbar {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-6);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+
+.topbar-brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, var(--accent), #60A5FA);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.topbar-nav { display: flex; gap: var(--sp-2); }
+
+.nav-tab {
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--t-fast);
+  font-family: inherit;
+}
+
+.nav-tab:hover { background: var(--bg-elevated); color: var(--text); }
+.nav-tab.active {
+  background: var(--accent-glow);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.user-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  object-fit: cover;
+}
+
+/* ============================
+   Auth Screen
+   ============================ */
+.auth-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  gap: var(--sp-6);
+  text-align: center;
+}
+
+.auth-logo {
+  width: 80px; height: 80px;
+  background: var(--accent-glow);
+  border-radius: var(--r-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  border: 1px solid var(--accent);
+}
+
+.auth-title {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.auth-subtitle { color: var(--text-muted); max-width: 400px; }
+
+/* ============================
+   Page sections
+   ============================ */
+.page-section { display: none; }
+.page-section.active { display: block; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-6);
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.section-subtitle {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-top: var(--sp-1);
+}
+
+/* ============================
+   Utilities
+   ============================ */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.gap-2 { gap: var(--sp-2); }
+.gap-4 { gap: var(--sp-4); }
+.mt-4 { margin-top: var(--sp-4); }
+.mt-6 { margin-top: var(--sp-6); }
+.hidden { display: none !important; }
+.text-muted { color: var(--text-muted); font-size: 0.875rem; }
+.text-accent { color: var(--accent); }
+.text-success { color: var(--success); }
+.text-danger  { color: var(--danger); }
+.text-warning { color: var(--warning); }
+.mono { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* Selection */
+::selection { background: var(--accent-glow); color: var(--text); }
