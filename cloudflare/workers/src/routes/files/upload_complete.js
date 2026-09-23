@@ -3,23 +3,14 @@
 
 import { Hono } from 'hono';
 import { requireAuth } from '../../lib/auth.js';
-import { firestoreGet, firestoreSet, firestoreList, fromFirestoreDoc } from '../../lib/firebase.js';
+import { firestoreGet, firestoreSet, fromFirestoreDoc } from '../../lib/firebase.js';
 import { withCors } from '../../lib/cors.js';
+import { isOutputFolder } from '../../lib/folders.js';
+import { isValidSha256, normalizeSha256 } from '../../lib/file_ids.js';
+import { findFileBySha256 } from '../../lib/file_lookup.js';
+import { enqueueSourceAdd } from '../../lib/tasks.js';
 
 const router = new Hono();
-
-/**
- * Kiểm tra SHA-256 đã tồn tại trong Firestore của user chưa.
- * Lấy toàn bộ files collection và lọc phía Worker (Firestore REST không hỗ trợ WHERE tốt).
- */
-async function checkDuplicateSHA256(env, uid, sha256) {
-  const resp = await firestoreList(env, `users/${uid}/files`, 200);
-  const docs = resp.documents || [];
-  return docs.some((doc) => {
-    const obj = fromFirestoreDoc(doc);
-    return obj.sha256 === sha256 && obj.status !== 'pending_upload' && obj.status !== 'archived';
-  });
-}
 
 /**
  * Xóa file trên Google Drive (dùng khi phát hiện duplicate sau khi đã upload).
@@ -48,7 +39,8 @@ router.post('/complete', requireAuth(async (c) => {
     if (!doc_id || !sha256) {
       return withCors(c.json({ error: 'doc_id và sha256 là bắt buộc' }, 400), origin);
     }
-    if (!/^[a-f0-9]{64}$/.test(sha256)) {
+    const sha = normalizeSha256(sha256);
+    if (!isValidSha256(sha)) {
       return withCors(c.json({ error: 'sha256 không hợp lệ — phải là hex 64 ký tự' }, 400), origin);
     }
 
@@ -58,9 +50,9 @@ router.post('/complete', requireAuth(async (c) => {
       return withCors(c.json({ error: 'Document không tồn tại hoặc không thuộc về bạn' }, 404), origin);
     }
 
-    // Kiểm tra SHA-256 duplicate
-    const isDuplicate = await checkDuplicateSHA256(c.env, user.uid, sha256);
-    if (isDuplicate) {
+    // Kiểm tra SHA-256 duplicate (bỏ qua pending_upload/archived)
+    const duplicate = await findFileBySha256(c.env, user.uid, sha);
+    if (duplicate) {
       // Dọn sạch Drive file vừa upload (nếu có)
       await deleteDriveFile(drive_access_token, drive_file_id);
       // Soft delete placeholder document
@@ -68,40 +60,44 @@ router.post('/complete', requireAuth(async (c) => {
         status: 'archived',
         updated_at: new Date().toISOString(),
       });
-      return withCors(c.json({ status: 'duplicate', sha256 }, 409), origin);
+      return withCors(c.json({
+        status: 'duplicate',
+        sha256: sha,
+        file_id: duplicate._id || duplicate.id || '',
+      }, 409), origin);
     }
 
     const now = new Date().toISOString();
+    const meta = fromFirestoreDoc(existingDoc);
+    const isOutput = meta.is_output === true || isOutputFolder(meta.folder_path);
 
     // Cập nhật Firestore document với metadata đầy đủ
     await firestoreSet(c.env, `users/${user.uid}/files/${doc_id}`, {
-      sha256,
+      sha256: sha,
       drive_file_id: drive_file_id || '',
       status: 'uploaded',
+      is_output: isOutput,
       updated_at: now,
     });
 
-    // Queue NotebookLM sync task (auto-ingestion pipeline)
-    const existingFields = fromFirestoreDoc(existingDoc);
-    if (existingFields.course_id) {
-      const taskId = crypto.randomUUID();
-      await firestoreSet(c.env, `nlm_task_queue/${taskId}`, {
-        id: taskId,
-        action: 'source_add',
-        uid: user.uid,
-        file_id: doc_id,
-        course_id: existingFields.course_id,
-        filename: existingFields.filename || '',
-        status: 'pending',
-        created_at: now,
-      });
-    }
+    // Lớp 2 NO-LOOP: chỉ queue source_add khi file KHÔNG nằm trong 04_Ket_Qua_Xuat_Ban
+    const taskId = await enqueueSourceAdd(c.env, {
+      uid: user.uid,
+      fileId: doc_id,
+      courseId: meta.course_id || '',
+      filename: meta.filename || '',
+      subject: meta.subject || '',
+      folderPath: meta.folder_path || '',
+      isOutput,
+    });
 
     return withCors(c.json({
       status: 'uploaded',
       doc_id,
-      sha256,
+      sha256: sha,
       drive_file_id: drive_file_id || '',
+      is_output: isOutput,
+      queued_source_add: !!taskId,
     }), origin);
   } catch (err) {
     console.error('Upload complete error:', err);

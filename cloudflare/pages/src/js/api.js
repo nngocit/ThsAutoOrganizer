@@ -7,7 +7,7 @@ const WORKER_URL = 'https://ths-organizer-api.ths-organizer-nngocit.workers.dev'
  * @returns {string|null}
  */
 function getIdToken() {
-  return window._googleIdToken || null;
+  return window._googleIdToken || localStorage.getItem('ths_google_id_token') || null;
 }
 
 /**
@@ -118,6 +118,121 @@ export const insightsApi = {
   }),
 
   delete: (id) => apiFetch(`/api/ai/insights/${id}`, { method: 'DELETE' }),
+};
+
+// ============================
+// Chat API (Phase 3) — §3.2
+// ============================
+
+export const chatApi = {
+  listSessions: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/chat/sessions${qs ? '?' + qs : ''}`);
+  },
+  createSession: (data) => apiFetch('/api/chat/sessions', {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+  getSession: (id) => apiFetch(`/api/chat/sessions/${id}`),
+  updateSession: (id, data) => apiFetch(`/api/chat/sessions/${id}`, {
+    method: 'PATCH', body: JSON.stringify(data),
+  }),
+  /** soft delete (archive) mặc định; hard=true → xoá session + toàn bộ messages */
+  deleteSession: (id, hard = false) =>
+    apiFetch(`/api/chat/sessions/${id}${hard ? '?hard=1' : ''}`, { method: 'DELETE' }),
+  /** Polling realtime: since = ISO timestamp, trả {messages, server_time} */
+  getMessages: (id, since = '', limit = 100) => {
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (since) qs.set('since', since);
+    return apiFetch(`/api/chat/sessions/${id}/messages?${qs}`);
+  },
+  /** Gửi prompt → 202 {message_id, job_id, status:'queued'} */
+  sendMessage: (id, data) => apiFetch(`/api/chat/sessions/${id}/messages`, {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+  /** Source Selector: loại rejected & chưa uploaded */
+  listSources: (courseId = '') => {
+    const qs = courseId ? `?course_id=${encodeURIComponent(courseId)}` : '';
+    return apiFetch(`/api/chat/sources${qs}`);
+  },
+};
+
+// ============================
+// Review API (Phase 4) — §3.4
+// ============================
+
+export const reviewApi = {
+  list: (status = 'unreviewed') =>
+    apiFetch(`/api/files/review?status=${encodeURIComponent(status)}`),
+  /** {review_status:'approved'|'rejected', note?} → approved: queue source_add nếu chưa sync */
+  review: (fileId, data) => apiFetch(`/api/files/${fileId}/review`, {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+};
+
+// ============================
+// Deep Research API (Phase 4) — §3.5
+// ============================
+
+export const researchApi = {
+  /** → 202 {job_id, task_id, status:'queued'} */
+  create: (data) => apiFetch('/api/ai/research', {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/ai/research${qs ? '?' + qs : ''}`);
+  },
+  get: (jobId) => apiFetch(`/api/ai/research/${jobId}`),
+};
+
+// ============================
+// Artifacts API (Phase 4) — §3.6
+// ============================
+
+export const artifactApi = {
+  /** Queue tải artifact về 04_Ket_Qua_Xuat_Ban → 202 {task_id} */
+  download: (data) => apiFetch('/api/ai/artifact/download', {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+  /** Files is_output===true */
+  list: (courseId = '') => {
+    const qs = courseId ? `?course_id=${encodeURIComponent(courseId)}` : '';
+    return apiFetch(`/api/ai/artifacts${qs}`);
+  },
+};
+
+// ============================
+// Exam API (Phase 4) — §3.7
+// ============================
+
+export const examApi = {
+  /** Tạo đề: 50 flashcard + 5 tự luận → 202 {job_id, task_id} */
+  generate: (data) => apiFetch('/api/exam/sets/generate', {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+  /** List (không kèm flashcards/essays) */
+  list: (courseId = '') => {
+    const qs = courseId ? `?course_id=${encodeURIComponent(courseId)}` : '';
+    return apiFetch(`/api/exam/sets${qs}`);
+  },
+  /** Full set (đã JSON.parse) */
+  get: (id) => apiFetch(`/api/exam/sets/${id}`),
+  delete: (id) => apiFetch(`/api/exam/sets/${id}`, { method: 'DELETE' }),
+  /** Lưu điểm: {score, total, answers?} */
+  saveAttempt: (id, data) => apiFetch(`/api/exam/sets/${id}/attempt`, {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+};
+
+// ============================
+// Citation Engine API — §3.3
+// ============================
+
+export const citationsApi = {
+  /** {sources:[{title,authors,year,publisher,journal,url,doi,source_id,page}], style:'auto'|'apa7'|'ieee'|'harvard', inline:true} */
+  format: (data) => apiFetch('/api/ai/citations/format', {
+    method: 'POST', body: JSON.stringify(data),
+  }),
 };
 
 /**

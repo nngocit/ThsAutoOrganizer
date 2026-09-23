@@ -38,6 +38,10 @@
       <button class="nav-tab" data-tab="study-hub" id="tab-study-hub">🧠 AI Study Hub
         <span class="badge badge-synced" style="margin-left:4px; font-size:0.65rem">Plus</span>
       </button>
+      <button class="nav-tab" data-tab="chat" id="tab-chat">💬 Chat AI</button>
+      <button class="nav-tab" data-tab="review" id="tab-review">✅ Duyệt nguồn</button>
+      <button class="nav-tab" data-tab="exam" id="tab-exam">📝 Ôn thi</button>
+      <button class="nav-tab" data-tab="artifacts" id="tab-artifacts">📦 Artifacts</button>
       <button class="nav-tab" data-tab="settings" id="tab-settings">⚙ Cài đặt</button>
     </nav>
 
@@ -78,6 +82,17 @@
             <option value="unverified_web">🌐 Web</option>
             <option value="ket_qua">✅ Kết quả</option>
           </select>
+          <select id="filter-review" class="btn btn-ghost btn-sm">
+            <option value="">Mọi trạng thái duyệt</option>
+            <option value="unreviewed">🟡 Chờ duyệt</option>
+            <option value="approved">✓ Đã duyệt</option>
+            <option value="rejected">✗ Từ chối</option>
+          </select>
+          <select id="filter-output" class="btn btn-ghost btn-sm">
+            <option value="">Input + Output</option>
+            <option value="false">Chỉ Input</option>
+            <option value="true">⛔ Chỉ Output (NO-LOOP)</option>
+          </select>
         </div>
       </div>
 
@@ -116,6 +131,50 @@
       <div id="insights-grid"></div>
     </section>
 
+    <!-- ===== CHAT AI (Phase 3) ===== -->
+    <section class="page-section" id="page-chat" aria-labelledby="page-chat-title">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" id="page-chat-title">💬 Chat AI</h1>
+          <div class="section-subtitle">Hội thoại multi-turn với NotebookLM — chọn nguồn, nhận trích dẫn chuẩn APA/IEEE/Harvard</div>
+        </div>
+      </div>
+      <div id="chat-root"></div>
+    </section>
+
+    <!-- ===== DUYỆT NGUỒN (Phase 4) ===== -->
+    <section class="page-section" id="page-review" aria-labelledby="page-review-title">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" id="page-review-title">✅ Duyệt nguồn</h1>
+          <div class="section-subtitle">Nguồn từ Deep Research chờ kiểm duyệt trước khi đưa vào NotebookLM</div>
+        </div>
+      </div>
+      <div id="review-root"></div>
+    </section>
+
+    <!-- ===== ÔN THI (Phase 4) ===== -->
+    <section class="page-section" id="page-exam" aria-labelledby="page-exam-title">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" id="page-exam-title">📝 Trạm Ôn thi</h1>
+          <div class="section-subtitle">Đề ôn AI: 50 flashcard + 5 câu tự luận — cày quiz và lưu điểm</div>
+        </div>
+      </div>
+      <div id="exam-root"></div>
+    </section>
+
+    <!-- ===== ARTIFACTS (Phase 4) ===== -->
+    <section class="page-section" id="page-artifacts" aria-labelledby="page-artifacts-title">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" id="page-artifacts-title">📦 Artifacts</h1>
+          <div class="section-subtitle">Slide .pptx / tài liệu .docx do NotebookLM tạo — lưu trong 04_Ket_Qua_Xuat_Ban (⛔ NO-LOOP)</div>
+        </div>
+      </div>
+      <div id="artifacts-root"></div>
+    </section>
+
     <!-- ===== SETTINGS ===== -->
     <section class="page-section" id="page-settings" aria-labelledby="page-settings-title">
       <div class="page-header">
@@ -140,12 +199,20 @@ nlm login</pre>
 <script type="module">
   import { initDashboard } from './js/pages/dashboard.js';
   import { initStudyHub } from './js/pages/study_hub.js';
+  import { initChat } from './js/pages/chat.js';
+  import { initReview } from './js/pages/review.js';
+  import { initExam } from './js/pages/exam.js';
+  import { initArtifacts } from './js/pages/artifacts.js';
   import './js/app.js';
 
   // Init pages sau khi DOM ready (app.js xử lý auth và tab routing)
   document.addEventListener('DOMContentLoaded', () => {
     initDashboard();
     initStudyHub();
+    initChat();
+    initReview();
+    initExam();
+    initArtifacts();
   });
 </script>
 </body>

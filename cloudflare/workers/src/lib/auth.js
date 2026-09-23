@@ -83,3 +83,45 @@ export function requireAgentAuth(handler) {
     return handler(c);
   };
 }
+
+/**
+ * Chấp nhận CẢ HAI: `Authorization: Bearer <google_id_token>` (user web)
+ * hoặc `X-Agent-Secret: <AGENT_SECRET>` (Python agent).
+ * - Nhánh user: c.set('user', {...})
+ * - Nhánh agent: c.set('agent', true) + c.set('user', {uid: ''}) → uid lấy từ body.uid
+ *
+ * @param {Function} handler - Hono route handler (c) => Response
+ * @returns {Function} Wrapped handler
+ */
+export function requireAuthOrAgent(handler) {
+  return async (c) => {
+    const secret = c.req.header('X-Agent-Secret') || '';
+    const expected = c.env.AGENT_SECRET || '';
+    if (expected && secret && secret === expected) {
+      c.set('agent', true);
+      c.set('user', { uid: '', email: '', name: 'agent' });
+      return handler(c);
+    }
+
+    try {
+      const authHeader = c.req.header('Authorization') || '';
+      if (!authHeader.startsWith('Bearer ')) {
+        return c.json({
+          error: 'Unauthorized',
+          detail: 'Cần Bearer token của Google hoặc header X-Agent-Secret hợp lệ',
+        }, 401);
+      }
+      const user = await verifyIdToken(c.env, authHeader.slice(7));
+      c.set('user', user);
+      return handler(c);
+    } catch (err) {
+      return c.json({ error: 'Unauthorized', detail: err.message }, 401);
+    }
+  };
+}
+
+/** Lấy uid hiệu lực: token user ưu tiên, agent phải truyền uid tường minh */
+export function resolveTargetUid(c, bodyUid, queryUid) {
+  const user = c.get('user') || {};
+  return user.uid || bodyUid || queryUid || '';
+}

@@ -70,3 +70,14 @@ htmlcov/
 # Superpowers temporary session data
 .superpowers/
 
+
+# Root-level stray SQLite (legacy)
+database.db
+
+# Release housekeeping (contract §6.6)
+temp_test_slide.pptx
+.wrangler/
+cloudflare/pages/dist/
+--output
+cloudflare/workers/tmp_*.txt
+cloudflare/workers/tmp_*.mjs

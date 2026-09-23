@@ -2,7 +2,7 @@
 // Dùng Firebase REST API thay vì SDK — tương thích Cloudflare Worker edge runtime
 
 const FIRESTORE_BASE = (projectId) =>
-  `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+  `https://asia-southeast1-firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
 /** Lấy access token từ service account qua JWT Bearer assertion */
 async function getAccessToken(serviceAccount) {
@@ -13,7 +13,7 @@ async function getAccessToken(serviceAccount) {
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/cloud-platform',
   };
   const header = { alg: 'RS256', typ: 'JWT' };
   const enc = (obj) =>
@@ -50,12 +50,16 @@ async function getAccessToken(serviceAccount) {
 /** Chuyển JS object sang Firestore document format */
 function toFirestoreDoc(obj) {
   const fields = {};
+  if (!obj || typeof obj !== 'object') return { fields };
+
   for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue; // Bỏ qua các field undefined
+
     if (typeof v === 'string') fields[k] = { stringValue: v };
     else if (typeof v === 'number' && Number.isInteger(v)) fields[k] = { integerValue: String(v) };
     else if (typeof v === 'number') fields[k] = { doubleValue: v };
     else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
-    else if (v === null || v === undefined) fields[k] = { nullValue: null };
+    else if (v === null) fields[k] = { nullValue: null };
     else fields[k] = { stringValue: JSON.stringify(v) };
   }
   return { fields };
@@ -93,14 +97,27 @@ export async function firestoreSet(env, path, data) {
   const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
   const token = await getAccessToken(sa);
   const body = toFirestoreDoc(data);
-  const fieldPaths = Object.keys(data).join(',');
-  const url = `${FIRESTORE_BASE(sa.project_id)}/${path}?updateMask.fieldPaths=${fieldPaths}`;
+
+  // Tạo updateMask.fieldPaths đúng chuẩn URLSearchParams của Google
+  const params = new URLSearchParams();
+  Object.keys(data).forEach(key => {
+    if (data[key] !== undefined) {
+      params.append('updateMask.fieldPaths', key);
+    }
+  });
+
+  const url = `${FIRESTORE_BASE(sa.project_id)}/${path}?${params.toString()}`;
+
   const resp = await fetch(url, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!resp.ok) throw new Error(`Firestore SET ${path} failed: ${resp.status}`);
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Firestore SET ${path} failed: ${resp.status} - ${errText}`);
+  }
   return resp.json();
 }
 

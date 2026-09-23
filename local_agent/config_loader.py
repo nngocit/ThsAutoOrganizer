@@ -7,7 +7,8 @@ from typing import Any
 
 # Mặc định — sẽ bị ghi đè bởi config.json
 _DEFAULTS: dict[str, Any] = {
-    "worker_url": "https://ths-organizer-api.workers.dev",
+    "worker_url": "https://ths-organizer-api.ths-organizer-nngocit.workers.dev",
+    # KHÔNG có default cho secret — bắt buộc phải có trong config.json hoặc env AGENT_SECRET
     "agent_secret": "",
     "poll_interval_seconds": 10,
     "task_queue_limit": 10,

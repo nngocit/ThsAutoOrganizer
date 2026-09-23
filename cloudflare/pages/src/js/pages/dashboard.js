@@ -1,7 +1,8 @@
 // cloudflare/pages/src/js/pages/dashboard.js — File list, upload UI, status badges (<200 lines)
 import { filesApi, coursesApi } from '../api.js';
-import { showToast } from '../app.js';
+import { showToast, onTabActivate } from '../app.js';
 import { renderFileUpload } from '../components/file_upload.js';
+import { REVIEW_STATUS_META } from '../constants.js';
 
 // Subject → emoji icon map
 const SUBJECT_ICONS = {
@@ -33,6 +34,13 @@ function renderFileCard(file) {
   const typeLabel = DOC_TYPE_LABELS[file.document_type] || file.document_type;
   const nlm = NLM_BADGE_MAP[file.notebooklm_sync_status] || NLM_BADGE_MAP.pending;
   const isNew = file.is_new;
+  // Badge kiểm duyệt nguồn (Phase 4) — bỏ qua khi not_applicable
+  const rv = REVIEW_STATUS_META[file.review_status];
+  const reviewBadge = (rv && file.review_status !== 'not_applicable')
+    ? `<span class="badge ${rv.cls}" title="Trạng thái kiểm duyệt">${rv.text}</span>` : '';
+  // Badge chống lặp cho file kết quả (04_Ket_Qua_Xuat_Ban)
+  const noLoopBadge = file.is_output
+    ? '<span class="badge badge-failed" title="File kết quả xuất bản — Inflow bỏ qua, không đồng bộ ngược">⛔ NO-LOOP</span>' : '';
 
   return `
     <div class="card file-card" data-id="${file.id}" data-sha="${file.sha256 || ''}">
@@ -48,6 +56,7 @@ function renderFileCard(file) {
       </div>
       <div class="flex gap-2 mt-4" style="flex-wrap:wrap; align-items:center">
         <span class="badge ${nlm.cls}"><span class="badge-dot"></span>${nlm.text}</span>
+        ${reviewBadge}${noLoopBadge}
         ${isNew ? '<span class="badge badge-new">Mới</span>' : ''}
         <span class="text-muted mono">${formatBytes(file.size_bytes)}</span>
       </div>
@@ -86,30 +95,32 @@ async function handleDeleteFile(fileId) {
   }
 }
 
+function currentFilters() {
+  const params = {
+    subject: document.getElementById('filter-subject')?.value || '',
+    document_type: document.getElementById('filter-doc-type')?.value || '',
+    review_status: document.getElementById('filter-review')?.value || '',
+    is_output: document.getElementById('filter-output')?.value || '',
+  };
+  // Bỏ param rỗng để URLSearchParams sạch
+  return Object.fromEntries(Object.entries(params).filter(([, v]) => v !== ''));
+}
+
 function initFilters() {
-  const subjectFilter = document.getElementById('filter-subject');
-  const typeFilter = document.getElementById('filter-doc-type');
-  if (subjectFilter) {
-    subjectFilter.addEventListener('change', () =>
-      loadFiles({ subject: subjectFilter.value, document_type: typeFilter?.value }));
-  }
-  if (typeFilter) {
-    typeFilter.addEventListener('change', () =>
-      loadFiles({ subject: subjectFilter?.value, document_type: typeFilter.value }));
-  }
+  ['filter-subject', 'filter-doc-type', 'filter-review', 'filter-output'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => loadFiles(currentFilters()));
+  });
 }
 
 export function initDashboard() {
   // Upload component
   const uploadArea = document.getElementById('upload-area');
   if (uploadArea) {
-    renderFileUpload(uploadArea, { onSuccess: () => loadFiles() });
+    renderFileUpload(uploadArea, { onSuccess: () => loadFiles(currentFilters()) });
   }
   initFilters();
   loadFiles();
 
-  // Refresh khi tab được activate
-  window.__onTabActivate = (tabId) => {
-    if (tabId === 'dashboard') loadFiles();
-  };
+  // Refresh khi tab được activate (registry trong app.js — không ghi đè page khác)
+  onTabActivate('dashboard', () => loadFiles(currentFilters()));
 }

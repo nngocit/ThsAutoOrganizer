@@ -11,7 +11,7 @@ from googleapiclient.http import MediaFileUpload  # type: ignore
 from google.oauth2.credentials import Credentials  # type: ignore
 
 from .config_loader import get
-from .cascade_delete import hard_delete_file
+from .cascade_delete import hard_delete_file, move_to_recycle_bin
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,71 @@ def _find_or_create_folder(service: Any, folder_name: str, parent_id: str | None
     folder = service.files().create(body=meta, fields="id").execute()
     logger.info("Đã tạo Drive folder: %s (id=%s)", folder_name, folder["id"])
     return folder["id"]
+
+
+def ensure_folder_path(service: Any, folder_path: str, root_name: str | None = None) -> str:
+    """Tạo folder lồng nhau trên Drive theo folder_path (vd 'a/b/c'). Trả về folder ID cuối."""
+    parent_id: str | None = None
+    if root_name:
+        parent_id = _find_or_create_folder(service, root_name)
+    for part in [p for p in (folder_path or "").replace("\\", "/").split("/") if p]:
+        parent_id = _find_or_create_folder(service, part, parent_id)
+    return parent_id or ""
+
+
+def upload_file(local_path: str | Path, folder_path: str = "", subject: str = "") -> dict:
+    """Upload file local lên Drive vào folder_path (tạo folder lồng nhau nếu thiếu).
+
+    Returns: {drive_file_id, name, size_bytes}
+    """
+    path = Path(local_path)
+    if not path.exists():
+        raise FileNotFoundError(f"File local không tồn tại: {path}")
+    service = _get_drive_service()
+    drive_root = get("drive_root_folder", "")
+    full_folder = f"{subject}/{folder_path}" if subject and folder_path else (subject or folder_path)
+    parent_id = ensure_folder_path(service, full_folder, drive_root or None) or None
+
+    mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    meta: dict[str, Any] = {"name": path.name}
+    if parent_id:
+        meta["parents"] = [parent_id]
+    media = MediaFileUpload(str(path), mimetype=mime, resumable=True)
+    created = service.files().create(body=meta, media_body=media, fields="id, name, size").execute()
+    logger.info("Đã upload Drive: %s -> %s (id=%s)", path.name, full_folder or "root", created["id"])
+    return {"drive_file_id": created["id"], "name": created.get("name", path.name),
+            "size_bytes": int(created.get("size") or path.stat().st_size)}
+
+
+def download_file(drive_file_id: str, dest_path: str | Path) -> Path:
+    """Tải file từ Drive về dest_path. Trả về Path đích."""
+    from googleapiclient.http import MediaIoBaseDownload  # type: ignore
+    service = _get_drive_service()
+    dest = Path(dest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    request = service.files().get_media(fileId=drive_file_id)
+    with open(dest, "wb") as fh:
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+    logger.info("Đã tải Drive file %s -> %s", drive_file_id, dest)
+    return dest
+
+
+def handle_soft_delete_local(task: dict) -> None:
+    """Bước 3 Cascade Delete: gửi file local vào Recycle Bin (fallback archive).
+
+    Task format: {action: "soft_delete_local", file_id: "...", local_path: "..."}
+    """
+    local_path = task.get("local_path", "")
+    if not local_path:
+        logger.warning("soft_delete_local task thiếu local_path — bỏ qua")
+        return
+    result = move_to_recycle_bin(local_path)
+    if not result.get("success"):
+        raise RuntimeError(f"soft_delete_local thất bại: {result.get('error', 'unknown')}")
+    logger.info("soft_delete_local OK (%s): %s", result.get("method"), local_path)
 
 
 def handle_move_to_archive(task: dict) -> None:
@@ -129,6 +194,7 @@ def handle_drive_task(task: dict) -> None:
     handlers = {
         "move_to_archive": handle_move_to_archive,
         "hard_delete": handle_hard_delete_drive,
+        "soft_delete_local": handle_soft_delete_local,
     }
     handler = handlers.get(action)
     if handler is None:

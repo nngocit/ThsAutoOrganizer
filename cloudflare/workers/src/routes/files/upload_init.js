@@ -1,24 +1,16 @@
 // src/routes/files/upload_init.js — Phase 1: Tạo Google Drive upload session (<150 lines)
 // Client gửi metadata → Worker tạo Drive resumable URL → Client upload trực tiếp vào Drive
+// NO-LOOP lớp 1: is_output = folder_path nằm trong 04_Ket_Qua_Xuat_Ban
 
 import { Hono } from 'hono';
 import { requireAuth } from '../../lib/auth.js';
-import { firestoreSet, firestoreList, fromFirestoreDoc } from '../../lib/firebase.js';
+import { firestoreSet } from '../../lib/firebase.js';
 import { withCors } from '../../lib/cors.js';
+import {
+  folderForDocType, defaultReviewStatus, isSupportedFile, extensionOf, isOutputFolder,
+} from '../../lib/folders.js';
 
 const router = new Hono();
-
-const SUPPORTED_EXTENSIONS = new Set([
-  '.pdf', '.docx', '.pptx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.mp3',
-]);
-
-const FOLDER_MAP = {
-  giao_trinh:     '01_Giao_Trinh_Goc',
-  slide:          '02_Slide_Giang_Day',
-  bai_bao:        '03_Tai_Lieu_Tham_Khao/01_Bai_Bao_Khoa_Hoc',
-  unverified_web: '03_Tai_Lieu_Tham_Khao/02_Unverified_Web',
-  ket_qua:        '04_Ket_Qua_Xuat_Ban',
-};
 
 /**
  * Tạo Google Drive resumable upload session.
@@ -81,15 +73,15 @@ router.post('/init', requireAuth(async (c) => {
       return withCors(c.json({ error: 'filename và subject là bắt buộc' }, 400), origin);
     }
 
-    // Validate extension
-    const ext = '.' + filename.split('.').pop().toLowerCase();
-    if (!SUPPORTED_EXTENSIONS.has(ext)) {
+    // Validate extension — dùng bảng hỗ trợ chung (§1)
+    if (!isSupportedFile(filename)) {
+      const ext = extensionOf(filename) || '(không rõ)';
       return withCors(c.json({ error: `Định dạng ${ext} không được hỗ trợ` }, 415), origin);
     }
 
     const docType = document_type || 'giao_trinh';
-    const folderPath = FOLDER_MAP[docType] || '01_Giao_Trinh_Goc';
-    const isOutput = docType === 'ket_qua';
+    const folderPath = folderForDocType(docType);
+    const isOutput = isOutputFolder(folderPath); // Lớp 1 NO-LOOP
     const mimeType = getMimeType(filename);
 
     // Tạo Drive resumable upload session (dùng user's access token)
@@ -115,6 +107,11 @@ router.post('/init', requireAuth(async (c) => {
       size_bytes: size_bytes ? String(size_bytes) : '0',
       sha256: '',
       drive_file_id: '',
+      local_path: '',
+      source_kind: 'web_upload',
+      review_status: defaultReviewStatus(docType),
+      review_note: '',
+      reviewed_at: '',
       notebooklm_source_id: '',
       notebooklm_sync_status: 'pending',
       user_email: user.email,
@@ -127,6 +124,7 @@ router.post('/init', requireAuth(async (c) => {
       upload_url: uploadUrl,
       expires_at: expiresAt,
       folder_path: folderPath,
+      is_output: isOutput,
       mime_type: mimeType,
     }, 201), origin);
   } catch (err) {

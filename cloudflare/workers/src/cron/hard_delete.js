@@ -2,6 +2,7 @@
 // Chạy hàng ngày lúc 02:00 UTC theo trigger trong wrangler.toml
 
 import { firestoreList, firestoreDelete, firestoreSet, fromFirestoreDoc } from '../lib/firebase.js';
+import { enqueueHardDelete } from '../lib/tasks.js';
 
 /**
  * Query tất cả archived_files có hard_delete_at <= now và xóa chúng.
@@ -44,6 +45,7 @@ export async function handleHardDelete(env) {
           user_email: fileData.user_email || '',
           uid: fileData.uid || '',
           drive_file_id: fileData.drive_file_id || '',
+          local_path: fileData.local_path || '',
           archived_at: fileData.archived_at || '',
           hard_deleted_at: now,
           backup_cloud_link: fileData.drive_file_id
@@ -51,17 +53,14 @@ export async function handleHardDelete(env) {
             : '',
         });
 
-        // Queue task cho Python agent để xóa file Drive vĩnh viễn
-        if (fileData.drive_file_id && fileData.uid) {
-          const taskId = crypto.randomUUID();
-          await firestoreSet(env, `drive_task_queue/${taskId}`, {
-            id: taskId,
-            action: 'hard_delete',
+        // Queue task cho Python agent: xoá vĩnh viễn cả file Drive + file local PC
+        if (fileData.uid) {
+          await enqueueHardDelete(env, {
             uid: fileData.uid,
-            file_id: fileData._id || '',
-            drive_file_id: fileData.drive_file_id,
-            status: 'pending',
-            created_at: now,
+            fileId: fileData._id || fileData._path?.split('/').pop() || '',
+            driveFileId: fileData.drive_file_id || '',
+            filename: fileData.filename || '',
+            localPath: fileData.local_path || '',
           });
         }
 

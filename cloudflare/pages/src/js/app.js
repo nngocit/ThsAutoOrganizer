@@ -2,7 +2,7 @@
 import { authApi } from './api.js';
 
 // Google OAuth 2.0 Client ID
-const GOOGLE_CLIENT_ID = '1010816280157-0mr97o9t142d0d16rr3itr9s9u138qkk.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '437903639644-img3tmoj4hdji3nkocknmitmk197k3lv.apps.googleusercontent.com';
 
 // ============================
 // Toast Notifications
@@ -25,6 +25,14 @@ export function showToast(message, type = 'info', duration = 3500) {
 // ============================
 // Tab Router
 // ============================
+
+// Registry: nhiều page cùng đăng ký handler (tránh ghi đè lẫn nhau)
+const _tabHandlers = {};
+
+/** Đăng ký handler chạy mỗi khi tab được activate (lazy-load page data) */
+export function onTabActivate(tabId, handler) {
+  _tabHandlers[tabId] = handler;
+}
 
 function activateTab(tabId) {
   // Update nav tabs
@@ -71,20 +79,25 @@ function renderApp(user) {
 
 window.handleGoogleCredentialResponse = async function (response) {
   const idToken = response.credential;
-  window._googleIdToken = idToken;  // Store for API calls
+  window._googleIdToken = idToken;  // Store in RAM
+  localStorage.setItem('ths_google_id_token', idToken); // <--- LƯU VÀO LOCALSTORAGE
+
   try {
     const user = await authApi.login(idToken);
+    localStorage.setItem('ths_user_data', JSON.stringify(user)); // Lưu thông tin user
     renderApp(user);
     showToast(`Chào mừng, ${user.name || user.email}!`, 'success');
   } catch (err) {
     showToast(`Đăng nhập thất bại: ${err.message}`, 'error');
-    window._googleIdToken = null;
+    signOut();
   }
 };
 
 function signOut() {
   window._googleIdToken = null;
   _currentUser = null;
+  localStorage.removeItem('ths_google_id_token'); // <--- XÓA LOCALSTORAGE
+  localStorage.removeItem('ths_user_data');
   renderAuthScreen();
   showToast('Đã đăng xuất.', 'info');
 }
@@ -99,7 +112,7 @@ async function checkNLMStatus() {
 
   // Kiểm tra Worker health (Worker sẽ check NLM status từ Firestore user profile)
   try {
-    const resp = await fetch('https://ths-organizer-api.workers.dev/health');
+    const resp = await fetch('https://ths-organizer-api.ths-organizer-nngocit.workers.dev/health');
     const data = await resp.json();
     if (data.status === 'ok') {
       badge.className = 'nlm-status-badge connected';
@@ -144,6 +157,21 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       google.accounts.id.prompt();   // Show One Tap nếu có session cũ
     }
+    // Khôi phục phiên đăng nhập nếu đã có token từ trước
+    const savedToken = localStorage.getItem('ths_google_id_token');
+    const savedUser = localStorage.getItem('ths_user_data');
+
+    if (savedToken && savedUser) {
+      try {
+        window._googleIdToken = savedToken;
+        const user = JSON.parse(savedUser);
+        renderApp(user);
+      } catch (e) {
+        signOut();
+      }
+    } else {
+      renderAuthScreen();
+    }
   };
   document.head.appendChild(script);
 
@@ -152,4 +180,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Expose activateTab để các pages có thể navigate
   window.activateTab = activateTab;
+  // Dispatch tới handler đã đăng ký trong registry
+  window.__onTabActivate = (tabId) => { _tabHandlers[tabId]?.(tabId); };
 });

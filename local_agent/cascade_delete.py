@@ -83,6 +83,16 @@ def move_to_recycle_bin(file_path: str | Path) -> dict:
         return {"success": False, "method": "failed", "error": str(e)}
 
 
+def resolve_local_path(subject: str, folder_path: str, filename: str) -> Path:
+    """Suy ra đường dẫn local tuyệt đối: <local_base_path>/<subject>/<folder_path>/<filename>.
+
+    folder_path có thể rỗng hoặc lồng nhau (vd '03_Tai_Lieu_Tham_Khao/01_Bai_Bao_Khoa_Hoc').
+    """
+    base = Path(get("local_base_path", "."))
+    parts = [p for p in (folder_path or "").replace("\\", "/").split("/") if p]
+    return base.joinpath(subject, *parts, filename) if subject else base.joinpath(*parts, filename)
+
+
 def hard_delete_file(file_path: str | Path) -> dict:
     """
     Xóa file vĩnh viễn (sau 90 ngày, được cron cấp phép).
