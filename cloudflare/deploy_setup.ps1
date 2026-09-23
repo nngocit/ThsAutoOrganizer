@@ -1,90 +1,74 @@
-#!/usr/bin/env pwsh
-# deploy_setup.ps1 — Script hướng dẫn deploy ThsAutoOrganizer lên Cloudflare
-# Chạy script này trong PowerShell THÔNG THƯỜNG (không qua IDE)
-# Cách chạy: .\cloudflare\deploy_setup.ps1
-
+param()
 Set-Location "$PSScriptRoot\workers"
 
-Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "  ThsAutoOrganizer — Deploy Setup" -ForegroundColor Cyan
-Write-Host "==================================================" -ForegroundColor Cyan
+Write-Host "ThsAutoOrganizer -- Deploy Setup" -ForegroundColor Cyan
+Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ─── BƯỚC 1: Cập nhật Wrangler ─────────────────────────────────────────────
-Write-Host "[BƯỚC 1] Cập nhật Wrangler lên v4..." -ForegroundColor Yellow
+# BUOC 1: Cap nhat Wrangler v4
+Write-Host "[1] Updating Wrangler to v4..." -ForegroundColor Yellow
 npm install --save-dev wrangler@4 --silent
-Write-Host "✓ Wrangler đã cập nhật" -ForegroundColor Green
+Write-Host "OK - Wrangler updated" -ForegroundColor Green
 Write-Host ""
 
-# ─── BƯỚC 2: Đăng nhập Cloudflare ──────────────────────────────────────────
-Write-Host "[BƯỚC 2] Đăng nhập Cloudflare..." -ForegroundColor Yellow
-Write-Host "         Trình duyệt sẽ tự mở. Đăng nhập tài khoản Cloudflare của bạn." -ForegroundColor Gray
+# BUOC 2: Dang nhap Cloudflare (mo browser)
+Write-Host "[2] Login to Cloudflare (browser will open)..." -ForegroundColor Yellow
 npx wrangler login
-Write-Host "✓ Đã đăng nhập Cloudflare" -ForegroundColor Green
+Write-Host "OK - Logged in" -ForegroundColor Green
 Write-Host ""
 
-# ─── BƯỚC 3: Tìm file Firebase Service Account ─────────────────────────────
-Write-Host "[BƯỚC 3] Firebase Service Account JSON" -ForegroundColor Yellow
+# BUOC 3: Firebase Service Account JSON
+Write-Host "[3] Firebase Service Account" -ForegroundColor Yellow
+Write-Host "    Get file from: Firebase Console -> Project Settings -> Service Accounts -> Generate new private key" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  Nếu chưa có file JSON, hãy tạo theo hướng dẫn:" -ForegroundColor Gray
-Write-Host "  1. Vào: https://console.firebase.google.com → Project của bạn" -ForegroundColor Gray
-Write-Host "  2. Project Settings → Service Accounts" -ForegroundColor Gray
-Write-Host "  3. Nhấn 'Generate new private key' → Download file .json" -ForegroundColor Gray
-Write-Host ""
-
-$jsonPath = Read-Host "Nhập đường dẫn đầy đủ tới file Firebase .json (vd: C:\Users\xuann\Downloads\firebase-key.json)"
-
+$jsonPath = Read-Host "    Enter full path to Firebase .json file"
 if (-not (Test-Path $jsonPath)) {
-    Write-Host "✗ File không tìm thấy: $jsonPath" -ForegroundColor Red
-    Write-Host "  Vui lòng kiểm tra lại đường dẫn." -ForegroundColor Red
+    Write-Host "ERROR: File not found: $jsonPath" -ForegroundColor Red
     exit 1
 }
-
-# Minify JSON (loại bỏ xuống dòng để paste vào wrangler)
-$jsonContent = Get-Content $jsonPath -Raw | ConvertFrom-Json | ConvertTo-Json -Compress
-Write-Host "✓ Đã đọc Firebase JSON ($($jsonContent.Length) ký tự)" -ForegroundColor Green
+$jsonRaw = Get-Content $jsonPath -Raw
+$jsonObj = $jsonRaw | ConvertFrom-Json
+$jsonMinified = $jsonObj | ConvertTo-Json -Compress -Depth 10
+Write-Host "    Read OK ($($jsonMinified.Length) chars)" -ForegroundColor Green
 Write-Host ""
 
-# ─── BƯỚC 4: Set tất cả secrets ────────────────────────────────────────────
-Write-Host "[BƯỚC 4] Set Wrangler Secrets..." -ForegroundColor Yellow
+# BUOC 4: Set secrets
+Write-Host "[4] Setting Wrangler secrets..." -ForegroundColor Yellow
 
-# FIREBASE_SERVICE_ACCOUNT
-Write-Host "  → FIREBASE_SERVICE_ACCOUNT" -ForegroundColor Gray
-$jsonContent | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
+Write-Host "    -> FIREBASE_SERVICE_ACCOUNT" -ForegroundColor Gray
+$jsonMinified | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
+
 Write-Host ""
+Write-Host "    -> GOOGLE_CLIENT_ID" -ForegroundColor Gray
+$gClientId = Read-Host "    Enter Google Client ID (ends with .apps.googleusercontent.com)"
+$gClientId | npx wrangler secret put GOOGLE_CLIENT_ID
 
-# GOOGLE_CLIENT_ID
-Write-Host "  → GOOGLE_CLIENT_ID" -ForegroundColor Gray
-$googleClientId = Read-Host "  Nhập Google Client ID (kết thúc bằng .apps.googleusercontent.com)"
-$googleClientId | npx wrangler secret put GOOGLE_CLIENT_ID
 Write-Host ""
+Write-Host "    -> GOOGLE_CLIENT_SECRET" -ForegroundColor Gray
+$gClientSecret = Read-Host "    Enter Google Client Secret"
+$gClientSecret | npx wrangler secret put GOOGLE_CLIENT_SECRET
 
-# GOOGLE_CLIENT_SECRET
-Write-Host "  → GOOGLE_CLIENT_SECRET" -ForegroundColor Gray
-$googleClientSecret = Read-Host "  Nhập Google Client Secret"
-$googleClientSecret | npx wrangler secret put GOOGLE_CLIENT_SECRET
 Write-Host ""
-
-# AGENT_SECRET
-Write-Host "  → AGENT_SECRET (tạo random nếu chưa có)" -ForegroundColor Gray
-$agentSecret = [System.Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-Write-Host "  Secret được tạo tự động: $agentSecret" -ForegroundColor Cyan
-Write-Host "  (Lưu lại secret này để dùng trong config.json của Python agent)" -ForegroundColor Gray
+Write-Host "    -> AGENT_SECRET (auto-generated)" -ForegroundColor Gray
+$bytes = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+$agentSecret = [System.Convert]::ToBase64String($bytes)
 $agentSecret | npx wrangler secret put AGENT_SECRET
+Write-Host "    AGENT_SECRET = $agentSecret" -ForegroundColor Cyan
+Write-Host "    (Save this! Add to config.json as agent_secret)" -ForegroundColor Gray
+
 Write-Host ""
 
-# ─── BƯỚC 5: Deploy Worker ─────────────────────────────────────────────────
-Write-Host "[BƯỚC 5] Deploy Cloudflare Worker..." -ForegroundColor Yellow
+# BUOC 5: Deploy Worker
+Write-Host "[5] Deploying Cloudflare Worker..." -ForegroundColor Yellow
 npx wrangler deploy src/index.js
 
 Write-Host ""
-Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "✅ Worker deployed thành công!" -ForegroundColor Green
+Write-Host "==================================" -ForegroundColor Cyan
+Write-Host "Worker deployed!" -ForegroundColor Green
 Write-Host ""
-Write-Host "AGENT_SECRET để dùng trong config.json:" -ForegroundColor Yellow
-Write-Host $agentSecret -ForegroundColor Cyan
+Write-Host "AGENT_SECRET: $agentSecret" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Bước tiếp theo — Deploy Cloudflare Pages:" -ForegroundColor Yellow
+Write-Host "Next step - Deploy Pages:" -ForegroundColor Yellow
 Write-Host "  cd ..\pages" -ForegroundColor Gray
 Write-Host "  npx wrangler pages deploy src --project-name=ths-organizer" -ForegroundColor Gray
-Write-Host "==================================================" -ForegroundColor Cyan
+Write-Host "==================================" -ForegroundColor Cyan
