@@ -171,3 +171,45 @@ def test_handle_source_add_track2_triggers_async_download():
         assert "drive_id_xyz" in call_kwargs.get("args", ())
 
 
+def test_sync_remote_config_updates_runtime_config():
+    """sync_remote_config kéo cấu hình từ Cloud và merge vào config runtime."""
+    from local_agent.config_loader import sync_remote_config, get
+
+    mock_remote = {
+        "config": {
+            "local_base_path": "E:\\New_Folder_2026",
+            "google_drive_root_folder_id": "remote_drive_root_999",
+            "file_watcher_enabled": True,
+        }
+    }
+
+    with patch("local_agent.api_client.get_system_config", return_value=mock_remote):
+        cfg = sync_remote_config()
+        assert cfg["local_base_path"] == "E:\\New_Folder_2026"
+        assert get("local_base_path") == "E:\\New_Folder_2026"
+        assert get("google_drive_root_folder_id") == "remote_drive_root_999"
+
+
+def test_send_log_posts_to_worker_api():
+    """send_log gọi _post tới /api/logs với payload đầy đủ."""
+    from local_agent.api_client import send_log
+
+    with patch("local_agent.api_client._post") as mock_post:
+        mock_post.return_value = {"status": "created", "log_id": "log_123"}
+        res = send_log(
+            level="ERROR",
+            module="nlm_task_handler",
+            message="Test error message",
+            subject="Triết học",
+            file_name="de_cuong.pdf",
+        )
+        assert res["status"] == "created"
+        mock_post.assert_called_once()
+        path, payload = mock_post.call_args[0]
+        assert path == "/api/logs"
+        assert payload["level"] == "ERROR"
+        assert payload["module"] == "nlm_task_handler"
+        assert payload["message"] == "Test error message"
+
+
+

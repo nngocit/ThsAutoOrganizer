@@ -14,6 +14,8 @@ import chatRouter from './routes/chat/index.js';
 import coursesRouter from './routes/courses/index.js';
 import syncRouter from './routes/sync/index.js';
 import examRouter from './routes/exam/index.js';
+import settingsRouter from './routes/settings/index.js';
+import logsRouter from './routes/logs/index.js';
 
 const app = new Hono();
 
@@ -41,6 +43,8 @@ app.route('/api/chat', chatRouter);   // chat sessions, messages, agent-reply, s
 app.route('/api/courses', coursesRouter);
 app.route('/api/tasks', syncRouter);
 app.route('/api/exam', examRouter);   // Trạm Ôn Thi (§3.7)
+app.route('/api/settings', settingsRouter); // Global Settings (§1)
+app.route('/api/logs', logsRouter);         // System Logs Dashboard (§2)
 
 // 404 fallback
 app.notFound((c) =>

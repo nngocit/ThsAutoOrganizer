@@ -246,7 +246,14 @@ def handle_source_add(task: dict) -> str:
             logger.warning("Lỗi khi tra cứu notebook theo subject %s: %s", subject, e)
 
     if not notebook_id:
-        raise ValueError(f"source_add task thiếu notebook_id (course_id={course_id!r}, subject={subject!r})")
+        msg = f"source_add task thiếu notebook_id (course_id={course_id!r}, subject={subject!r})"
+        try:
+            from .api_client import send_log
+            send_log(level="ERROR", module="nlm_task_handler", action="source_add",
+                     subject=subject, file_name=file_name, message=msg, context=task, uid=uid)
+        except Exception:
+            pass
+        raise ValueError(msg)
 
     # =========================================================================
     # TRACK 2 (CHẠY NGẦM / ASYNC): Tải file vật lý từ Drive xuống ổ cứng (Local Path)
@@ -298,7 +305,15 @@ def handle_source_add(task: dict) -> str:
     returncode, stdout, stderr = _run_nlm(args, timeout=660)
 
     if returncode != 0:
-        raise RuntimeError(f"nlm source add thất bại (code={returncode}): {stderr or stdout}")
+        msg = f"nlm source add thất bại (code={returncode}): {stderr or stdout}"
+        try:
+            from .api_client import send_log
+            send_log(level="ERROR", module="nlm_task_handler", action="source_add",
+                     subject=subject, file_name=file_name, message=msg, error_detail=stderr or stdout,
+                     context=task, uid=uid)
+        except Exception:
+            pass
+        raise RuntimeError(msg)
 
     data = _parse_nlm_json(stdout)
     source_id = data.get("source_id") or data.get("id") or ""

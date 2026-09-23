@@ -5,7 +5,7 @@ import logging
 import signal
 import sys
 
-from .config_loader import load_config, get
+from .config_loader import load_config, get, sync_remote_config
 from .firestore_poller import FirestorePoller
 from .nlm_task_handler import handle_source_add, handle_source_remove
 from .chat_task_handler import handle_chat_query
@@ -60,6 +60,14 @@ def main():
         sys.exit(1)
     if not cfg.get("agent_secret"):
         logger.warning("agent_secret trống — task queue API sẽ bị từ chối")
+
+    # Kéo cấu hình Global Settings từ Firestore (bảng system_config)
+    try:
+        cfg = sync_remote_config()
+        logger.info("Đã đồng bộ Global Settings từ Cloud Firestore (local_base_path=%s, drive_root=%s)",
+                    cfg.get("local_base_path"), cfg.get("google_drive_root_folder_id"))
+    except Exception as e:
+        logger.warning("Không thể nạp remote config (dùng local fallback): %s", e)
 
     logger.info("ThsAutoOrganizer Local Agent khởi động")
     logger.info("Worker URL: %s", worker_url)

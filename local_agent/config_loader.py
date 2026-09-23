@@ -68,3 +68,26 @@ def get_config() -> dict[str, Any]:
 def get(key: str, default: Any = None) -> Any:
     """Lấy một giá trị cấu hình theo key."""
     return get_config().get(key, default)
+
+
+def sync_remote_config(uid: str = "") -> dict[str, Any]:
+    """Kéo cấu hình từ Worker API (Firestore system_config) và merge vào runtime config."""
+    global _config
+    cfg = get_config()
+    try:
+        from . import api_client
+        res = api_client.get_system_config(uid=uid)
+        remote_cfg = res.get("config", {})
+        if remote_cfg:
+            # Ghi đè các key cấu hình quan trọng từ Cloud
+            for k in ("local_base_path", "google_drive_root_folder_id", "google_drive_root_name",
+                      "file_watcher_enabled", "auto_sync_nlm", "poll_interval_seconds"):
+                if k in remote_cfg and remote_cfg[k] is not None:
+                    cfg[k] = remote_cfg[k]
+            _config = cfg
+            return cfg
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).debug("sync_remote_config không thành công (dùng local fallback): %s", e)
+    return cfg
+

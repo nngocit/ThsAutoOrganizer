@@ -145,3 +145,42 @@ def get_course(course_id: str, uid: str = "") -> dict[str, Any]:
     target_uid = uid or get("uid", "") or get("root_account_email", "")
     query = f"?uid={target_uid}" if target_uid else ""
     return _request("GET", f"/api/courses/{course_id}{query}")
+
+
+def get_system_config(uid: str = "") -> dict[str, Any]:
+    """GET /api/settings/config — nạp cấu hình hệ thống từ Firestore."""
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    query = f"?uid={target_uid}" if target_uid else ""
+    return _request("GET", f"/api/settings/config{query}")
+
+
+def update_system_config(config_data: dict, uid: str = "") -> dict[str, Any]:
+    """PUT /api/settings/config — cập nhật cấu hình hệ thống lên Firestore."""
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    query = f"?uid={target_uid}" if target_uid else ""
+    return _request("PUT", f"/api/settings/config{query}", config_data)
+
+
+def send_log(*, level: str = "ERROR", module: str = "", message: str = "",
+             error_detail: str = "", action: str = "", subject: str = "",
+             file_name: str = "", context: dict | None = None, uid: str = "") -> dict[str, Any]:
+    """POST /api/logs — đẩy log lỗi / sự cố từ Local Agent lên Cloud."""
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    payload: dict[str, Any] = {
+        "level": level,
+        "source": "local_agent",
+        "module": module,
+        "message": message,
+        "error_detail": error_detail,
+        "action": action,
+        "subject": subject,
+        "file_name": file_name,
+        "context": context or {},
+    }
+    if target_uid:
+        payload["uid"] = target_uid
+    try:
+        return _post("/api/logs", payload)
+    except Exception as e:
+        logger.warning("Không thể gửi log lên Worker API: %s", e)
+        return {"error": str(e)}

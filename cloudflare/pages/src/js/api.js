@@ -247,6 +247,39 @@ export const citationsApi = {
   }),
 };
 
+// ============================
+// Settings API — §3.8
+// ============================
+
+export const settingsApi = {
+  /** Lấy cấu hình hệ thống hiện tại */
+  getConfig: () => apiFetch('/api/settings/config'),
+  /** Cập nhật cấu hình hệ thống */
+  updateConfig: (data) => apiFetch('/api/settings/config', {
+    method: 'PUT', body: JSON.stringify(data),
+  }),
+};
+
+// ============================
+// System Logs API — §3.9
+// ============================
+
+export const logsApi = {
+  /** Danh sách logs: level, source, resolved, limit */
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/logs${qs ? '?' + qs : ''}`);
+  },
+  /** Ghi log sự cố mới */
+  create: (data) => apiFetch('/api/logs', {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+  /** Đánh dấu log đã được giải quyết/khắc phục */
+  resolve: (logId) => apiFetch(`/api/logs/${logId}/resolve`, {
+    method: 'PATCH',
+  }),
+};
+
 /**
  * Tính SHA-256 của File object phía client (Web Crypto API).
  * @param {File} file
@@ -259,3 +292,4 @@ export async function computeSHA256(file) {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
+

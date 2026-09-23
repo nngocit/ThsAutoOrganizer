@@ -209,17 +209,154 @@
         <div id="artifacts-root"></div>
       </section>
 
-      <!-- ===== SETTINGS ===== -->
+      <!-- ===== SETTINGS & OBSERVABILITY ===== -->
       <section class="page-section" id="page-settings" aria-labelledby="page-settings-title">
         <div class="page-header">
-          <h1 class="page-title" id="page-settings-title">⚙ Cài đặt</h1>
+          <div>
+            <h1 class="page-title" id="page-settings-title">⚙ Cài đặt & Giám sát Hệ thống</h1>
+            <div class="section-subtitle">Quản lý đường dẫn đồng bộ toàn cục và theo dõi nhật ký sự cố theo thời gian thực</div>
+          </div>
+          <div id="settings-status" class="text-muted" style="font-size:0.8rem">Đang sẵn sàng</div>
         </div>
-        <div class="card" style="max-width:600px">
-          <div style="font-weight:600; margin-bottom:14px">🔗 Cấu hình NotebookLM MCP</div>
-          <p class="text-muted" style="margin-bottom:12px">Để kích hoạt đồng bộ NotebookLM Plus, chạy lệnh sau trong terminal:</p>
-          <pre class="mono" style="background:var(--bg-elevated); padding:12px; border-radius:var(--r-sm); overflow-x:auto; border:1px solid var(--border)">pip install notebooklm-mcp-cli
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4); margin-bottom:var(--sp-6)">
+          <!-- Cột Trái: Cấu hình Toàn cục -->
+          <div class="card">
+            <div style="font-weight:600; font-size:1.05rem; margin-bottom:12px; display:flex; align-items:center; gap:8px">
+              <span>🌐</span> Cấu hình Đồng bộ Toàn cục
+            </div>
+            <form id="settings-form">
+              <div class="form-group">
+                <label class="form-label" for="cfg-local-base-path">
+                  <span>📂 Đường dẫn Thư mục Cục bộ (Local Base Path):</span>
+                </label>
+                <input type="text" id="cfg-local-base-path" class="form-input" 
+                       placeholder="Ví dụ: H:\2026\Thac Sy\Mon_Hoc hoặc /Users/name/Study">
+                <div class="form-help">Local Agent trên máy sẽ theo dõi thư mục này. Không còn bị hardcode đường dẫn ổ đĩa.</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="cfg-drive-root-id">
+                  <span>☁️ Google Drive Root Folder ID:</span>
+                </label>
+                <input type="text" id="cfg-drive-root-id" class="form-input"
+                       placeholder="Ví dụ: 14o_r2s9d80Wz27q7tK8_Jc_...">
+                <div class="form-help">ID thư mục gốc trên Google Drive nơi chứa các thư mục môn học.</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="cfg-drive-root-name">
+                  <span>📁 Tên Thư mục Gốc Drive:</span>
+                </label>
+                <input type="text" id="cfg-drive-root-name" class="form-input" value="02_Mon_Hoc">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="cfg-poll-interval">
+                  <span>⏱️ Chu kỳ Thăm dò Hàng đợi (Giây):</span>
+                </label>
+                <input type="number" id="cfg-poll-interval" class="form-input" min="3" max="300" value="10">
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:10px; margin:16px 0">
+                <label class="form-checkbox-row">
+                  <input type="checkbox" id="cfg-file-watcher-enabled" checked>
+                  <span>Bật Tự động quét file mới trong thư mục (File Watcher)</span>
+                </label>
+                <label class="form-checkbox-row">
+                  <input type="checkbox" id="cfg-auto-sync-nlm" checked>
+                  <span>Bật Tự động nạp tài liệu vào Google NotebookLM (Auto-Sync NLM)</span>
+                </label>
+              </div>
+
+              <div class="flex items-center justify-between mt-4">
+                <button type="submit" class="btn btn-primary" id="btn-save-settings">💾 Lưu Cấu hình</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Cột Phải: Hướng dẫn Khởi chạy & NotebookLM MCP -->
+          <div class="flex flex-col gap-4">
+            <div class="card">
+              <div style="font-weight:600; font-size:1.05rem; margin-bottom:10px; display:flex; align-items:center; gap:8px">
+                <span>🔗</span> Kết nối NotebookLM MCP & Local Agent
+              </div>
+              <p class="text-muted" style="margin-bottom:10px; font-size:0.85rem">
+                Để kích hoạt đồng bộ tài liệu vào NotebookLM Plus, hãy đảm bảo bạn đã cài đặt MCP CLI và đăng nhập trên máy tính:
+              </p>
+              <pre class="mono" style="background:var(--bg-elevated); padding:10px 12px; border-radius:var(--r-sm); overflow-x:auto; border:1px solid var(--border); font-size:0.8rem">pip install notebooklm-mcp-cli
 nlm login</pre>
-          <p class="text-muted" style="margin-top:12px; font-size:0.85rem">Sau khi đăng nhập, Python Local Agent sẽ tự động đồng bộ tài liệu vào đúng Notebook.</p>
+              <div class="alert-callout info" style="margin-top:12px; width:100%">
+                <span class="alert-callout-icon">💡</span>
+                <span>Local Agent tự động tải cấu hình từ trang này khi khởi động và ghi nhận nhật ký lỗi trực tiếp lên Đám mây.</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div style="font-weight:600; font-size:1.05rem; margin-bottom:8px; display:flex; align-items:center; gap:8px">
+                <span>🤖</span> Trạng thái Khởi động Local Agent
+              </div>
+              <p class="text-muted" style="font-size:0.82rem; margin-bottom:8px">
+                Chạy lệnh sau tại thư mục gốc của dự án để khởi chạy agent giám sát:
+              </p>
+              <pre class="mono" style="background:var(--bg-elevated); padding:8px 12px; border-radius:var(--r-sm); overflow-x:auto; border:1px solid var(--border); font-size:0.8rem">python -m local_agent.main</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Khối Giám sát Hệ thống: System Logs Dashboard -->
+        <div class="card" style="margin-top:var(--sp-5)">
+          <div class="flex items-center justify-between" style="margin-bottom:14px; flex-wrap:wrap; gap:10px">
+            <div class="flex items-center gap-2">
+              <div style="font-weight:600; font-size:1.1rem; display:flex; align-items:center; gap:8px">
+                <span>📊</span> Nhật ký Hoạt động & Bảng Giám sát Lỗi
+              </div>
+              <span id="logs-count-badge" class="badge badge-synced">0 bản ghi</span>
+            </div>
+
+            <!-- Bộ lọc logs -->
+            <div class="flex items-center gap-2">
+              <select id="filter-log-level" class="btn btn-ghost btn-sm">
+                <option value="">Tất cả Cấp độ</option>
+                <option value="ERROR">🔴 Chỉ Lỗi (ERROR)</option>
+                <option value="WARN">🟡 Cảnh báo (WARN)</option>
+                <option value="INFO">🔵 Thông tin (INFO)</option>
+              </select>
+
+              <select id="filter-log-status" class="btn btn-ghost btn-sm">
+                <option value="">Tất cả Trạng thái</option>
+                <option value="false">⚠️ Đang mở (Chưa xử lý)</option>
+                <option value="true">✅ Đã giải quyết</option>
+              </select>
+
+              <button class="btn btn-ghost btn-sm" id="btn-refresh-logs" title="Tải lại nhật ký">
+                🔄 Làm mới
+              </button>
+            </div>
+          </div>
+
+          <!-- Bảng danh sách Logs -->
+          <div class="logs-table-container">
+            <table class="logs-table">
+              <thead>
+                <tr>
+                  <th style="width:130px">Thời gian</th>
+                  <th style="width:100px">Mức độ</th>
+                  <th style="width:180px">Nguồn / Module</th>
+                  <th>Thông điệp & Sự cố</th>
+                  <th style="width:130px">Trạng thái</th>
+                  <th style="width:130px">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="logs-table-body">
+                <tr>
+                  <td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted)">
+                    Đang nạp nhật ký hệ thống...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -252,6 +389,53 @@ nlm login</pre>
   </div>
 </div>
 
+<!-- Modal Chi Tiết Lỗi & Sự Cố -->
+<div id="system-log-modal" class="modal-backdrop hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">🔍 Chi tiết Sự cố Hệ thống</div>
+      <button class="btn-icon btn-sm" onclick="document.getElementById('system-log-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="flex items-center justify-between" style="padding-bottom:8px; border-bottom:1px solid var(--border-subtle)">
+        <div>
+          <span id="modal-log-level" class="log-badge error">ERROR</span>
+          <span id="modal-log-source" class="mono" style="margin-left:8px; font-size:0.8rem; color:var(--text-muted)"></span>
+        </div>
+        <div id="modal-log-time" style="font-size:0.78rem; color:var(--text-muted)"></div>
+      </div>
+
+      <div>
+        <div class="form-label">Thông điệp chính:</div>
+        <div id="modal-log-message" style="font-weight:600; color:var(--text); margin-top:2px"></div>
+      </div>
+
+      <div>
+        <div class="form-label">Tài liệu / Tên file liên quan:</div>
+        <div id="modal-log-file" class="mono" style="font-size:0.82rem; color:var(--primary); margin-top:2px"></div>
+      </div>
+
+      <div>
+        <div class="form-label">Chi tiết Lỗi & Stack Trace:</div>
+        <pre id="modal-log-detail" class="mono" style="background:var(--bg-elevated); padding:10px 12px; border-radius:var(--r-sm); overflow-x:auto; border:1px solid var(--border); font-size:0.75rem; color:#f87171; max-height:220px"></pre>
+      </div>
+
+      <div>
+        <div class="form-label">Ngữ cảnh kỹ thuật (Context):</div>
+        <pre id="modal-log-context" class="mono" style="background:var(--bg-elevated); padding:8px 12px; border-radius:var(--r-sm); overflow-x:auto; border:1px solid var(--border); font-size:0.75rem; color:var(--text-muted); max-height:140px"></pre>
+      </div>
+
+      <div style="font-size:0.72rem; color:var(--text-muted)">
+        ID sự cố: <span id="modal-log-id" class="mono"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-close-log-modal">Đóng</button>
+      <button class="btn btn-primary" id="btn-modal-resolve-log">✓ Đánh dấu đã giải quyết</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container" class="toast-container"></div>
 
@@ -263,6 +447,7 @@ nlm login</pre>
   import { initReview } from './js/pages/review.js';
   import { initExam } from './js/pages/exam.js';
   import { initArtifacts } from './js/pages/artifacts.js';
+  import { initSettings } from './js/pages/settings.js';
   import './js/app.js';
 
   // Init pages sau khi DOM ready (app.js xử lý auth và tab routing)
@@ -273,6 +458,7 @@ nlm login</pre>
     initReview();
     initExam();
     initArtifacts();
+    initSettings();
   });
 </script>
 </body>
