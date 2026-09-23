@@ -23,6 +23,11 @@
     <!-- Google Sign-In button (rendered by GSI SDK) -->
     <div id="google-signin-btn"></div>
     <p class="text-muted" style="font-size:0.8rem; margin-top:4px">Đăng nhập bằng tài khoản Google có quyền truy cập</p>
+    <div style="margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 10px; width: 100%; text-align: center;">
+      <button id="btn-auth-version" class="btn-version-link" type="button">
+        🚀 Phiên bản v2.1.0 — Three-Way Sync Architecture (Release Notes)
+      </button>
+    </div>
   </div>
 </div>
 
@@ -39,6 +44,10 @@
         <span class="brand-title">ThsAutoOrganizer</span>
         <span class="badge-studio">Studio</span>
       </div>
+      <button id="btn-release-notes" class="badge-version" title="Xem thông tin phiên bản & Release Notes" type="button">
+        <span class="version-dot"></span>
+        <span>v2.1.0</span>
+      </button>
       <span id="nlm-status-badge" class="nlm-status-badge needs-login">
         <span class="badge-dot"></span> Đang kết nối...
       </span>
@@ -277,6 +286,26 @@
 
           <!-- Cột Phải: Hướng dẫn Khởi chạy & NotebookLM MCP -->
           <div class="flex flex-col gap-4">
+            <!-- Phiên bản & Kiến trúc Hệ thống -->
+            <div class="card" style="border: 1px solid rgba(59, 130, 246, 0.35); background: linear-gradient(180deg, rgba(59, 130, 246, 0.06) 0%, transparent 100%);">
+              <div class="flex items-center justify-between" style="flex-wrap:wrap; gap:8px">
+                <div class="flex items-center gap-2">
+                  <span style="font-size:1.3rem">🚀</span>
+                  <div>
+                    <div style="font-weight:600; font-size:0.95rem; color:var(--text); display:flex; align-items:center; gap:8px">
+                      ThsAutoOrganizer <span class="badge-version" style="font-size:0.72rem">v2.1.0</span>
+                    </div>
+                    <div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px">
+                      Kiến trúc Three-Way Sync (Web UI • Cloudflare Worker • Drive • Local Agent)
+                    </div>
+                  </div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="btn-settings-release-notes" type="button">
+                  📋 Xem Release Notes
+                </button>
+              </div>
+            </div>
+
             <div class="card">
               <div style="font-weight:600; font-size:1.05rem; margin-bottom:10px; display:flex; align-items:center; gap:8px">
                 <span>🔗</span> Kết nối NotebookLM MCP & Local Agent
@@ -432,6 +461,102 @@ nlm login</pre>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="btn-close-log-modal">Đóng</button>
       <button class="btn btn-primary" id="btn-modal-resolve-log">✓ Đánh dấu đã giải quyết</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ghi chú Phát hành (Release Notes) -->
+<div id="release-notes-modal" class="modal-backdrop hidden">
+  <div class="modal-content" style="max-width: 740px;">
+    <div class="modal-header">
+      <div class="flex items-center gap-2">
+        <span style="font-size:1.25rem">🚀</span>
+        <div class="modal-title">Nhật ký Phát hành (Release Notes)</div>
+      </div>
+      <button class="btn-icon btn-sm" id="btn-close-release-modal" type="button">✕</button>
+    </div>
+    <div class="modal-body" style="gap: 16px; padding: 20px;">
+      <!-- Version Hero Banner -->
+      <div class="release-hero">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="release-badge-current">Phiên bản Sản phẩm</span>
+            <span style="font-weight: 700; font-size: 1.18rem; color: var(--text);">v2.1.0</span>
+            <span class="badge badge-synced">Mới nhất</span>
+          </div>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">24/09/2026</span>
+        </div>
+        <div style="font-size: 0.88rem; color: var(--text); margin-top: 8px; line-height: 1.5;">
+          <strong>Three-Way Sync Architecture & SOLID Clean Workers:</strong> Triển khai kiến trúc luồng dữ liệu 3 chiều thông suốt giữa Web UI, Cloudflare Worker (Service Account), Google Drive và Local Agent; thanh lọc toàn bộ mã nguồn thừa và khôi phục Golden Baseline chuẩn xác.
+        </div>
+      </div>
+
+      <!-- Feature Details -->
+      <div class="release-section">
+        <div class="release-section-title">
+          <span>🔄</span> 1. Thiết kế Luồng Dữ liệu 3 Chiều (Three-Way Sync Flows)
+        </div>
+        <ul class="release-list">
+          <li>
+            <strong>Master Creation Flow (Tạo mới Môn học):</strong> Người dùng tạo môn học trên Web UI -> Cloudflare Worker dùng Service Account JWT tự động tạo thư mục trên Google Drive 24/7 -> Lưu Firestore ở trạng thái <code>pending</code> -> Local Agent ở nhà tự động chạy lệnh <code>nlm notebook create</code> lấy NotebookLM ID và tạo cây thư mục vật lý <code>H:\2026\Thac Sy\Mon...</code>.
+          </li>
+          <li>
+            <strong>Web-to-Cloud-to-Local Upload Flow (Tải lên Tài liệu):</strong> Cho phép upload trực tiếp tài liệu từ Web UI -> Cloudflare Worker stream dữ liệu lên Google Drive, gán quyền Public Reader -> Tạo hàng đợi task <code>source_add</code> -> Local Agent nạp file vào NotebookLM Plus và sao lưu về máy tính.
+          </li>
+          <li>
+            <strong>Reconciliation & Auto-Discovery Flow (Đối soát & Quét tự động):</strong> Cung cấp API đối soát toàn diện giữa Google Drive và Firestore, hỗ trợ nhập nhanh (1-click import) các môn học sẵn có trên Google Drive thành môn học chính thức.
+          </li>
+        </ul>
+      </div>
+
+      <div class="release-section">
+        <div class="release-section-title">
+          <span>⚡</span> 2. Tinh gọn Mã nguồn Workers Chuẩn SOLID (Clean Workers)
+        </div>
+        <ul class="release-list">
+          <li>
+            <strong>Xóa sạch Code Rác & Trùng lặp:</strong> Xóa bỏ hoàn toàn các file và endpoint thừa (<code>routes/insights/</code>, <code>upload_init.js</code>, <code>upload_complete.js</code>, cấu hình notebook hardcode).
+          </li>
+          <li>
+            <strong>Google Drive Client Tinh gọn (<code>src/lib/drive.js</code>):</strong> Sử dụng Web Crypto API thuần chạy trực tiếp trên Cloudflare Workers Edge, xác thực Google Service Account JWT 24/7 không cần User OAuth refresh token.
+          </li>
+          <li>
+            <strong>Phân rã Router Độc lập:</strong> Chuẩn hóa các route <code>/api/courses</code>, <code>/api/files/upload</code>, <code>/api/sync</code>, <code>/api/ai/insights</code> theo đúng nguyên tắc Single Responsibility.
+          </li>
+        </ul>
+      </div>
+
+      <div class="release-section">
+        <div class="release-section-title">
+          <span>🛡️</span> 3. Khôi phục Nền tảng Cốt lõi (Golden Baseline Core v2.0)
+        </div>
+        <ul class="release-list">
+          <li>
+            <strong>Nguyên tắc Zero-Noise:</strong> File chạy chính <code>main.py</code> đã được khôi phục về trạng thái sạch tuyệt đối: chỉ in ĐÚNG 5 dòng log khởi tạo hệ thống (Config, MCP, Firebase, Auth email, Cloudflare ping) và thoát với mã lỗi 0.
+          </li>
+          <li>
+            <strong>Kiểm thử Tự động Hóa 100%:</strong> Đạt 10/10 test Vitest cho Cloudflare Workers và 28/28 test Pytest cho Local Agent & Golden Baseline.
+          </li>
+        </ul>
+      </div>
+
+      <!-- History -->
+      <details class="release-history">
+        <summary style="cursor:pointer; font-weight:600; font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">
+          📜 Xem lịch sử các phiên bản trước
+        </summary>
+        <div style="display:flex; flex-direction:column; gap:8px; padding-left:8px; font-size:0.82rem; color:var(--text-muted);">
+          <div><strong>v2.0.0 (23/09/2026):</strong> Tích hợp NotebookLM Plus MCP, thiết kế giao diện Google AI Studio Dark Theme, trung tâm kiểm tra ôn thi và xuất bản ấn phẩm.</div>
+          <div><strong>v1.0.0 (15/09/2026):</strong> Khởi tạo hệ thống AutoOrganizer, giám sát tài liệu tự động cho học viên Thạc sĩ HTTT.</div>
+        </div>
+      </details>
+    </div>
+    <div class="modal-footer" style="justify-content: space-between;">
+      <div class="flex items-center gap-2" style="font-size:0.78rem; color:var(--text-muted);">
+        <span class="version-dot"></span>
+        <span>Hệ thống sẵn sàng: Cloudflare Pages + Worker API</span>
+      </div>
+      <button class="btn btn-primary" id="btn-modal-dismiss-release" type="button">Đã hiểu</button>
     </div>
   </div>
 </div>

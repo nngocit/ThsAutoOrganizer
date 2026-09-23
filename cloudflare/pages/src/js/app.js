@@ -283,11 +283,34 @@ async function checkNLMStatus() {
 }
 
 // ============================
+// Release Notes Modal
+// ============================
+function initReleaseNotesModal() {
+  const modal = document.getElementById('release-notes-modal');
+  if (!modal) return;
+
+  const openModal = () => modal.classList.remove('hidden');
+  const closeModal = () => modal.classList.add('hidden');
+
+  document.getElementById('btn-release-notes')?.addEventListener('click', openModal);
+  document.getElementById('btn-auth-version')?.addEventListener('click', openModal);
+  document.getElementById('btn-settings-release-notes')?.addEventListener('click', openModal);
+
+  document.getElementById('btn-close-release-modal')?.addEventListener('click', closeModal);
+  document.getElementById('btn-modal-dismiss-release')?.addEventListener('click', closeModal);
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+}
+
+// ============================
 // Init
 // ============================
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initStudioLayout();
+  initReleaseNotesModal();
 
   const courseSelect = document.getElementById('global-course-select');
   if (courseSelect) {
