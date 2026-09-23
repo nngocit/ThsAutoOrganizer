@@ -576,7 +576,10 @@
           body: JSON.stringify({ display_name: name, local_folder_name: folder })
         });
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || data.detail || 'Lỗi tạo môn học');
+        if (!resp.ok) {
+          const errMsg = data.detail ? `${data.error}: ${data.detail}` : (data.error || 'Lỗi tạo môn học');
+          throw new Error(errMsg);
+        }
 
         showToast(`✓ Đã tạo môn '${name}'. Đang đồng bộ tới Local Agent!`, 'success');
         closeCreateCourseModal();

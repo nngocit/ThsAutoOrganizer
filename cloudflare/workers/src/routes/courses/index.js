@@ -109,7 +109,17 @@ router.post('/', requireAuth(async (c) => {
       driveFolderId = folderRes.id;
     } catch (driveErr) {
       console.error('Lỗi tạo thư mục Google Drive:', driveErr);
-      return withCors(c.json({ error: 'Không thể tạo thư mục môn học trên Google Drive', detail: driveErr.message }, 502), origin);
+      let detailMsg = driveErr.message;
+      if (driveErr.message.includes('has not been used in project') || driveErr.message.includes('disabled')) {
+        detailMsg = 'Google Drive API chưa được BẬT trên Google Cloud Console (Project 437903639644). Vui lòng nhấn nút BẬT (Enable) tại https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=437903639644 rồi thử lại.';
+      } else if (driveErr.message.includes('File not found') || driveErr.message.includes('404')) {
+        detailMsg = `Thư mục cha trên Google Drive (${rootFolderId}) không tìm thấy hoặc chưa chia sẻ quyền 'Người chỉnh sửa (Editor)' cho Service Account: firebase-adminsdk-fbsvc@thsautoorganizer.iam.gserviceaccount.com`;
+      }
+      return withCors(c.json({ 
+        error: 'Không thể tạo thư mục môn học trên Google Drive', 
+        detail: detailMsg,
+        raw_error: driveErr.message 
+      }, 502), origin);
     }
 
     const docId = crypto.randomUUID();
