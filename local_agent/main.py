@@ -15,6 +15,11 @@ from .exam_task_handler import handle_exam_generate
 from .drive_sync import handle_drive_task
 from .file_watcher import FileWatcher
 
+# Ép stdout/stderr về UTF-8 để log tiếng Việt không lỗi khi redirect sang file (Windows cp1252)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Thiết lập logging
 logging.basicConfig(
     level=logging.INFO,
