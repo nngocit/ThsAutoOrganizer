@@ -3,6 +3,7 @@
 
 import { firestoreSet } from './firebase.js';
 import { isOutputFolder } from './folders.js';
+import { resolveNotebookId } from './notebooks.js';
 
 export const NLM_QUEUE = 'nlm_task_queue';
 export const DRIVE_QUEUE = 'drive_task_queue';
@@ -35,12 +36,18 @@ export async function enqueueSourceAdd(env, { uid, fileId, courseId, notebookId,
     return null;
   }
   if (!uid || !fileId) return null;
+
+  let resolvedNbId = notebookId || '';
+  if (!resolvedNbId) {
+    resolvedNbId = await resolveNotebookId(env, uid, { courseId, subject });
+  }
+
   return enqueueTask(env, NLM_QUEUE, {
     action: 'source_add',
     uid,
     file_id: fileId,
     course_id: courseId || '',
-    notebook_id: notebookId || '',
+    notebook_id: resolvedNbId || '',
     filename: filename || '',
     subject: subject || '',
     // Agent cần các field này để resolve file vật lý (local trước, Drive fallback)

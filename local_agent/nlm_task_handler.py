@@ -83,6 +83,36 @@ def _resolve_source_file(task: dict) -> Path:
                      f"drive_file_id={drive_file_id!r})")
 
 
+def _resolve_notebook_id(subject: str) -> str:
+    """Tự động tìm Notebook trên Google NotebookLM theo tên môn học (subject)."""
+    if not _nlm_available() or not subject:
+        return ""
+    try:
+        import re
+        rc, stdout, stderr = _run_nlm(["notebook", "list"], timeout=30)
+        if rc == 0:
+            data = _parse_nlm_json(stdout)
+            notebooks = data if isinstance(data, list) else (data.get("notebooks", []) if isinstance(data, dict) else [])
+            if not notebooks:
+                try:
+                    notebooks = json.loads(stdout)
+                except Exception:
+                    pass
+            s_clean = re.sub(r"[^a-zA-Z0-9]", "", subject).lower()
+            if isinstance(notebooks, list):
+                for nb in notebooks:
+                    if isinstance(nb, dict):
+                        title = nb.get("title") or nb.get("name") or ""
+                        t_clean = re.sub(r"[^a-zA-Z0-9]", "", title).lower()
+                        if s_clean and (s_clean == t_clean or s_clean in t_clean or t_clean in s_clean):
+                            nb_id = nb.get("id") or ""
+                            logger.info("Tự động nhận diện Notebook cho môn %s: '%s' (id=%s)", subject, title, nb_id)
+                            return nb_id
+    except Exception as e:
+        logger.warning("Lỗi tự động tra cứu notebook cho môn %s: %s", subject, e)
+    return ""
+
+
 def handle_source_add(task: dict) -> str:
     """Xử lý action='source_add': nlm source add <notebook_id> --file <path> --wait --json.
 
@@ -93,10 +123,14 @@ def handle_source_add(task: dict) -> str:
         raise RuntimeError("nlm CLI không tìm thấy. Chạy: pip install notebooklm-mcp-cli")
 
     notebook_id = task.get("notebook_id", "")
+    subject = task.get("subject", "")
     filename = task.get("filename", "")
 
+    if not notebook_id and subject:
+        notebook_id = _resolve_notebook_id(subject)
+
     if not notebook_id:
-        raise ValueError("source_add task thiếu notebook_id")
+        raise ValueError(f"source_add task thiếu notebook_id (subject={subject!r})")
 
     ext = Path(filename or "").suffix.lower()
     if filename and ext not in SUPPORTED_NLM_EXTENSIONS:
