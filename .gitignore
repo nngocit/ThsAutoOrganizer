@@ -14,7 +14,8 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# Python packaging dist - scope root only
+/dist/
 downloads/
 eggs/
 .eggs/
