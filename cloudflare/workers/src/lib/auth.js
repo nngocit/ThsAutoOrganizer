@@ -122,9 +122,25 @@ export function requireAuthOrAgent(handler) {
 
 /** Lấy uid hiệu lực: token user ưu tiên, agent phải truyền uid tường minh hoặc cấu hình DEFAULT_UID */
 export function resolveTargetUid(c, bodyUid, queryUid) {
-  const user = c.get('user') || {};
-  return user.uid || bodyUid || queryUid || (c?.env?.DEFAULT_UID || '');
+  const user = c?.get ? (c.get('user') || {}) : {};
+  if (user && typeof user.uid === 'string' && user.uid.trim()) {
+    return user.uid.trim();
+  }
+  if (typeof bodyUid === 'string' && bodyUid.trim()) {
+    return bodyUid.trim();
+  }
+  if (bodyUid && typeof bodyUid.uid === 'string' && bodyUid.uid.trim()) {
+    return bodyUid.uid.trim();
+  }
+  if (typeof queryUid === 'string' && queryUid.trim()) {
+    return queryUid.trim();
+  }
+  if (c?.env?.DEFAULT_UID && typeof c.env.DEFAULT_UID === 'string' && c.env.DEFAULT_UID.trim()) {
+    return c.env.DEFAULT_UID.trim();
+  }
+  return '';
 }
+
 
 /** Fallback tìm uid từ collection users nếu agent không truyền và không có DEFAULT_UID */
 export async function getFallbackUid(env) {

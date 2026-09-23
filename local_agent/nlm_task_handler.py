@@ -418,10 +418,12 @@ def handle_course_create(task: dict) -> str:
     if course_id:
         try:
             from . import api_client
-            api_client._request("PUT", f"/api/courses/{course_id}/notebooklm", {
-                "notebooklm_id": notebooklm_id,
-                "status": "active",
-            })
+            api_client.update_course_notebooklm(
+                course_id=course_id,
+                notebooklm_id=notebooklm_id,
+                status="active",
+                uid=uid,
+            )
             logger.info("Đã cập nhật course %s lên Firestore: notebooklm_id=%s, status=active", course_id, notebooklm_id)
         except Exception as e:
             logger.warning("Cập nhật course qua API cảnh báo: %s", e)

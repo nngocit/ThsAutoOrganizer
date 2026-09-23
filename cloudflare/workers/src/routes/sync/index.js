@@ -16,9 +16,8 @@ const DEFAULT_DRIVE_ROOT = '1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg'; // ThacSi_HTTT r
  * So sánh thực tế trên Google Drive với danh sách môn học trên Firestore
  */
 router.get('/reconcile', requireAuthOrAgent(async (c) => {
-  const user = c.get('user');
   const origin = c.req.header('Origin') || '';
-  const targetUid = resolveTargetUid(c, user, c.req.query('uid')) || await getFallbackUid(c.env);
+  const targetUid = resolveTargetUid(c, null, c.req.query('uid')) || await getFallbackUid(c.env);
 
   if (!targetUid) {
     return withCors(c.json({ error: 'UID không xác định' }, 400), origin);
@@ -87,12 +86,12 @@ router.get('/reconcile', requireAuthOrAgent(async (c) => {
  * Import một thư mục phát hiện trên Drive thành Môn học chính thức
  */
 router.post('/import-drive-folder', requireAuthOrAgent(async (c) => {
-  const user = c.get('user');
   const origin = c.req.header('Origin') || '';
-  const targetUid = resolveTargetUid(c, user, c.req.query('uid')) || await getFallbackUid(c.env);
 
   try {
-    const { folder_id, folder_name, local_folder_name } = await c.req.json();
+    const body = await c.req.json();
+    const { folder_id, folder_name, local_folder_name, uid } = body;
+    const targetUid = resolveTargetUid(c, uid, c.req.query('uid')) || await getFallbackUid(c.env);
     if (!folder_id || !folder_name) {
       return withCors(c.json({ error: 'folder_id và folder_name là bắt buộc' }, 400), origin);
     }

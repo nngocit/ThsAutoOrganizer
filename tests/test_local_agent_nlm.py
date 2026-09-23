@@ -1,6 +1,7 @@
 # tests/test_local_agent_nlm.py — Test bộ lọc file và auto-lookup notebook_id
 
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from local_agent.nlm_task_handler import (
     SUPPORTED_EXTS,
@@ -266,6 +267,7 @@ def test_handle_course_create(tmp_path: Path):
         "course_id": "course_123",
         "display_name": "Kiến Trúc Phần Mềm",
         "local_folder_name": "Kien_Truc_Phan_Mem",
+        "uid": "user_test_456",
     }
     with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
          patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"id": "nb_ktpm_999"}', "")) as mock_run, \
@@ -280,13 +282,14 @@ def test_handle_course_create(tmp_path: Path):
         # Thư mục local phải được tạo ra
         created_folder = tmp_path / "Kien_Truc_Phan_Mem"
         assert created_folder.exists()
-        # API PUT /api/courses/:id/notebooklm phải được gọi
+        # API PUT /api/courses/:id/notebooklm phải được gọi kèm uid
         mock_api.assert_called_once()
         method, url, data = mock_api.call_args[0]
         assert method == "PUT"
-        assert "/api/courses/course_123/notebooklm" in url
+        assert "/api/courses/course_123/notebooklm?uid=user_test_456" in url
         assert data["notebooklm_id"] == "nb_ktpm_999"
         assert data["status"] == "active"
+        assert data["uid"] == "user_test_456"
 
 
 

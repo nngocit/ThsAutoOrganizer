@@ -96,6 +96,10 @@
         <div id="user-profile" class="hidden flex items-center gap-2 pl-2 border-l border-slate-800">
           <img id="user-avatar" class="w-8 h-8 rounded-full border border-slate-700" src="" alt="User" />
           <span id="user-name" class="text-xs font-medium text-slate-300 hidden lg:inline-block"></span>
+          <button onclick="openSettingsModal()" class="text-xs text-slate-300 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 shadow-sm" title="Cài đặt Google Drive & Hệ thống">
+            <span>⚙️</span>
+            <span class="hidden sm:inline font-medium">Cài đặt</span>
+          </button>
           <button onclick="signOut()" class="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20">
             Thoát
           </button>
@@ -346,6 +350,121 @@
             class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25 transition flex items-center gap-2"
           >
             <span>💾 Lưu & Khởi tạo</span>
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CÀI ĐẶT TÀI KHOẢN & GOOGLE DRIVE ==================== -->
+  <div id="modal-settings" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Close button -->
+      <button onclick="closeSettingsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-800 transition">
+        ✕
+      </button>
+
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+          ⚙️
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white">Cài Đặt Lưu Trữ & Google Drive</h3>
+          <p class="text-xs text-slate-400">Quản lý không gian Drive cá nhân và đường dẫn máy tính Local</p>
+        </div>
+      </div>
+
+      <!-- Account Badge info -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between mb-5 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">Tài khoản:</span>
+          <span id="settings-user-email" class="font-semibold text-white">Chưa đăng nhập</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="settings-user-status" class="text-emerald-400 font-medium">Sẵn sàng</span>
+        </div>
+      </div>
+
+      <!-- Settings Form -->
+      <form id="form-settings" onsubmit="handleSaveSettings(event)" class="space-y-4">
+        
+        <!-- Google Drive Section -->
+        <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-slate-200 uppercase tracking-wider">
+              📂 Thư Mục Gốc Google Drive Cá Nhân
+            </label>
+            <a id="settings-drive-link" href="#" target="_blank" class="hidden text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 underline">
+              <span>Mở Drive ↗</span>
+            </a>
+          </div>
+
+          <!-- Current Root Folder Info Card -->
+          <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div class="text-[11px] text-slate-400">Tên thư mục Drive hiện tại:</div>
+              <div id="settings-drive-name-display" class="text-sm font-semibold text-indigo-300">ThacSi_HTTT</div>
+            </div>
+            <button 
+              type="button" 
+              id="btn-provision-drive" 
+              onclick="handleProvisionDrive()" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-1.5 whitespace-nowrap"
+            >
+              <span>⚡ Tạo Thư Mục Riêng Tự Động</span>
+            </button>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">
+              Google Drive Root Folder ID (Tùy chỉnh thủ công):
+            </label>
+            <input 
+              type="text" 
+              id="settings-input-drive-id" 
+              placeholder="VD: 1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg" 
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-amber-300 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+            <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+              💡 <span class="text-slate-400">Mẹo:</span> Khi bấm <b>Tạo Thư Mục Riêng Tự Động</b>, hệ thống sẽ tự sinh thư mục riêng và phân quyền <i>Editor</i> cho email của bạn. Nếu nhập ID thủ công từ Drive của bạn, nhớ chia sẻ quyền Editor cho: <code class="text-blue-300 select-all">firebase-adminsdk-fbsvc@thsautoorganizer.iam.gserviceaccount.com</code>.
+            </p>
+          </div>
+        </div>
+
+        <!-- Local Path Section -->
+        <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2">
+          <label class="block text-xs font-semibold text-slate-200 uppercase tracking-wider">
+            💻 Đường Dẫn Thư Mục Local Trên PC
+          </label>
+          <input 
+            type="text" 
+            id="settings-input-local-path" 
+            placeholder="H:\2026\Thac Sy\Mon_Hoc" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-emerald-400 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          />
+          <p class="text-[11px] text-slate-500">
+            Nơi Local Agent tự động tạo các thư mục môn học vật lý khi được kích hoạt.
+          </p>
+        </div>
+
+        <!-- Footer Buttons -->
+        <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
+          <button 
+            type="button" 
+            onclick="closeSettingsModal()" 
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+          >
+            Đóng
+          </button>
+          <button 
+            type="submit" 
+            id="btn-save-settings"
+            class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25 transition flex items-center gap-2"
+          >
+            <span>💾 Lưu Cài Đặt</span>
           </button>
         </div>
       </form>
@@ -914,6 +1033,128 @@
       checkSavedUser();
       showToast('Đã đăng xuất tài khoản', 'info');
       loadCourses();
+    }
+
+
+    // ===== 7.5 SETTINGS MODAL CONTROLLERS =====
+    function openSettingsModal() {
+      const modal = document.getElementById('modal-settings');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      const token = getIdToken();
+      const emailElem = document.getElementById('settings-user-email');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (emailElem) emailElem.textContent = payload.email || payload.name || 'Đã xác thực';
+        } catch {
+          if (emailElem) emailElem.textContent = 'Đã xác thực';
+        }
+      } else {
+        if (emailElem) emailElem.textContent = 'Chưa đăng nhập (dùng cấu hình mặc định)';
+      }
+
+      loadSettingsConfig();
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('modal-settings')?.classList.add('hidden');
+    }
+
+    async function loadSettingsConfig() {
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/settings/config`, {
+          headers: buildHeaders()
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const res = await resp.json();
+        if (res.config) {
+          const cfg = res.config;
+          const driveIdInput = document.getElementById('settings-input-drive-id');
+          const driveNameElem = document.getElementById('settings-drive-name-display');
+          const localPathInput = document.getElementById('settings-input-local-path');
+          const driveLink = document.getElementById('settings-drive-link');
+
+          if (driveIdInput) driveIdInput.value = cfg.google_drive_root_folder_id || '';
+          if (driveNameElem) driveNameElem.textContent = cfg.google_drive_root_name || (cfg.google_drive_root_folder_id ? 'Thư mục cá nhân' : 'Chưa thiết lập');
+          if (localPathInput) localPathInput.value = cfg.local_base_path || 'H:\\2026\\Thac Sy\\Mon_Hoc';
+
+          if (driveLink && cfg.google_drive_root_folder_id) {
+            driveLink.href = `https://drive.google.com/drive/folders/${cfg.google_drive_root_folder_id}`;
+            driveLink.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi tải cấu hình cài đặt:', err);
+      }
+    }
+
+    async function handleProvisionDrive() {
+      const token = getIdToken();
+      if (!token) {
+        showToast('Vui lòng đăng nhập Google trước khi cấp phát thư mục Drive!', 'warning');
+        return;
+      }
+
+      const btn = document.getElementById('btn-provision-drive');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Đang cấp phát...';
+
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/settings/provision-drive`, {
+          method: 'POST',
+          headers: buildHeaders({ 'Content-Type': 'application/json' }),
+        });
+        const res = await resp.json();
+        if (!resp.ok) {
+          throw new Error(res.detail || res.error || 'Cấp phát thất bại');
+        }
+
+        showToast(`✓ Đã tạo và phân quyền thư mục '${res.folder_name}' thành công!`, 'success');
+        await loadSettingsConfig();
+      } catch (err) {
+        showToast(`Cấp phát thất bại: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    async function handleSaveSettings(event) {
+      event.preventDefault();
+      const driveId = document.getElementById('settings-input-drive-id')?.value.trim();
+      const localPath = document.getElementById('settings-input-local-path')?.value.trim();
+
+      const btn = document.getElementById('btn-save-settings');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Đang lưu...';
+
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/settings/config`, {
+          method: 'PUT',
+          headers: buildHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            google_drive_root_folder_id: driveId,
+            local_base_path: localPath,
+          }),
+        });
+        const res = await resp.json();
+        if (!resp.ok) {
+          throw new Error(res.detail || res.error || 'Lưu cấu hình thất bại');
+        }
+
+        showToast('✓ Đã lưu cài đặt thành công!', 'success');
+        await loadSettingsConfig();
+        setTimeout(closeSettingsModal, 600);
+      } catch (err) {
+        showToast(`Lưu cấu hình thất bại: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
     }
 
 

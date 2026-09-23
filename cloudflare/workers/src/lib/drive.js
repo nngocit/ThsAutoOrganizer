@@ -203,3 +203,33 @@ export async function listDriveSubfolders(env, parentId) {
   const data = await resp.json();
   return data.files || [];
 }
+
+/**
+ * Cấp quyền Chỉnh sửa (writer) cho một email người dùng cụ thể trên file/thư mục Google Drive
+ */
+export async function setDriveWriterPermission(env, fileId, email) {
+  if (!fileId) throw new Error('fileId là bắt buộc');
+  if (!email) throw new Error('email là bắt buộc');
+
+  const token = await getDriveAccessToken(env);
+  const resp = await fetch(`${DRIVE_API}/files/${fileId}/permissions?sendNotificationEmail=false`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      role: 'writer',
+      type: 'user',
+      emailAddress: email,
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Cấp quyền writer Drive cho ${email} thất bại (${resp.status}): ${errText}`);
+  }
+
+  return await resp.json();
+}
+

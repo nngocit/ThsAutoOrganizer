@@ -18,9 +18,8 @@ const router = new Hono();
  *   - document_type: Loại tài liệu (tùy chọn)
  */
 router.post('/', requireAuthOrAgent(async (c) => {
-  const user = c.get('user');
   const origin = c.req.header('Origin') || '';
-  const targetUid = resolveTargetUid(c, user, c.req.query('uid')) || await getFallbackUid(c.env);
+  const targetUid = resolveTargetUid(c, null, c.req.query('uid')) || await getFallbackUid(c.env);
 
   if (!targetUid) {
     return withCors(c.json({ error: 'UID không xác định' }, 400), origin);

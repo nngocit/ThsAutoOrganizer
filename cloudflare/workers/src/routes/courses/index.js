@@ -3,7 +3,7 @@
 import { Hono } from 'hono';
 import { requireAuth, requireAuthOrAgent, resolveTargetUid, getFallbackUid } from '../../lib/auth.js';
 import { firestoreSet, firestoreList, firestoreGet, fromFirestoreDoc } from '../../lib/firebase.js';
-import { createDriveFolder } from '../../lib/drive.js';
+import { createDriveFolder, setDriveWriterPermission } from '../../lib/drive.js';
 import { withCors } from '../../lib/cors.js';
 
 const router = new Hono();
@@ -14,13 +14,13 @@ const DEFAULT_DRIVE_ROOT = '1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg'; // ThacSi_HTTT r
  * Trả về danh sách courses của user.
  */
 router.get('/', requireAuthOrAgent(async (c) => {
-  const user = c.get('user');
   const origin = c.req.header('Origin') || '';
-  const targetUid = resolveTargetUid(c, user, c.req.query('uid')) || await getFallbackUid(c.env);
+  const targetUid = resolveTargetUid(c, null, c.req.query('uid')) || await getFallbackUid(c.env);
 
   if (!targetUid) {
     return withCors(c.json({ error: 'UID không xác định' }, 400), origin);
   }
+
 
   try {
     const resp = await firestoreList(c.env, `users/${targetUid}/courses`, 100);
@@ -90,19 +90,53 @@ router.post('/', requireAuth(async (c) => {
         .replace(/_+/g, '_');
     }
 
-    // 1. Xác định Root Folder ID trên Google Drive
-    let rootFolderId = DEFAULT_DRIVE_ROOT;
+    // 1. Xác định hoặc Tự động cấp phát Root Folder ID trên Google Drive cho User
+    let rootFolderId = '';
     try {
-      let configDoc = await firestoreGet(c.env, `users/${user.uid}/settings/config`);
-      if (!configDoc) {
-        configDoc = await firestoreGet(c.env, 'system_config/default');
-      }
+      const configDoc = await firestoreGet(c.env, `users/${user.uid}/settings/config`);
       if (configDoc) {
         const cfg = fromFirestoreDoc(configDoc);
-        if (cfg.google_drive_root_folder_id) rootFolderId = cfg.google_drive_root_folder_id;
+        if (cfg.google_drive_root_folder_id) {
+          rootFolderId = cfg.google_drive_root_folder_id;
+        }
       }
     } catch (e) {
-      console.warn('Không thể đọc settings config, dùng root fallback:', e);
+      console.warn('Không thể đọc settings config của user:', e);
+    }
+
+    // Nếu user chưa có root folder riêng, tự động tạo và chia sẻ quyền Editor qua email
+    if (!rootFolderId) {
+      try {
+        const userEmail = user.email || '';
+        const emailPrefix = userEmail ? userEmail.split('@')[0] : (user.name || user.uid.slice(0, 8));
+        const userRootName = `ThacSi_HTTT - ${user.name || emailPrefix}`;
+
+        // 1.1 Tạo thư mục riêng cho user trong DEFAULT_DRIVE_ROOT
+        const userFolder = await createDriveFolder(c.env, userRootName, DEFAULT_DRIVE_ROOT);
+        rootFolderId = userFolder.id;
+
+        // 1.2 Phân quyền writer cho email của user
+        if (userEmail) {
+          try {
+            await setDriveWriterPermission(c.env, rootFolderId, userEmail);
+          } catch (permErr) {
+            console.warn(`Lỗi phân quyền Drive cho user ${userEmail}:`, permErr.message);
+          }
+        }
+
+        // 1.3 Lưu vào users/${user.uid}/settings/config
+        await firestoreSet(c.env, `users/${user.uid}/settings/config`, {
+          google_drive_root_folder_id: rootFolderId,
+          google_drive_root_name: userRootName,
+          user_email: userEmail,
+          local_base_path: 'H:\\2026\\Thac Sy\\Mon_Hoc',
+          updated_at: new Date().toISOString(),
+          updated_by: userEmail,
+        });
+      } catch (provErr) {
+        console.warn('Tự động cấp phát thư mục Drive riêng thất bại, fallback về DEFAULT_DRIVE_ROOT:', provErr.message);
+        rootFolderId = DEFAULT_DRIVE_ROOT;
+      }
     }
 
     // 2. Tạo thư mục Drive bằng Service Account
@@ -175,15 +209,23 @@ router.post('/', requireAuth(async (c) => {
  * Cập nhật notebooklm_id cho course (Local agent gọi hoặc admin liên kết thủ công)
  */
 router.put('/:courseId/notebooklm', requireAuthOrAgent(async (c) => {
-  const user = c.get('user');
   const courseId = c.req.param('courseId');
   const origin = c.req.header('Origin') || '';
-  const targetUid = resolveTargetUid(c, user, c.req.query('uid')) || await getFallbackUid(c.env);
 
   try {
-    const { notebooklm_id, status } = await c.req.json();
+    const body = await c.req.json();
+    const { notebooklm_id, status, uid } = body;
     if (!notebooklm_id) {
       return withCors(c.json({ error: 'notebooklm_id là bắt buộc' }, 400), origin);
+    }
+
+    let targetUid = resolveTargetUid(c, uid, c.req.query('uid'));
+    if (!targetUid) {
+      targetUid = await getFallbackUid(c.env);
+    }
+
+    if (!targetUid) {
+      return withCors(c.json({ error: 'UID không xác định' }, 400), origin);
     }
 
     const doc = await firestoreGet(c.env, `users/${targetUid}/courses/${courseId}`);

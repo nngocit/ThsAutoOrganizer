@@ -154,6 +154,20 @@ def get_course(course_id: str, uid: str = "") -> dict[str, Any]:
     return _request("GET", f"/api/courses/{course_id}{query}")
 
 
+def update_course_notebooklm(course_id: str, notebooklm_id: str, status: str = "active", uid: str = "") -> dict[str, Any]:
+    """PUT /api/courses/:courseId/notebooklm — cập nhật notebooklm_id cho course."""
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    query = f"?uid={target_uid}" if target_uid else ""
+    payload = {
+        "notebooklm_id": notebooklm_id,
+        "status": status,
+    }
+    if target_uid:
+        payload["uid"] = target_uid
+    return _request("PUT", f"/api/courses/{course_id}/notebooklm{query}", payload)
+
+
+
 def get_system_config(uid: str = "") -> dict[str, Any]:
     """GET /api/settings/config — nạp cấu hình hệ thống từ Firestore."""
     target_uid = uid or get("uid", "") or get("root_account_email", "")
