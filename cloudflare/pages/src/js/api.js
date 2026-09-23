@@ -78,12 +78,33 @@ export const authApi = {
 // ============================
 
 export const filesApi = {
-  /** Phase 1: Khởi tạo upload session */
+  /** Luồng 2: Upload trực tiếp file lên Worker -> Google Drive -> Firestore */
+  upload: async (formData) => {
+    const url = `${WORKER_URL}/api/files/upload`;
+    const token = getIdToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    let data;
+    try { data = await resp.json(); } catch { data = {}; }
+    if (!resp.ok) {
+      const msg = data.error || data.detail || `HTTP ${resp.status}`;
+      throw Object.assign(new Error(msg), { status: resp.status, data });
+    }
+    return data;
+  },
+
+  /** Phase 1: Khởi tạo upload session (legacy) */
   initUpload: (meta) => apiFetch('/api/files/upload/init', {
     method: 'POST', body: JSON.stringify(meta),
   }),
 
-  /** Phase 3: Hoàn tất upload */
+  /** Phase 3: Hoàn tất upload (legacy) */
   completeUpload: (payload) => apiFetch('/api/files/upload/complete', {
     method: 'POST', body: JSON.stringify(payload),
   }),

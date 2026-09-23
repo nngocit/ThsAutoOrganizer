@@ -55,7 +55,14 @@ function renderShell() {
              style="border:1px solid var(--border); border-radius:var(--r-sm); padding:8px; margin-bottom:8px; max-height:160px; overflow-y:auto"></div>
         <div id="chat-messages"
              style="flex:1; overflow-y:auto; max-height:420px; min-height:280px; display:flex; flex-direction:column; gap:8px; padding:4px"></div>
-        <div class="flex gap-2 mt-4">
+        <!-- Quick Prompts (Kế thừa tinh hoa từ Study Hub) -->
+        <div class="flex gap-2" style="margin-top:8px; flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm quick-chip" type="button" data-prompt="Tóm tắt tổng quan những nội dung cốt lõi và bài học trọng tâm từ các tài liệu môn học này">📝 Tóm tắt bài học</button>
+          <button class="btn btn-ghost btn-sm quick-chip" type="button" data-prompt="Lập đề cương ôn tập chi tiết từng chủ đề và các câu hỏi trọng tâm thường gặp">📋 Lập đề cương</button>
+          <button class="btn btn-ghost btn-sm quick-chip" type="button" data-prompt="Tạo 5 câu hỏi trắc nghiệm kiểm tra kiến thức kèm đáp án giải thích chi tiết">🎯 Tạo trắc nghiệm</button>
+          <button class="btn btn-ghost btn-sm quick-chip" type="button" data-prompt="Giải thích chi tiết các thuật ngữ và khái niệm quan trọng nhất trong tài liệu này">💡 Giải thích khái niệm</button>
+        </div>
+        <div class="flex gap-2 mt-2">
           <input id="chat-input" type="text" placeholder="Nhập câu hỏi cho NotebookLM..."
                  style="flex:1; background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--r-sm); padding:8px 12px; color:var(--text); font-family:inherit; font-size:0.875rem">
           <button class="btn btn-primary" id="btn-send-chat">Gửi →</button>
@@ -68,6 +75,17 @@ function renderShell() {
   document.getElementById('btn-delete-session').addEventListener('click', deleteSession);
   document.getElementById('btn-toggle-sources').addEventListener('click', toggleSourcePanel);
   document.getElementById('chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendPrompt(); });
+
+  root.querySelectorAll('.quick-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById('chat-input');
+      if (input) {
+        input.value = btn.dataset.prompt;
+        input.focus();
+        sendPrompt();
+      }
+    });
+  });
 }
 
 // ---------- Session list ----------

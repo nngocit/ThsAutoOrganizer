@@ -112,15 +112,33 @@ function initFilters() {
   });
 }
 
+async function loadFilterSubjects() {
+  const filterSub = document.getElementById('filter-subject');
+  if (!filterSub) return;
+  try {
+    const data = await coursesApi.list();
+    const courses = (data.courses || []).filter((c) => c.kind === 'subject');
+    filterSub.innerHTML = '<option value="">Tất cả môn học</option>' +
+      courses.map((c) => {
+        const name = c.name || c.folder_name || c.local_folder_name || c.id;
+        return `<option value="${name}">${name}</option>`;
+      }).join('');
+  } catch {}
+}
+
 export function initDashboard() {
   // Upload component
   const uploadArea = document.getElementById('upload-area');
   if (uploadArea) {
     renderFileUpload(uploadArea, { onSuccess: () => loadFiles(currentFilters()) });
   }
+  loadFilterSubjects();
   initFilters();
   loadFiles();
 
-  // Refresh khi tab được activate (registry trong app.js — không ghi đè page khác)
-  onTabActivate('dashboard', () => loadFiles(currentFilters()));
+  // Refresh khi tab được activate
+  onTabActivate('dashboard', () => {
+    loadFilterSubjects();
+    loadFiles(currentFilters());
+  });
 }

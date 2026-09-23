@@ -214,7 +214,7 @@ select option { background: var(--bg-surface); color: var(--text); }
 
 .studio-body {
   display: grid;
-  grid-template-columns: 280px 1fr 300px;
+  grid-template-columns: 280px 1fr;
   height: calc(100vh - var(--topbar-h));
   overflow: hidden;
   position: relative;
@@ -222,7 +222,7 @@ select option { background: var(--bg-surface); color: var(--text); }
 }
 
 .studio-body.studio-collapsed {
-  grid-template-columns: 280px 1fr 48px;
+  grid-template-columns: 0px 1fr;
 }
 
 /* Cột 1: Nguồn tài liệu */

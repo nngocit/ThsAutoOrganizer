@@ -68,14 +68,6 @@ function applyTheme(theme) {
 // Studio 3-Column Layout & Panels
 // ============================
 function initStudioLayout() {
-  const toggleStudioBtn = document.getElementById('btn-toggle-studio-panel');
-  const studioBody = document.getElementById('studio-body');
-  if (toggleStudioBtn && studioBody) {
-    toggleStudioBtn.addEventListener('click', () => {
-      studioBody.classList.toggle('studio-collapsed');
-    });
-  }
-
   const addSourceBtn = document.getElementById('btn-quick-add-source');
   if (addSourceBtn) {
     addSourceBtn.addEventListener('click', () => {
@@ -170,11 +162,11 @@ async function onCourseChanged(courseId) {
       }
     }
 
-    // 3. Đồng bộ dropdown ở các tab nếu có
-    const qrSelect = document.getElementById('quick-research-course');
-    if (qrSelect && courseId) qrSelect.value = courseId;
+    // 3. Đồng bộ dropdown ở các tab
     const examSelect = document.getElementById('exam-course');
     if (examSelect && courseId) examSelect.value = courseId;
+    const uploadSelect = document.getElementById('upload-subject-select');
+    if (uploadSelect && courseId) uploadSelect.value = courseId;
   } catch (err) {
     listEl.innerHTML = `<div class="text-danger" style="padding:8px; font-size:0.8rem">Lỗi: ${err.message}</div>`;
   }
