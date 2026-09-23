@@ -1,3 +1,8 @@
+# Node.js
+node_modules/
+cloudflare/workers/node_modules/
+cloudflare/pages/node_modules/
+
 # Python artifacts
 __pycache__/
 *.py[cod]
