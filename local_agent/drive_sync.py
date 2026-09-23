@@ -15,8 +15,8 @@ from .cascade_delete import hard_delete_file, move_to_recycle_bin
 
 logger = logging.getLogger(__name__)
 
-# Google Drive API scopes
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+# Google Drive API scopes (khớp với token.json và src/drive.py)
+SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 TOKEN_FILE = Path(__file__).parent.parent / "token.json"
 CREDS_FILE = Path(__file__).parent.parent / "credentials.json"
 
@@ -27,12 +27,27 @@ ARCHIVE_FOLDER_NAME = "_Archive_Trash_90Days"
 def _get_drive_service() -> Any:
     """
     Xây dựng Google Drive API service từ token đã lưu.
+    Tự động refresh token nếu hết hạn và cập nhật lại vào token.json.
     Raises RuntimeError nếu token không tồn tại hoặc không hợp lệ.
     """
     if not TOKEN_FILE.exists():
         raise RuntimeError(f"Drive token không tìm thấy: {TOKEN_FILE}. Chạy lại xác thực OAuth.")
+
+    from google.auth.transport.requests import Request
     creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
-    return build("drive", "v3", credentials=creds)
+    if not creds.valid:
+        if creds.expired and creds.refresh_token:
+            logger.info("Đang refresh Google Drive access token...")
+            try:
+                creds.refresh(Request())
+                TOKEN_FILE.write_text(creds.to_json(), encoding="utf-8")
+                logger.info("Đã cập nhật token.json sau khi refresh thành công.")
+            except Exception as e:
+                raise RuntimeError(f"Lỗi refresh Google Drive token: {e}. Vui lòng đăng nhập lại.") from e
+        else:
+            raise RuntimeError("Drive token không hợp lệ và không có refresh_token.")
+
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
 def _find_or_create_folder(service: Any, folder_name: str, parent_id: str | None = None) -> str:
