@@ -3,6 +3,9 @@ node_modules/
 cloudflare/workers/node_modules/
 cloudflare/pages/node_modules/
 
+# Local agent secrets (NEVER COMMIT)
+config.json
+
 # Python artifacts
 __pycache__/
 *.py[cod]
