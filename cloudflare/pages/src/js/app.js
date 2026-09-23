@@ -2,7 +2,7 @@
 import { authApi } from './api.js';
 
 // Google OAuth 2.0 Client ID
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '1010816280157-0mr97o9t142d0d16rr3itr9s9u138qkk.apps.googleusercontent.com';
 
 // ============================
 // Toast Notifications
