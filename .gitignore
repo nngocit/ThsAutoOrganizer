@@ -30,6 +30,8 @@ env/
 # Google Drive API credentials & tokens (CRITICAL: NEVER COMMIT)
 credentials.json
 token.json
+*firebase-adminsdk*.json
+*service-account*.json
 
 # SQLite Database & Runtime Data
 data/*.db
