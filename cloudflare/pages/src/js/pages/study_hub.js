@@ -137,8 +137,10 @@ async function loadCourseSelect() {
         const tag = c.notebook_id ? ' (✓ NLM)' : '';
         return `<option value="${id}">${escapeHtml(c.name || c.folder_name)}${tag}</option>`;
       }).join('');
-    // Ưu tiên chọn môn đã liên kết NotebookLM nếu chưa chọn gì
-    if (!select.value) {
+    // Ưu tiên chọn môn toàn cục hoặc môn đã liên kết NotebookLM nếu chưa chọn gì
+    if (window._activeCourseId) {
+      select.value = window._activeCourseId;
+    } else if (!select.value) {
       const linked = courses.find((c) => c.notebook_id);
       if (linked) select.value = linked.id || linked._id;
     }
@@ -159,7 +161,10 @@ async function quickResearch() {
     return;
   }
 
-  const courseId = courseEl?.value || '';
+  if (courseEl && !courseEl.value && window._activeCourseId) {
+    courseEl.value = window._activeCourseId;
+  }
+  const courseId = courseEl?.value || window._activeCourseId || '';
   if (!courseId) {
     showToast('Vui lòng chọn môn học đã liên kết NotebookLM!', 'warning');
     return;
@@ -303,6 +308,20 @@ window.toggleCitations = (id) => {
   document.getElementById(`cit-list-${id}`)?.classList.toggle('open');
 };
 
+function triggerStudioQuickAction(promptText) {
+  if (window.activateTab) window.activateTab('study-hub');
+  const courseSel = document.getElementById('quick-research-course');
+  if (courseSel && window._activeCourseId) {
+    courseSel.value = window._activeCourseId;
+  }
+  const input = document.getElementById('quick-research-input');
+  if (input) {
+    input.value = promptText;
+    input.focus();
+  }
+  quickResearch();
+}
+
 export function initStudyHub() {
   loadInsights();
   loadCourseSelect();
@@ -314,4 +333,19 @@ export function initStudyHub() {
   if (sendBtn) sendBtn.addEventListener('click', quickResearch);
   const input = document.getElementById('quick-research-input');
   if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') quickResearch(); });
+
+  // Gắn sự kiện cho các nút hành động nhanh ở Cột Studio
+  document.getElementById('studio-action-quiz')?.addEventListener('click', () => {
+    triggerStudioQuickAction('Tạo bộ 5 câu hỏi trắc nghiệm ôn tập kèm đáp án giải thích chi tiết dựa trên các tài liệu đã nạp');
+  });
+  document.getElementById('studio-action-summary')?.addEventListener('click', () => {
+    triggerStudioQuickAction('Tóm tắt tổng quan những nội dung cốt lõi và bài học trọng tâm từ các tài liệu môn học này');
+  });
+  document.getElementById('studio-action-outline')?.addEventListener('click', () => {
+    triggerStudioQuickAction('Lập đề cương ôn thi chi tiết từng chủ đề và các câu hỏi trọng tâm thường gặp trong đề thi');
+  });
+  document.getElementById('studio-action-slides')?.addEventListener('click', () => {
+    if (window.activateTab) window.activateTab('artifacts');
+    showToast('Chuyển sang kho Slide thuyết trình & Xuất bản', 'info');
+  });
 }

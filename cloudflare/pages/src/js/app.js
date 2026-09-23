@@ -152,12 +152,29 @@ async function onCourseChanged(courseId) {
         recentEl.innerHTML = '<div class="text-muted" style="font-size:0.75rem">Chưa có ấn phẩm nào.</div>';
       } else {
         recentEl.innerHTML = insights.map(ins => `
-          <div class="card" style="padding:8px; font-size:0.78rem">
+          <div class="card cursor-pointer studio-recent-card" data-id="${ins.id}" style="padding:8px; font-size:0.78rem; cursor:pointer" title="Bấm để xem trong Study Hub">
             <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${ins.title}</div>
             <div class="text-muted" style="font-size:0.7rem; margin-top:2px">${ins.insight_type}</div>
           </div>`).join('');
+        recentEl.querySelectorAll('.studio-recent-card').forEach(card => {
+          card.addEventListener('click', () => {
+            activateTab('study-hub');
+            const target = document.getElementById(`insight-${card.dataset.id}`);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              target.style.boxShadow = '0 0 0 2px var(--accent)';
+              setTimeout(() => { target.style.boxShadow = ''; }, 2000);
+            }
+          });
+        });
       }
     }
+
+    // 3. Đồng bộ dropdown ở các tab nếu có
+    const qrSelect = document.getElementById('quick-research-course');
+    if (qrSelect && courseId) qrSelect.value = courseId;
+    const examSelect = document.getElementById('exam-course');
+    if (examSelect && courseId) examSelect.value = courseId;
   } catch (err) {
     listEl.innerHTML = `<div class="text-danger" style="padding:8px; font-size:0.8rem">Lỗi: ${err.message}</div>`;
   }
@@ -275,6 +292,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const courseSelect = document.getElementById('global-course-select');
   if (courseSelect) {
     courseSelect.addEventListener('change', (e) => onCourseChanged(e.target.value));
+  }
+
+  const addSourceBtn = document.getElementById('btn-quick-add-source');
+  if (addSourceBtn) {
+    addSourceBtn.addEventListener('click', () => {
+      activateTab('dashboard');
+      document.getElementById('upload-area')?.scrollIntoView({ behavior: 'smooth' });
+    });
   }
 
   document.querySelectorAll('.nav-tab').forEach((tab) => {

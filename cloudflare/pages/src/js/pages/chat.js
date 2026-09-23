@@ -21,6 +21,16 @@ function parseJsonArray(v) {
   return Array.isArray(v) ? v : [];
 }
 
+function getEffectiveSources() {
+  const globalChecked = Array.from(document.querySelectorAll('.global-source-cb:checked')).map((cb) => cb.value);
+  return Array.from(new Set([..._selectedSources, ...globalChecked]));
+}
+
+function updateSourceCountBadge() {
+  const el = document.getElementById('source-count');
+  if (el) el.textContent = getEffectiveSources().length;
+}
+
 // ---------- Shell ----------
 function renderShell() {
   const root = document.getElementById('chat-root');
@@ -95,7 +105,7 @@ async function createSession() {
   const title = prompt('Tên phiên chat mới:', `Chat ${new Date().toLocaleString('vi')}`);
   if (title === null) return;
   try {
-    const { id } = await chatApi.createSession({ title, source_ids: [..._selectedSources] });
+    const { id } = await chatApi.createSession({ title, source_ids: getEffectiveSources() });
     showToast('Đã tạo phiên chat', 'success');
     _currentId = id;
     await loadSessions();
@@ -151,7 +161,7 @@ async function toggleSourcePanel() {
       : '<div class="text-muted">Chưa có nguồn nào đã đồng bộ.</div>';
     panel.querySelectorAll('.source-cb').forEach((cb) => cb.addEventListener('change', () => {
       if (cb.checked) _selectedSources.add(cb.value); else _selectedSources.delete(cb.value);
-      document.getElementById('source-count').textContent = _selectedSources.size;
+      updateSourceCountBadge();
       if (_currentId) {
         chatApi.updateSession(_currentId, { selected_source_ids: [..._selectedSources] }).catch(() => {});
       }
@@ -215,7 +225,7 @@ async function selectSession(id) {
     const { session, messages } = await chatApi.getSession(id);
     box.innerHTML = '';
     parseJsonArray(session?.selected_source_ids).forEach((sid) => _selectedSources.add(sid));
-    document.getElementById('source-count').textContent = _selectedSources.size;
+    updateSourceCountBadge();
     appendMessages(messages || []);
     _unsubscribe = subscribeMessages(id, {
       onMessages: appendMessages,
@@ -235,7 +245,7 @@ async function sendPrompt() {
   const style = document.getElementById('chat-citation-style').value;
   try {
     await chatApi.sendMessage(_currentId, {
-      content, source_ids: [..._selectedSources], citation_style: style,
+      content, source_ids: getEffectiveSources(), citation_style: style,
     });
     // Polling (realtime.js) sẽ tự nhặt message mới; fetch ngay 1 lần cho nhanh
     const { messages } = await chatApi.getMessages(_currentId);
@@ -244,5 +254,6 @@ async function sendPrompt() {
 }
 
 export function initChat() {
-  onTabActivate('chat', () => { renderShell(); loadSessions(); });
+  onTabActivate('chat', () => { renderShell(); loadSessions(); updateSourceCountBadge(); });
+  document.getElementById('panel-sources-list')?.addEventListener('change', updateSourceCountBadge);
 }
