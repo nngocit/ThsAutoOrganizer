@@ -120,8 +120,29 @@ export function requireAuthOrAgent(handler) {
   };
 }
 
-/** Lấy uid hiệu lực: token user ưu tiên, agent phải truyền uid tường minh */
+/** Lấy uid hiệu lực: token user ưu tiên, agent phải truyền uid tường minh hoặc cấu hình DEFAULT_UID */
 export function resolveTargetUid(c, bodyUid, queryUid) {
   const user = c.get('user') || {};
-  return user.uid || bodyUid || queryUid || '';
+  return user.uid || bodyUid || queryUid || (c?.env?.DEFAULT_UID || '');
 }
+
+/** Fallback tìm uid từ collection users nếu agent không truyền và không có DEFAULT_UID */
+export async function getFallbackUid(env) {
+  if (env?.DEFAULT_UID) return env.DEFAULT_UID;
+  try {
+    const { firestoreList } = await import('./firebase.js');
+    const resp = await firestoreList(env, 'users', 1);
+    if (resp && resp.documents && resp.documents.length > 0) {
+      const docName = resp.documents[0].name || '';
+      const parts = docName.split('/');
+      const uIndex = parts.indexOf('users');
+      if (uIndex !== -1 && parts[uIndex + 1]) {
+        return parts[uIndex + 1];
+      }
+    }
+  } catch (err) {
+    console.warn('getFallbackUid error:', err.message);
+  }
+  return '';
+}
+

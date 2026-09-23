@@ -41,20 +41,28 @@ def _post(path: str, body: dict) -> dict[str, Any]:
     return _request("POST", path, body)
 
 
-def check_hash(sha256: str) -> dict[str, Any]:
+def check_hash(sha256: str, uid: str = "") -> dict[str, Any]:
     """POST /api/files/check-hash -> {duplicate, file_id?, drive_file_id?, filename?}."""
-    return _post("/api/files/check-hash", {"sha256": sha256})
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    body: dict[str, Any] = {"sha256": sha256}
+    if target_uid:
+        body["uid"] = target_uid
+    return _post("/api/files/check-hash", body)
 
 
 def register_file(*, filename: str, subject: str, document_type: str, sha256: str,
                   drive_file_id: str, size_bytes: int, local_path: str,
-                  folder_path: str = "", course_id: str = "") -> dict[str, Any]:
+                  folder_path: str = "", course_id: str = "", uid: str = "") -> dict[str, Any]:
     """POST /api/files/register — Local watcher đăng ký file đã upload Drive."""
-    return _post("/api/files/register", {
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    payload: dict[str, Any] = {
         "filename": filename, "subject": subject, "document_type": document_type,
         "folder_path": folder_path, "sha256": sha256, "drive_file_id": drive_file_id,
         "size_bytes": size_bytes, "local_path": local_path, "course_id": course_id,
-    })
+    }
+    if target_uid:
+        payload["uid"] = target_uid
+    return _post("/api/files/register", payload)
 
 
 def agent_reply(session_id: str, *, job_id: str, message_id: str, content: str,

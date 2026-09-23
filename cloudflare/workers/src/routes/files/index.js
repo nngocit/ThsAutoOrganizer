@@ -16,8 +16,8 @@ router.route('/upload', uploadInitRouter);
 router.route('/upload', uploadCompleteRouter);
 
 // Phase 2 — Dual Inflow (Python local agent)
-router.route('/', registerRouter);   // POST /api/files/register
-router.route('/', checkHashRouter);  // POST /api/files/check-hash
+router.route('/register', registerRouter);   // POST /api/files/register
+router.route('/check-hash', checkHashRouter);  // POST /api/files/check-hash
 
 // Phase 4 — Hàng đợi duyệt nguồn (đăng ký trước /:fileId để không bị nuốt bởi param)
 router.route('/', reviewRouter);     // GET /api/files/review + POST /api/files/:id/review

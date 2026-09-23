@@ -2,7 +2,7 @@
 // Auth: X-Agent-Secret. NO-LOOP: TUYỆT ĐỐI không queue source_add cho file trong 04_Ket_Qua_Xuat_Ban.
 
 import { Hono } from 'hono';
-import { requireAgentAuth } from '../../lib/auth.js';
+import { requireAgentAuth, resolveTargetUid, getFallbackUid } from '../../lib/auth.js';
 import { firestoreSet } from '../../lib/firebase.js';
 import { withCors } from '../../lib/cors.js';
 import {
@@ -16,8 +16,7 @@ import { enqueueSourceAdd } from '../../lib/tasks.js';
 
 const router = new Hono();
 
-// POST /api/files/register
-router.post('/', requireAgentAuth(async (c) => {
+const handleRegister = requireAgentAuth(async (c) => {
   const origin = c.req.header('Origin') || '';
 
   try {
@@ -27,7 +26,12 @@ router.post('/', requireAgentAuth(async (c) => {
       sha256, drive_file_id, size_bytes, local_path, course_id,
     } = body;
 
-    if (!uid) {
+    let targetUid = uid || resolveTargetUid(c, uid, c.req.query('uid'));
+    if (!targetUid) {
+      targetUid = await getFallbackUid(c.env);
+    }
+
+    if (!targetUid) {
       return withCors(c.json({ error: 'uid là bắt buộc' }, 400), origin);
     }
     if (!filename || !sha256) {
@@ -65,7 +69,7 @@ router.post('/', requireAgentAuth(async (c) => {
     }
 
     const now = new Date().toISOString();
-    const existing = await findFileBySha256(c.env, uid, sha);
+    const existing = await findFileBySha256(c.env, targetUid, sha);
     const fileId = existing?._id || stableFileId(sha);
 
     if (existing) {
@@ -79,9 +83,9 @@ router.post('/', requireAgentAuth(async (c) => {
         updated_at: now,
       };
       if (!SOURCE_KINDS.includes(existing.source_kind)) patch.source_kind = 'local_scan';
-      await firestoreSet(c.env, `users/${uid}/files/${fileId}`, patch);
+      await firestoreSet(c.env, `users/${targetUid}/files/${fileId}`, patch);
     } else {
-      await firestoreSet(c.env, `users/${uid}/files/${fileId}`, {
+      await firestoreSet(c.env, `users/${targetUid}/files/${fileId}`, {
         id: fileId,
         filename,
         subject: subject || '',
@@ -111,7 +115,7 @@ router.post('/', requireAgentAuth(async (c) => {
     const taskId = (isOutput || alreadySynced)
       ? null
       : await enqueueSourceAdd(c.env, {
-        uid,
+        uid: targetUid,
         fileId,
         courseId: course_id || existing?.course_id || '',
         filename,
@@ -134,6 +138,10 @@ router.post('/', requireAgentAuth(async (c) => {
     console.error('Register file error:', err);
     return withCors(c.json({ error: 'Đăng ký file thất bại', detail: err.message }, 500), origin);
   }
-}));
+});
+
+// Hỗ trợ cả khi mount tại router.route('/register', registerRouter) lẫn router.route('/', registerRouter)
+router.post('/', handleRegister);
+router.post('/register', handleRegister);
 
 export default router;
