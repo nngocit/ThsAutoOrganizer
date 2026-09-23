@@ -3,6 +3,8 @@
 
 const ALLOWED_ORIGINS = [
   'https://ths-organizer.pages.dev',
+  'https://aeb9c0e2.ths-organizer.pages.dev',
+  'https://ths-organizer-api.ths-organizer-nngocit.workers.dev',
   'http://localhost:3000',
   'http://localhost:8080',
   'http://127.0.0.1:3000',
