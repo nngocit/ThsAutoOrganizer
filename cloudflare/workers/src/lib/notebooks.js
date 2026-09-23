@@ -7,7 +7,9 @@ export async function notebookForCourse(env, uid, courseId) {
   if (!uid || !courseId) return '';
   try {
     const doc = await firestoreGet(env, `users/${uid}/courses/${courseId}`);
-    return doc ? (fromFirestoreDoc(doc).notebooklm_id || '') : '';
+    if (!doc) return '';
+    const data = fromFirestoreDoc(doc);
+    return data.notebooklm_id || data.notebook_id || '';
   } catch (err) {
     console.warn('notebookForCourse lỗi:', err.message);
     return '';

@@ -97,13 +97,13 @@ export async function loadGlobalCourses() {
     select.innerHTML = '<option value="">-- Tất cả môn học --</option>' +
       courses.map(c => {
         const id = c.id || c._id;
-        const tag = c.notebook_id ? ' (✓ NLM)' : '';
+        const tag = (c.notebook_id || c.notebooklm_id) ? ' (✓ NLM)' : '';
         return `<option value="${id}">${c.name || c.folder_name}${tag}</option>`;
       }).join('');
 
     // Ưu tiên chọn môn có NLM nếu chưa chọn gì
     if (!window._activeCourseId) {
-      const linked = courses.find(c => c.notebook_id);
+      const linked = courses.find(c => c.notebook_id || c.notebooklm_id);
       if (linked) {
         window._activeCourseId = linked.id || linked._id;
         select.value = window._activeCourseId;

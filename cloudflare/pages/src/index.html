@@ -16,12 +16,14 @@
      AUTH SCREEN (Màn hình đăng nhập)
      ============================== -->
 <div id="auth-screen" class="auth-screen">
-  <div class="auth-logo">✨</div>
-  <h1 class="auth-title">ThsAutoOrganizer Studio</h1>
-  <p class="auth-subtitle">Trợ lý học thuật Thạc sĩ — Tổ chức tài liệu, đồng bộ NotebookLM, và tạo nội dung AI tự động.</p>
-  <!-- Google Sign-In button (rendered by GSI SDK) -->
-  <div id="google-signin-btn"></div>
-  <p class="text-muted" style="font-size:0.8rem">Đăng nhập bằng tài khoản Google có quyền truy cập</p>
+  <div class="auth-card">
+    <div class="auth-logo">✨</div>
+    <h1 class="auth-title">ThsAutoOrganizer Studio</h1>
+    <p class="auth-subtitle">Trợ lý học thuật Thạc sĩ — Tổ chức tài liệu, đồng bộ NotebookLM, và tạo nội dung AI tự động.</p>
+    <!-- Google Sign-In button (rendered by GSI SDK) -->
+    <div id="google-signin-btn"></div>
+    <p class="text-muted" style="font-size:0.8rem; margin-top:4px">Đăng nhập bằng tài khoản Google có quyền truy cập</p>
+  </div>
 </div>
 
 <!-- ==============================
@@ -45,10 +47,10 @@
     <!-- Thanh Điều Hướng Tab Ở Giữa -->
     <nav class="studio-nav-tabs" role="navigation" aria-label="Điều hướng chính">
       <button class="nav-tab active" data-tab="dashboard" id="tab-dashboard">📂 Tài liệu</button>
-      <button class="nav-tab" data-tab="study-hub" id="tab-study-hub">🧠 AI Study Hub</button>
+      <button class="nav-tab" data-tab="study-hub" id="tab-study-hub">💡 AI Study Hub</button>
       <button class="nav-tab" data-tab="chat" id="tab-chat">💬 Chat AI</button>
       <button class="nav-tab" data-tab="review" id="tab-review">🔍 Duyệt nguồn</button>
-      <button class="nav-tab" data-tab="exam" id="tab-exam">📝 Ôn thi</button>
+      <button class="nav-tab" data-tab="exam" id="tab-exam">🎯 Ôn thi</button>
       <button class="nav-tab" data-tab="artifacts" id="tab-artifacts">📦 Xuất bản</button>
       <button class="nav-tab" data-tab="settings" id="tab-settings">⚙ Cài đặt</button>
     </nav>
@@ -139,7 +141,7 @@
       <section class="page-section" id="page-study-hub" aria-labelledby="page-study-hub-title">
         <div class="page-header">
           <div>
-            <h1 class="page-title" id="page-study-hub-title">🧠 AI Study Hub</h1>
+            <h1 class="page-title" id="page-study-hub-title">💡 AI Study Hub</h1>
             <div class="section-subtitle">Tóm tắt, Quiz, Đề cương do AI tạo từ tài liệu của bạn</div>
           </div>
         </div>
@@ -189,7 +191,7 @@
       <section class="page-section" id="page-exam" aria-labelledby="page-exam-title">
         <div class="page-header">
           <div>
-            <h1 class="page-title" id="page-exam-title">📝 Trạm Ôn thi</h1>
+            <h1 class="page-title" id="page-exam-title">🎯 Trạm Ôn thi</h1>
             <div class="section-subtitle">Đề ôn AI: 50 flashcard + 5 câu tự luận — cày quiz và lưu điểm</div>
           </div>
         </div>

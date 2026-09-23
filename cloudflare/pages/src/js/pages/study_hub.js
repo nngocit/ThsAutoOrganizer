@@ -134,14 +134,14 @@ async function loadCourseSelect() {
     select.innerHTML = '<option value="">-- Chọn môn học --</option>' +
       courses.map((c) => {
         const id = c.id || c._id;
-        const tag = c.notebook_id ? ' (✓ NLM)' : '';
+        const tag = (c.notebook_id || c.notebooklm_id) ? ' (✓ NLM)' : '';
         return `<option value="${id}">${escapeHtml(c.name || c.folder_name)}${tag}</option>`;
       }).join('');
     // Ưu tiên chọn môn toàn cục hoặc môn đã liên kết NotebookLM nếu chưa chọn gì
     if (window._activeCourseId) {
       select.value = window._activeCourseId;
     } else if (!select.value) {
-      const linked = courses.find((c) => c.notebook_id);
+      const linked = courses.find((c) => c.notebook_id || c.notebooklm_id);
       if (linked) select.value = linked.id || linked._id;
     }
   } catch (err) {

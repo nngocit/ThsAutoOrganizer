@@ -40,7 +40,12 @@ async function loadQueue() {
   try {
     const { files, total } = await reviewApi.list('unreviewed');
     if (!files || !files.length) {
-      root.innerHTML = `<div class="card"><div class="text-success">✓ Không còn nguồn nào chờ duyệt. Tuyệt vời!</div></div>`;
+      root.innerHTML = `
+        <div class="card" style="text-align:center; padding:48px 24px; border-style:dashed">
+          <div style="font-size:2.2rem; margin-bottom:10px">✨</div>
+          <div style="font-weight:600; font-size:1.05rem; color:var(--text); margin-bottom:6px">Không còn nguồn nào chờ duyệt</div>
+          <p class="text-muted" style="font-size:0.85rem">Tất cả tài liệu từ Deep Research đã được kiểm duyệt và sẵn sàng cho NotebookLM.</p>
+        </div>`;
       return;
     }
     root.innerHTML = `
