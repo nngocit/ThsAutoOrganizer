@@ -59,7 +59,7 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
     const body = await c.req.json();
     const { status, error: errorMsg, result } = body;
 
-    const validStatuses = new Set(['done', 'failed', 'processing', 'skipped_ext']);
+    const validStatuses = new Set(['done', 'failed', 'processing', 'skipped_ext', 'skipped_no_course']);
     if (!validStatuses.has(status)) {
       return withCors(c.json({ error: `status không hợp lệ: ${status}` }, 400), origin);
     }
@@ -76,14 +76,15 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
 
     await firestoreSet(c.env, `${queueName}/${taskId}`, updateData);
 
-    // Nếu là NLM source_add done hoặc skipped_ext: cập nhật notebooklm_sync_status trên file
+    // Nếu là NLM source_add done, skipped_ext hoặc skipped_no_course: cập nhật notebooklm_sync_status trên file
     const taskData = fromFirestoreDoc(existingDoc);
-    if (queueName === 'nlm_task_queue' && taskData.action === 'source_add' && (status === 'done' || status === 'skipped_ext')) {
+    if (queueName === 'nlm_task_queue' && taskData.action === 'source_add' && (status === 'done' || status === 'skipped_ext' || status === 'skipped_no_course')) {
       if (taskData.uid && taskData.file_id) {
         const resultStr = typeof result === 'string' ? result : (result ? JSON.stringify(result) : '');
-        const skipped = status === 'skipped_ext' || resultStr.startsWith('skipped');
+        const skipped = status === 'skipped_ext' || status === 'skipped_no_course' || resultStr.startsWith('skipped');
+        const finalStatus = (status === 'skipped_ext' || status === 'skipped_no_course') ? status : (skipped ? 'skipped' : 'synced');
         await firestoreSet(c.env, `users/${taskData.uid}/files/${taskData.file_id}`, {
-          notebooklm_sync_status: status === 'skipped_ext' ? 'skipped_ext' : (skipped ? 'skipped' : 'synced'),
+          notebooklm_sync_status: finalStatus,
           notebooklm_source_id: skipped ? '' : resultStr,
           updated_at: now,
         });

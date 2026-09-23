@@ -124,6 +124,7 @@ def test_handle_source_add_track1_uses_drive_url():
     task = {
         "filename": "de_cuong.pdf",
         "notebook_id": "nb_triet_hoc_123",
+        "course_id": "course_triet_hoc_123",
         "drive_file_id": "1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd",
         "drive_view_link": "https://drive.google.com/file/d/1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd/view",
         "subject": "Triết học",
@@ -148,6 +149,7 @@ def test_handle_source_add_track2_triggers_async_download():
     task = {
         "filename": "sach_giao_trinh.pdf",
         "notebook_id": "nb_999",
+        "course_id": "course_triet_hoc_123",
         "drive_file_id": "drive_id_xyz",
         "subject": "Triết học",
         "folder_path": "01_Giao_Trinh",
@@ -169,6 +171,50 @@ def test_handle_source_add_track2_triggers_async_download():
         call_kwargs = mock_thread.call_args[1]
         assert call_kwargs.get("daemon") is True
         assert "drive_id_xyz" in call_kwargs.get("args", ())
+
+
+def test_handle_source_add_skips_when_course_id_empty():
+    """Bỏ qua nạp NLM và trả về skipped_no_course nếu course_id rỗng hoặc None."""
+    task = {
+        "id": "task_no_course_1",
+        "filename": "tailieu.pdf",
+        "course_id": "",
+        "subject": "Tài liệu chung",
+    }
+    with patch("requests.patch") as mock_patch:
+        res = handle_source_add(task)
+        assert res == "skipped_no_course"
+        # Phải cập nhật task status skipped_no_course lên Worker API
+        mock_patch.assert_called_once()
+        args, kwargs = mock_patch.call_args
+        assert "task_no_course_1" in args[0]
+        assert kwargs["json"]["status"] == "skipped_no_course"
+
+
+def test_handle_source_add_skips_when_subject_tai_lieu_chung():
+    """Bỏ qua nạp NLM nếu subject là 'Tài liệu chung' kể cả khi có course_id."""
+    task = {
+        "filename": "Chuong_trinh_khung.pdf",
+        "course_id": "some_id",
+        "subject": "Tài liệu chung",
+    }
+    res = handle_source_add(task)
+    assert res == "skipped_no_course"
+
+
+def test_firestore_poller_marks_skipped_no_course():
+    """Khi handler trả về skipped_no_course, poller phải mark task với status 'skipped_no_course'."""
+    poller = FirestorePoller("nlm_task_queue")
+    poller.register("source_add", lambda t: "skipped_no_course")
+
+    task = {"id": "task_no_course_2", "action": "source_add", "filename": "quyche.pdf"}
+
+    with patch.object(poller, "_mark_task") as mock_mark:
+        poller._process_task(task)
+        # Lần 1: mark processing, Lần 2: mark skipped_no_course
+        assert mock_mark.call_count == 2
+        mock_mark.assert_any_call("task_no_course_2", "processing")
+        mock_mark.assert_any_call("task_no_course_2", "skipped_no_course", result="skipped_no_course")
 
 
 def test_sync_remote_config_updates_runtime_config():

@@ -93,6 +93,9 @@ class FirestorePoller:
             if result == "skipped_ext":
                 self._mark_task(task_id, "skipped_ext", result="skipped_ext")
                 logger.info("[%s] Task %s (%s) bỏ qua (skipped_ext)", self.queue_name, task_id, action)
+            elif result == "skipped_no_course":
+                self._mark_task(task_id, "skipped_no_course", result="skipped_no_course")
+                logger.info("[%s] Task %s (%s) bỏ qua (skipped_no_course)", self.queue_name, task_id, action)
             else:
                 self._mark_task(task_id, "done", result=result or "")
                 logger.info("[%s] Task %s (%s) hoàn tất", self.queue_name, task_id, action)

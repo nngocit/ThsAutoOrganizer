@@ -216,16 +216,34 @@ def handle_source_add(task: dict) -> str:
         logger.info("Bỏ qua file không thuộc SUPPORTED_EXTS: %s (ext=%s)", file_name, ext)
         return "skipped_ext"
 
+    # 2. GUARD CLAUSE: Bỏ qua nếu file không thuộc môn học cụ thể (course_id rỗng hoặc subject == 'Tài liệu chung')
+    course_id = (task.get("course_id") or "").strip() if task.get("course_id") is not None else ""
+    subject = (task.get("subject") or "").strip() if task.get("subject") is not None else ""
+
+    if not course_id or subject == "Tài liệu chung":
+        logger.info("Bỏ qua nạp NLM do file không thuộc môn học cụ thể (course_id rỗng)")
+        task_id = task.get("id") or task.get("task_id")
+        if task_id:
+            try:
+                import requests
+                from .config_loader import get
+                worker_url = get("worker_url", "").rstrip("/")
+                if worker_url:
+                    headers = {"X-Agent-Secret": get("agent_secret", ""), "Content-Type": "application/json"}
+                    url = f"{worker_url}/api/tasks/nlm_task_queue/{task_id}"
+                    requests.patch(url, json={"status": "skipped_no_course", "result": "skipped_no_course"}, headers=headers, timeout=15)
+            except Exception as e:
+                logger.warning("Không thể cập nhật task status skipped_no_course: %s", e)
+        return "skipped_no_course"
+
     if not _nlm_available():
         raise RuntimeError("nlm CLI không tìm thấy. Chạy: pip install notebooklm-mcp-cli")
 
     notebook_id = task.get("notebook_id", "")
-    course_id = task.get("course_id", "")
-    subject = task.get("subject", "")
     uid = task.get("uid", "")
     drive_file_id = task.get("drive_file_id", "")
 
-    # 2. AUTO-LOOKUP NOTEBOOK_ID: nếu thiếu notebook_id nhưng có course_id -> chọc Firestore courses
+    # 3. AUTO-LOOKUP NOTEBOOK_ID: nếu thiếu notebook_id nhưng có course_id -> chọc Firestore courses
     if not notebook_id and course_id:
         try:
             nb_from_course = lookup_notebook_id_from_course(course_id, uid)
