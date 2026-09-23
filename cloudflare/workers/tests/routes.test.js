@@ -47,4 +47,18 @@ describe('Worker Routes Routing', () => {
     expect(res.status).not.toBe(404);
     expect(data.path).toBeUndefined();
   });
+
+  it('GET /api/ai/insights should return 404 Not Found (dead route purged)', async () => {
+    const res = await worker.fetch(new Request('http://localhost/api/ai/insights', {
+      method: 'GET',
+      headers: {
+        Origin: 'https://ths-organizer.pages.dev',
+      },
+    }), {});
+
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data.error).toBe('Not found');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://ths-organizer.pages.dev');
+  });
 });

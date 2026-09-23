@@ -77,7 +77,7 @@ router.post('/', requireAuth(async (c) => {
   try {
     const body = await c.req.json();
     const displayName = (body.display_name || body.name || '').trim();
-    let localFolderName = (body.local_folder_name || body.subject_key || '').trim();
+    let localFolderName = (body.local_folder_name || '').trim();
 
     if (!displayName) {
       return withCors(c.json({ error: 'display_name là bắt buộc' }, 400), origin);

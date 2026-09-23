@@ -1,9 +1,9 @@
-// src/index.js — Cloudflare Worker entry point + cron handler (<75 lines)
-// Router tổng mount tất cả sub-routes; export fetch + scheduled
+// src/index.js — Cloudflare Worker entry point + cron handler (<85 lines)
+// Router tổng mount các sub-routes hợp lệ; export fetch + scheduled
 
 import { Hono } from 'hono';
-import { cors } from 'hono/cors'; // <--- 1. Import cors từ hono
-import { optionsResponse } from './lib/cors.js';
+import { cors } from 'hono/cors';
+import { optionsResponse, isAllowedOrigin } from './lib/cors.js';
 import { handleHardDelete } from './cron/hard_delete.js';
 
 // Route modules
@@ -19,10 +19,9 @@ import logsRouter from './routes/logs/index.js';
 
 const app = new Hono();
 
-
-// <--- 2. Bật CORS Middleware toàn cục cho tất cả các Route
+// Global CORS Middleware
 app.use('*', cors({
-  origin: '*',
+  origin: (origin) => (isAllowedOrigin(origin) ? origin : (origin || '*')),
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Agent-Secret'],
 }));
@@ -38,24 +37,45 @@ app.get('/health', (c) =>
 // Mount sub-routers
 app.route('/api/auth', authRouter);
 app.route('/api/files', filesRouter);
-app.route('/api/ai', aiRouter);       // insights + citations + research + artifact
-app.route('/api/chat', chatRouter);   // chat sessions, messages, agent-reply, sources
-app.route('/api/courses', coursesRouter);
-app.route('/api/tasks', syncRouter);
-app.route('/api/sync', syncRouter);
-app.route('/api/exam', examRouter);   // Trạm Ôn Thi (§3.7)
-app.route('/api/settings', settingsRouter); // Global Settings (§1)
-app.route('/api/logs', logsRouter);         // System Logs Dashboard (§2)
+app.route('/api/ai', aiRouter);               // citations + research + artifact
+app.route('/api/chat', chatRouter);           // chat sessions, messages, agent-reply, sources
+app.route('/api/courses', coursesRouter);     // Luồng 1: Master Creation Flow
+app.route('/api/tasks', syncRouter);          // Task queues polling & status updates
+app.route('/api/sync', syncRouter);           // Luồng 3: Reconciliation & Drive Folder Import
+app.route('/api/exam', examRouter);           // Trạm Ôn Thi
+app.route('/api/settings', settingsRouter);   // Global Settings
+app.route('/api/logs', logsRouter);           // System Logs Dashboard
 
-// 404 fallback
-app.notFound((c) =>
-  c.json({ error: 'Not found', path: c.req.path }, 404)
-);
+// 404 fallback với CORS headers đầy đủ
+app.notFound((c) => {
+  const origin = c.req.header('Origin') || '*';
+  c.header('Access-Control-Allow-Origin', origin);
+  return c.json({ error: 'Not found', path: c.req.path }, 404);
+});
 
-// Global error handler
+// Global error handler: JSON log có cấu trúc & đính kèm CORS headers
 app.onError((err, c) => {
-  console.error('[Worker Error]', err);
-  return c.json({ error: 'Internal server error', detail: err.message }, 500);
+  const origin = c.req.header('Origin') || '*';
+  const errorLog = {
+    level: 'ERROR',
+    timestamp: new Date().toISOString(),
+    method: c.req.method,
+    path: c.req.path,
+    error: err.message,
+    stack: err.stack,
+  };
+  console.error('[Worker Fatal Error]', JSON.stringify(errorLog));
+
+  c.header('Access-Control-Allow-Origin', origin);
+  c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Agent-Secret');
+
+  return c.json({
+    error: 'Internal server error',
+    detail: err.message,
+    path: c.req.path,
+    timestamp: errorLog.timestamp,
+  }, 500);
 });
 
 // Export fetch handler + scheduled cron handler

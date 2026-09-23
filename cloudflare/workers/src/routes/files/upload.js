@@ -47,7 +47,7 @@ router.post('/', requireAuthOrAgent(async (c) => {
     const course = fromFirestoreDoc(courseDoc);
     const driveFolderId = course.drive_folder_id;
     const notebooklmId = course.notebooklm_id || course.notebook_id || '';
-    const localFolderName = course.local_folder_name || course.subject_key || '';
+    const localFolderName = course.local_folder_name || '';
 
     if (!driveFolderId) {
       return withCors(c.json({ error: 'Môn học chưa được liên kết thư mục Google Drive (thiếu drive_folder_id)' }, 400), origin);

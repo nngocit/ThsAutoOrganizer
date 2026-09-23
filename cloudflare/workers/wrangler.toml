@@ -10,7 +10,6 @@ ENVIRONMENT = "production"
 crons = ["0 2 * * *"]
 
 # Secrets — set via: wrangler secret put <SECRET_NAME>
-# FIREBASE_SERVICE_ACCOUNT  — JSON string của Firebase service account key
-# GOOGLE_CLIENT_ID          — OAuth 2.0 Web Client ID
-# GOOGLE_CLIENT_SECRET      — OAuth 2.0 Web Client Secret
-# AGENT_SECRET              — Shared secret cho Python local agent (X-Agent-Secret header)
+# FIREBASE_SERVICE_ACCOUNT  — JSON string của Firebase Service Account key (dùng cho Firestore & Google Drive JWT 24/7)
+# GOOGLE_CLIENT_ID          — OAuth 2.0 Web Client ID (dùng verify Google ID Token trên Web UI)
+# AGENT_SECRET              — Shared secret xác thực Local Agent Python (header: X-Agent-Secret)

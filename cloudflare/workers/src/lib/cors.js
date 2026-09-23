@@ -1,9 +1,8 @@
-// src/lib/cors.js — CORS helpers (<50 lines)
+// src/lib/cors.js — CORS helpers (<60 lines)
 // Quản lý tập trung các CORS headers cho tất cả Worker endpoints
 
 const ALLOWED_ORIGINS = [
   'https://ths-organizer.pages.dev',
-  'https://aeb9c0e2.ths-organizer.pages.dev',
   'https://ths-organizer-api.ths-organizer-nngocit.workers.dev',
   'http://localhost:3000',
   'http://localhost:8080',
@@ -11,14 +10,24 @@ const ALLOWED_ORIGINS = [
 ];
 
 /**
+ * Kiểm tra xem Origin gửi lên có hợp lệ không (hỗ trợ preview pages.dev)
+ */
+export function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (/^https:\/\/[a-z0-9-]+\.ths-organizer\.pages\.dev$/.test(origin)) return true;
+  return false;
+}
+
+/**
  * Trả về CORS headers cho origin được phép.
  * @param {string} requestOrigin
  * @returns {Object} headers object
  */
 export function corsHeaders(requestOrigin) {
-  const origin = ALLOWED_ORIGINS.includes(requestOrigin)
+  const origin = isAllowedOrigin(requestOrigin)
     ? requestOrigin
-    : ALLOWED_ORIGINS[0];
+    : (requestOrigin || ALLOWED_ORIGINS[0]);
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
