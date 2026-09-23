@@ -66,10 +66,10 @@
             </span>
           </div>
           <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
-            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse-subtle"></span>
+            <span id="api-status-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse-subtle"></span>
             <span id="api-status-text">Worker API Online</span>
             <span class="text-slate-600">•</span>
-            <span>v2.1.0</span>
+            <span>v2.5.0</span>
           </div>
         </div>
       </div>
@@ -78,15 +78,15 @@
       <nav class="hidden md:flex items-center p-1 rounded-xl bg-slate-800/80 border border-slate-700/60 shadow-inner" role="tablist">
         <button id="nav-btn-courses" onclick="switchTab('courses')" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 bg-blue-600 text-white shadow-md">
           <span>📚</span>
-          <span>Quản lý Môn học</span>
+          <span>Quản lý Sổ Hộ Khẩu</span>
         </button>
         <button id="nav-btn-upload" onclick="switchTab('upload')" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center gap-2">
           <span>☁️</span>
-          <span>Nạp Tài liệu</span>
+          <span>Kéo Thả Upload</span>
         </button>
         <button id="nav-btn-sync" onclick="switchTab('sync')" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center gap-2">
           <span>🔄</span>
-          <span>Đồng bộ & Hệ thống</span>
+          <span>Reconcile / Khám Sức Khỏe</span>
         </button>
       </nav>
 
@@ -106,23 +106,23 @@
 
     <!-- Mobile Nav Tabs -->
     <div class="md:hidden flex border-t border-slate-800 bg-slate-900 px-2 py-1.5 justify-around text-xs font-medium">
-      <button onclick="switchTab('courses')" class="mobile-tab-btn flex-1 py-1.5 text-center text-blue-400 font-semibold" data-tab="courses">📚 Môn học</button>
-      <button onclick="switchTab('upload')" class="mobile-tab-btn flex-1 py-1.5 text-center text-slate-400" data-tab="upload">☁️ Nạp File</button>
-      <button onclick="switchTab('sync')" class="mobile-tab-btn flex-1 py-1.5 text-center text-slate-400" data-tab="sync">🔄 Đồng bộ</button>
+      <button onclick="switchTab('courses')" class="mobile-tab-btn flex-1 py-1.5 text-center text-blue-400 font-semibold" data-tab="courses">📚 Sổ Hộ Khẩu</button>
+      <button onclick="switchTab('upload')" class="mobile-tab-btn flex-1 py-1.5 text-center text-slate-400" data-tab="upload">☁️ Kéo Thả</button>
+      <button onclick="switchTab('sync')" class="mobile-tab-btn flex-1 py-1.5 text-center text-slate-400" data-tab="sync">🔄 Khám SK</button>
     </div>
   </header>
 
   <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    <!-- ==================== TAB 1: QUẢN LÝ MÔN HỌC ==================== -->
-    <section id="tab-content-courses" class="space-y-6">
+    <!-- ==================== SECTION 1: QUẢN LÝ SỔ HỘ KHẨU (COURSES) ==================== -->
+    <section id="section-courses" class="space-y-6">
       
       <!-- Action Bar -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 sm:p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur">
         <div>
           <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <span>📚</span> Quản lý Môn học (Master Courses)
+            <span>📚</span> Quản lý Sổ Hộ Khẩu (Courses)
           </h1>
           <p class="text-xs sm:text-sm text-slate-400 mt-1">
             Quy trình tạo môn học 3 chiều: Web UI ➔ Google Drive API ➔ Firestore ➔ Local Agent (NLM & Ổ đĩa)
@@ -148,12 +148,12 @@
     </section>
 
 
-    <!-- ==================== TAB 2: NẠP TÀI LIỆU (UPLOAD) ==================== -->
-    <section id="tab-content-upload" class="hidden space-y-6 max-w-4xl mx-auto">
+    <!-- ==================== SECTION 2: KÉO THẢ UPLOAD (UPLOAD CENTER) ==================== -->
+    <section id="section-upload" class="hidden space-y-6 max-w-4xl mx-auto">
       
       <div class="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur">
         <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-          <span>☁️</span> Trung tâm Nạp Tài liệu (Upload Center)
+          <span>☁️</span> Kéo Thả Upload Tài Liệu (Upload Center)
         </h1>
         <p class="text-xs sm:text-sm text-slate-400 mt-1">
           Stream file trực tiếp lên Google Drive qua Service Account 24/7, gán Public Reader và kích hoạt Local Agent nạp vào NotebookLM Plus.
@@ -222,15 +222,15 @@
     </section>
 
 
-    <!-- ==================== TAB 3: ĐỒNG BỘ & HỆ THỐNG ==================== -->
-    <section id="tab-content-sync" class="hidden space-y-6">
+    <!-- ==================== SECTION 3: RECONCILE / KHÁM SỨC KHỎE (SYNC SYSTEM) ==================== -->
+    <section id="section-sync" class="hidden space-y-6">
       
       <!-- Top Overview Box -->
       <div class="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <span>🔄</span> Trung tâm Đồng bộ & Khám Sức Khỏe (Sync Reconcile)
+              <span>🔄</span> Reconcile / Khám Sức Khỏe Hệ Thống
             </h1>
             <p class="text-xs sm:text-sm text-slate-400 mt-1">
               So khớp cây thư mục thực tế trên Google Drive với cơ sở dữ liệu hệ thống, phát hiện các thư mục lạc trôi để liên kết 1-chạm.
@@ -298,19 +298,19 @@
         </div>
         <div>
           <h3 class="text-lg font-bold text-white">Thêm Môn Học Mới</h3>
-          <p class="text-xs text-slate-400">Khởi tạo môn học đồng bộ luồng 3 chiều</p>
+          <p class="text-xs text-slate-400">Khởi tạo môn học và kích hoạt chuỗi Đồng Bộ 3 Chiều</p>
         </div>
       </div>
 
       <form id="form-create-course" onsubmit="handleCreateCourse(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
-            Tên Môn Học Hiển Thị <span class="text-rose-400">*</span>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            Tên hiển thị môn học (display_name) <span class="text-rose-400">*</span>
           </label>
           <input 
             type="text" 
             id="input-course-name" 
-            required
+            required 
             placeholder="Ví dụ: Cơ sở dữ liệu phân tán" 
             class="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
             oninput="handleAutoSlug(this.value)"
@@ -318,23 +318,33 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
-            Tên Thư Mục Máy Tính (Local Folder Name)
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            Tên thư mục máy tính (local_folder_name)
           </label>
           <input 
             type="text" 
             id="input-course-folder" 
-            placeholder="Ví dụ: 03_CSDL_Phan_Tan" 
-            class="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-emerald-400 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            placeholder="Tự động sinh (VD: Mon_Co_so_du_lieu_phan_tan)" 
+            class="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-emerald-400 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
           />
-          <p class="text-[11px] text-slate-500 mt-1">Local Agent sẽ tự động tạo thư mục này tại H:\2026\Thac Sy\Mon_Hoc\</p>
+          <p class="text-[11px] text-slate-500 mt-1">
+            Local Agent sẽ tự động tạo: <code class="text-slate-400">H:\2026\Thac Sy\Mon_Hoc\&lt;tên_thư_mục&gt;</code>
+          </p>
         </div>
 
-        <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
-          <button type="button" onclick="closeCreateCourseModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition">
+        <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
+          <button 
+            type="button" 
+            onclick="closeCreateCourseModal()" 
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+          >
             Hủy bỏ
           </button>
-          <button type="submit" id="btn-submit-course" class="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25 transition flex items-center gap-2">
+          <button 
+            type="submit" 
+            id="btn-submit-course"
+            class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25 transition flex items-center gap-2"
+          >
             <span>💾 Lưu & Khởi tạo</span>
           </button>
         </div>
@@ -343,10 +353,10 @@
     </div>
   </div>
 
-  <!-- ==================== TOAST CONTAINER ==================== -->
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <!-- ==================== TOAST NOTIFICATION CONTAINER ==================== -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
 
-  <!-- ==================== LOGIC / VANILLA JS CONTROLLER ==================== -->
+  <!-- ==================== JAVASCRIPT CONTROLLERS ==================== -->
   <script>
     const WORKER_URL = 'https://ths-organizer-api.ths-organizer-nngocit.workers.dev';
     const GOOGLE_CLIENT_ID = '437903639644-img3tmoj4hdji3nkocknmitmk197k3lv.apps.googleusercontent.com';
@@ -369,6 +379,7 @@
 
     function showToast(message, type = 'info', duration = 4000) {
       const container = document.getElementById('toast-container');
+      if (!container) return;
       const toast = document.createElement('div');
       
       const colors = {
@@ -397,7 +408,7 @@
     function switchTab(tabName) {
       _activeTab = tabName;
       ['courses', 'upload', 'sync'].forEach(t => {
-        const content = document.getElementById(`tab-content-${t}`);
+        const content = document.getElementById(`section-${t}`);
         const navBtn = document.getElementById(`nav-btn-${t}`);
         const isMatch = (t === tabName);
 
@@ -422,7 +433,7 @@
       if (tabName === 'sync') runReconcile();
     }
 
-    // ===== 3. TAB 1: COURSES CONTROLLER =====
+    // ===== 3. SECTION 1: QUẢN LÝ SỔ HỘ KHẨU (COURSES) CONTROLLER =====
     async function loadCourses() {
       const grid = document.getElementById('courses-grid');
       const select = document.getElementById('upload-course-select');
@@ -433,18 +444,38 @@
         const resp = await fetch(`${WORKER_URL}/api/courses`, {
           headers: buildHeaders()
         });
+
+        if (!resp.ok) {
+          if (resp.status === 401) {
+            if (grid) {
+              grid.innerHTML = `
+                <div class="col-span-full p-8 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center">
+                  <div class="text-3xl mb-2">🔒</div>
+                  <div class="font-bold text-amber-300 text-base">Yêu cầu xác thực tài khoản</div>
+                  <p class="text-xs text-slate-400 mt-1 max-w-md mx-auto">Vui lòng bấm nút "Sign in with Google" ở góc trên bên phải để nạp dữ liệu môn học.</p>
+                </div>`;
+            }
+            return;
+          }
+          throw new Error(`Mã lỗi HTTP: ${resp.status}`);
+        }
+
         const data = await resp.json();
         _courses = data.courses || [];
 
-        // Render Dropdown for Tab 2
+        // Update dropdown for Upload Tab
         if (select) {
-          select.innerHTML = _courses.length 
-            ? _courses.map(c => `<option value="${c.id}">${c.display_name || c.name || c.id}</option>`).join('')
-            : '<option value="">(Chưa có môn học nào)</option>';
+          if (!_courses.length) {
+            select.innerHTML = '<option value="">-- Chưa có môn học nào --</option>';
+          } else {
+            select.innerHTML = '<option value="">-- Chọn môn học mục tiêu --</option>' +
+              _courses.map(c => `<option value="${c.id}">${c.display_name || c.name} (${c.local_folder_name || 'N/A'})</option>`).join('');
+          }
         }
 
-        // Render Grid
+        // Render Courses Grid Cards
         if (!grid) return;
+
         if (!_courses.length) {
           grid.innerHTML = `
             <div class="col-span-full text-center py-16 bg-slate-900/40 rounded-2xl border border-dashed border-slate-800 p-8">
@@ -536,7 +567,7 @@
 
       if (!name) return;
       btn.disabled = true;
-      btn.innerHTML = '<span>⏳ Đang tạo thư mục Drive...</span>';
+      btn.innerHTML = '<span class="inline-block animate-spin">⏳</span><span>Đang tạo thư mục Drive...</span>';
 
       try {
         const resp = await fetch(`${WORKER_URL}/api/courses`, {
@@ -565,7 +596,7 @@
     }
 
 
-    // ===== 4. TAB 2: UPLOAD CENTER CONTROLLER =====
+    // ===== 4. SECTION 2: KÉO THẢ UPLOAD CONTROLLER =====
     function initDragAndDrop() {
       const dropZone = document.getElementById('drop-zone');
       const fileInput = document.getElementById('file-input');
@@ -718,7 +749,7 @@
     }
 
 
-    // ===== 5. TAB 3: SYSTEM SYNC & RECONCILIATION =====
+    // ===== 5. SECTION 3: RECONCILE / KHÁM SỨC KHỎE CONTROLLER =====
     async function runReconcile() {
       const btn = document.getElementById('btn-run-reconcile');
       const spinner = document.getElementById('reconcile-spinner');
@@ -765,7 +796,7 @@
                 </div>
                 <div class="text-[11px] font-mono text-slate-400 mt-1">ID Drive: ${f.id}</div>
               </div>
-              <button onclick="handleImportFolder('${f.id}', '${f.name.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow flex items-center gap-1.5 self-start sm:self-auto">
+              <button id="btn-import-${f.id}" onclick="handleImportFolder('${f.id}', '${f.name.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow flex items-center gap-1.5 self-start sm:self-auto">
                 <span>⚡ Import 1-chạm</span>
               </button>
             </div>`).join('');
@@ -781,6 +812,12 @@
     }
 
     async function handleImportFolder(folderId, folderName) {
+      const btn = document.getElementById(`btn-import-${folderId}`);
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block animate-spin">⏳</span><span>Đang import...</span>';
+      }
+
       try {
         const resp = await fetch(`${WORKER_URL}/api/sync/import-drive-folder`, {
           method: 'POST',
@@ -795,11 +832,35 @@
         loadCourses();
       } catch (err) {
         showToast(`Thao tác thất bại: ${err.message}`, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>⚡ Import 1-chạm</span>';
+        }
       }
     }
 
 
-    // ===== 6. GOOGLE SIGN-IN SDK INITIALIZATION =====
+    // ===== 6. WORKER HEALTH CHECK PING =====
+    async function pingWorkerHealth() {
+      const statusText = document.getElementById('api-status-text');
+      const dot = document.getElementById('api-status-dot');
+      try {
+        const res = await fetch(`${WORKER_URL}/health`);
+        if (res.ok) {
+          if (statusText) statusText.textContent = 'Worker API Online';
+          if (dot) dot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse-subtle';
+        } else {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      } catch (err) {
+        if (statusText) statusText.textContent = 'Worker API Offline';
+        if (dot) dot.className = 'inline-block w-2 h-2 rounded-full bg-rose-500';
+      }
+    }
+
+
+    // ===== 7. GOOGLE SIGN-IN SDK INITIALIZATION =====
     function initGoogleAuth() {
       if (window.google?.accounts?.id) {
         window.google.accounts.id.initialize({
@@ -853,9 +914,10 @@
     }
 
 
-    // ===== 7. DOM CONTENT LOADED ENTRYPOINT =====
+    // ===== 8. DOM CONTENT LOADED ENTRYPOINT =====
     document.addEventListener('DOMContentLoaded', () => {
       initDragAndDrop();
+      pingWorkerHealth();
       loadCourses();
       setTimeout(initGoogleAuth, 1000);
     });
