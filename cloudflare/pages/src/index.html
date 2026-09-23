@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ThsAutoOrganizer — Trợ lý học thuật Thạc sĩ</title>
+  <title>ThsAutoOrganizer — Google AI Studio & NotebookLM Studio</title>
   <meta name="description" content="Hệ thống tổ chức tài liệu học thuật tự động với AI Study Hub và tích hợp NotebookLM Plus. Dành cho học viên Thạc sĩ.">
 
   <!-- CSS -->
@@ -16,12 +16,12 @@
      AUTH SCREEN (Màn hình đăng nhập)
      ============================== -->
 <div id="auth-screen" class="auth-screen">
-  <div class="auth-logo">🎓</div>
-  <h1 class="auth-title">ThsAutoOrganizer</h1>
+  <div class="auth-logo">✨</div>
+  <h1 class="auth-title">ThsAutoOrganizer Studio</h1>
   <p class="auth-subtitle">Trợ lý học thuật Thạc sĩ — Tổ chức tài liệu, đồng bộ NotebookLM, và tạo nội dung AI tự động.</p>
   <!-- Google Sign-In button (rendered by GSI SDK) -->
   <div id="google-signin-btn"></div>
-  <p class="text-muted" style="font-size:0.8rem">Đăng nhập bằng tài khoản Google có NotebookLM Plus</p>
+  <p class="text-muted" style="font-size:0.8rem">Đăng nhập bằng tài khoản Google có quyền truy cập</p>
 </div>
 
 <!-- ==============================
@@ -29,167 +29,225 @@
      ============================== -->
 <div id="app-shell" class="app-shell hidden">
 
-  <!-- Topbar -->
-  <header class="topbar">
-    <div class="topbar-brand">🎓 ThsOrganiz</div>
-
-    <nav class="topbar-nav" role="navigation" aria-label="Điều hướng chính">
-      <button class="nav-tab active" data-tab="dashboard" id="tab-dashboard">📂 Tài liệu</button>
-      <button class="nav-tab" data-tab="study-hub" id="tab-study-hub">🧠 AI Study Hub
-        <span class="badge badge-synced" style="margin-left:4px; font-size:0.65rem">Plus</span>
-      </button>
-      <button class="nav-tab" data-tab="chat" id="tab-chat">💬 Chat AI</button>
-      <button class="nav-tab" data-tab="review" id="tab-review">✅ Duyệt nguồn</button>
-      <button class="nav-tab" data-tab="exam" id="tab-exam">📝 Ôn thi</button>
-      <button class="nav-tab" data-tab="artifacts" id="tab-artifacts">📦 Artifacts</button>
-      <button class="nav-tab" data-tab="settings" id="tab-settings">⚙ Cài đặt</button>
-    </nav>
-
-    <div class="topbar-user">
+  <!-- Topbar chuẩn Google AI Studio -->
+  <header class="studio-topbar">
+    <div class="flex items-center gap-3">
+      <div class="brand">
+        <span class="gemini-sparkle">✨</span>
+        <span class="brand-title">ThsAutoOrganizer</span>
+        <span class="badge-studio">Studio</span>
+      </div>
       <span id="nlm-status-badge" class="nlm-status-badge needs-login">
         <span class="badge-dot"></span> Đang kết nối...
       </span>
-      <img id="user-avatar" class="user-avatar" src="" alt="Avatar" onerror="this.style.display='none'">
-      <span id="user-name" class="text-muted" style="font-size:0.875rem"></span>
-      <button class="btn btn-ghost btn-sm" id="btn-sign-out">Đăng xuất</button>
+    </div>
+
+    <!-- Thanh Điều Hướng Tab Ở Giữa -->
+    <nav class="studio-nav-tabs" role="navigation" aria-label="Điều hướng chính">
+      <button class="nav-tab active" data-tab="dashboard" id="tab-dashboard">📂 Tài liệu</button>
+      <button class="nav-tab" data-tab="study-hub" id="tab-study-hub">🧠 AI Study Hub</button>
+      <button class="nav-tab" data-tab="chat" id="tab-chat">💬 Chat AI</button>
+      <button class="nav-tab" data-tab="review" id="tab-review">🔍 Duyệt nguồn</button>
+      <button class="nav-tab" data-tab="exam" id="tab-exam">📝 Ôn thi</button>
+      <button class="nav-tab" data-tab="artifacts" id="tab-artifacts">📦 Xuất bản</button>
+      <button class="nav-tab" data-tab="settings" id="tab-settings">⚙ Cài đặt</button>
+    </nav>
+
+    <!-- Điều khiển góc phải -->
+    <div class="flex items-center gap-2">
+      <button id="theme-toggle-btn" class="btn-icon" title="Chuyển Dark / Light mode">☀️</button>
+      <div class="user-menu">
+        <img id="user-avatar" class="user-avatar" src="" alt="Avatar" onerror="this.style.display='none'">
+        <span id="user-name" class="text-muted" style="font-size:0.82rem"></span>
+        <button class="btn btn-ghost btn-sm" id="btn-sign-out">Thoát</button>
+      </div>
     </div>
   </header>
 
-  <!-- Main Content -->
-  <main class="app-main">
+  <!-- Khung Thân 3 Cột (NotebookLM Layout) -->
+  <div class="studio-body" id="studio-body">
 
-    <!-- ===== DASHBOARD (Tài liệu) ===== -->
-    <section class="page-section active" id="page-dashboard" aria-labelledby="page-dashboard-title">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title" id="page-dashboard-title">📂 Quản lý Tài liệu</h1>
-          <div class="section-subtitle">Upload, tổ chức và theo dõi trạng thái đồng bộ NotebookLM</div>
-        </div>
-        <div class="flex gap-2">
-          <select id="filter-subject" class="btn btn-ghost btn-sm">
-            <option value="">Tất cả môn học</option>
-            <option value="Triết học">Triết học</option>
-            <option value="Toán KHCL">Toán KHCL</option>
-            <option value="Cơ sở dữ liệu">Cơ sở dữ liệu</option>
-            <option value="Hệ thống thông tin">Hệ thống thông tin</option>
-            <option value="Kinh tế lượng">Kinh tế lượng</option>
-          </select>
-          <select id="filter-doc-type" class="btn btn-ghost btn-sm">
-            <option value="">Tất cả loại</option>
-            <option value="giao_trinh">📚 Giáo trình</option>
-            <option value="slide">📊 Slide</option>
-            <option value="bai_bao">🔬 Bài báo</option>
-            <option value="unverified_web">🌐 Web</option>
-            <option value="ket_qua">✅ Kết quả</option>
-          </select>
-          <select id="filter-review" class="btn btn-ghost btn-sm">
-            <option value="">Mọi trạng thái duyệt</option>
-            <option value="unreviewed">🟡 Chờ duyệt</option>
-            <option value="approved">✓ Đã duyệt</option>
-            <option value="rejected">✗ Từ chối</option>
-          </select>
-          <select id="filter-output" class="btn btn-ghost btn-sm">
-            <option value="">Input + Output</option>
-            <option value="false">Chỉ Input</option>
-            <option value="true">⛔ Chỉ Output (NO-LOOP)</option>
-          </select>
-        </div>
+    <!-- CỘT 1: NGUỒN TÀI LIỆU (Sources Panel) -->
+    <aside class="panel-sources" id="panel-sources">
+      <div class="panel-header">
+        <div class="panel-title">📚 Nguồn tài liệu</div>
+        <button class="btn btn-primary btn-sm" id="btn-quick-add-source">＋ Thêm</button>
       </div>
 
-      <!-- Upload Area -->
-      <div id="upload-area"></div>
+      <!-- Chọn môn học toàn cục -->
+      <div class="course-picker-wrapper">
+        <select id="global-course-select" class="course-select">
+          <option value="">-- Chọn môn học --</option>
+        </select>
+      </div>
 
-      <!-- Files Grid -->
-      <div id="files-grid" style="margin-top:24px"></div>
-    </section>
+      <!-- Danh sách tài liệu của môn học -->
+      <div class="sources-list" id="panel-sources-list">
+        <div class="text-muted" style="padding:12px; font-size:0.8rem">Đang nạp nguồn tài liệu...</div>
+      </div>
+    </aside>
 
-    <!-- ===== AI STUDY HUB ===== -->
-    <section class="page-section" id="page-study-hub" aria-labelledby="page-study-hub-title">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title" id="page-study-hub-title">🧠 AI Study Hub</h1>
-          <div class="section-subtitle">Tóm tắt, Quiz, Đề cương do AI tạo từ tài liệu của bạn</div>
+    <!-- CỘT 2: KHÔNG GIAN LÀM VIỆC CHÍNH (Center Canvas) -->
+    <main class="panel-canvas" id="panel-canvas">
+
+      <!-- ===== DASHBOARD (Tài liệu) ===== -->
+      <section class="page-section active" id="page-dashboard" aria-labelledby="page-dashboard-title">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title" id="page-dashboard-title">📂 Quản lý Tài liệu</h1>
+            <div class="section-subtitle">Upload, tổ chức và theo dõi trạng thái đồng bộ NotebookLM</div>
+          </div>
+          <div class="flex gap-2">
+            <select id="filter-subject" class="btn btn-ghost btn-sm">
+              <option value="">Tất cả môn học</option>
+              <option value="Triết học">Triết học</option>
+              <option value="Toán KHCL">Toán KHCL</option>
+              <option value="Cơ sở dữ liệu">Cơ sở dữ liệu</option>
+              <option value="Hệ thống thông tin">Hệ thống thông tin</option>
+              <option value="Kinh tế lượng">Kinh tế lượng</option>
+            </select>
+            <select id="filter-doc-type" class="btn btn-ghost btn-sm">
+              <option value="">Tất cả loại</option>
+              <option value="giao_trinh">📚 Giáo trình</option>
+              <option value="slide">📊 Slide</option>
+              <option value="bai_bao">🔬 Bài báo</option>
+              <option value="unverified_web">🌐 Web</option>
+              <option value="ket_qua">✅ Kết quả</option>
+            </select>
+            <select id="filter-review" class="btn btn-ghost btn-sm">
+              <option value="">Mọi trạng thái duyệt</option>
+              <option value="unreviewed">🟡 Chờ duyệt</option>
+              <option value="approved">✓ Đã duyệt</option>
+              <option value="rejected">✗ Từ chối</option>
+            </select>
+            <select id="filter-output" class="btn btn-ghost btn-sm">
+              <option value="">Input + Output</option>
+              <option value="false">Chỉ Input</option>
+              <option value="true">⛔ Chỉ Output (NO-LOOP)</option>
+            </select>
+          </div>
         </div>
-      </div>
 
-      <!-- Quick Research Box -->
-      <div class="card" style="margin-bottom:24px">
-        <div style="font-weight:600; margin-bottom:12px">💬 Hộp hỏi đáp nhanh (Quick Research)</div>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-          <select id="quick-research-course" class="btn btn-ghost btn-sm" style="min-width:160px">
-            <option value="">Tất cả môn học</option>
-          </select>
-          <input id="quick-research-input" type="text"
-                 placeholder='Nhập câu hỏi... vd: "Chuẩn hóa 3NF là gì?"'
-                 style="flex:1; min-width:200px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--r-sm); padding:8px 12px; color:var(--text); font-family:inherit; font-size:0.875rem">
-          <button class="btn btn-primary btn-sm" id="btn-quick-research">Gửi câu hỏi →</button>
+        <!-- Upload Area -->
+        <div id="upload-area"></div>
+
+        <!-- Files Grid -->
+        <div id="files-grid" style="margin-top:20px"></div>
+      </section>
+
+      <!-- ===== AI STUDY HUB ===== -->
+      <section class="page-section" id="page-study-hub" aria-labelledby="page-study-hub-title">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title" id="page-study-hub-title">🧠 AI Study Hub</h1>
+            <div class="section-subtitle">Tóm tắt, Quiz, Đề cương do AI tạo từ tài liệu của bạn</div>
+          </div>
         </div>
-        <div id="quick-research-result" style="margin-top:12px"></div>
-      </div>
 
-      <!-- Insights Grid -->
-      <div id="insights-grid"></div>
-    </section>
-
-    <!-- ===== CHAT AI (Phase 3) ===== -->
-    <section class="page-section" id="page-chat" aria-labelledby="page-chat-title">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title" id="page-chat-title">💬 Chat AI</h1>
-          <div class="section-subtitle">Hội thoại multi-turn với NotebookLM — chọn nguồn, nhận trích dẫn chuẩn APA/IEEE/Harvard</div>
+        <!-- Quick Research Box -->
+        <div class="card" style="margin-bottom:20px">
+          <div style="font-weight:600; margin-bottom:10px">💬 Hộp hỏi đáp nhanh (Quick Research)</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+            <select id="quick-research-course" class="btn btn-ghost btn-sm" style="min-width:160px">
+              <option value="">Tất cả môn học</option>
+            </select>
+            <input id="quick-research-input" type="text"
+                   placeholder='Nhập câu hỏi... vd: "Chuẩn hóa 3NF là gì?"'
+                   style="flex:1; min-width:200px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--r-sm); padding:8px 12px; color:var(--text); font-family:inherit; font-size:0.85rem">
+            <button class="btn btn-primary btn-sm" id="btn-quick-research">Gửi câu hỏi →</button>
+          </div>
+          <div id="quick-research-result" style="margin-top:12px"></div>
         </div>
-      </div>
-      <div id="chat-root"></div>
-    </section>
 
-    <!-- ===== DUYỆT NGUỒN (Phase 4) ===== -->
-    <section class="page-section" id="page-review" aria-labelledby="page-review-title">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title" id="page-review-title">✅ Duyệt nguồn</h1>
-          <div class="section-subtitle">Nguồn từ Deep Research chờ kiểm duyệt trước khi đưa vào NotebookLM</div>
+        <!-- Insights Grid -->
+        <div id="insights-grid"></div>
+      </section>
+
+      <!-- ===== CHAT AI (Phase 3) ===== -->
+      <section class="page-section" id="page-chat" aria-labelledby="page-chat-title">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title" id="page-chat-title">💬 Chat AI</h1>
+            <div class="section-subtitle">Hội thoại multi-turn với NotebookLM — chọn nguồn, nhận trích dẫn chuẩn APA/IEEE/Harvard</div>
+          </div>
         </div>
-      </div>
-      <div id="review-root"></div>
-    </section>
+        <div id="chat-root"></div>
+      </section>
 
-    <!-- ===== ÔN THI (Phase 4) ===== -->
-    <section class="page-section" id="page-exam" aria-labelledby="page-exam-title">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title" id="page-exam-title">📝 Trạm Ôn thi</h1>
-          <div class="section-subtitle">Đề ôn AI: 50 flashcard + 5 câu tự luận — cày quiz và lưu điểm</div>
+      <!-- ===== DUYỆT NGUỒN (Phase 4) ===== -->
+      <section class="page-section" id="page-review" aria-labelledby="page-review-title">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title" id="page-review-title">🔍 Duyệt nguồn</h1>
+            <div class="section-subtitle">Nguồn từ Deep Research chờ kiểm duyệt trước khi đưa vào NotebookLM</div>
+          </div>
         </div>
-      </div>
-      <div id="exam-root"></div>
-    </section>
+        <div id="review-root"></div>
+      </section>
 
-    <!-- ===== ARTIFACTS (Phase 4) ===== -->
-    <section class="page-section" id="page-artifacts" aria-labelledby="page-artifacts-title">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title" id="page-artifacts-title">📦 Artifacts</h1>
-          <div class="section-subtitle">Slide .pptx / tài liệu .docx do NotebookLM tạo — lưu trong 04_Ket_Qua_Xuat_Ban (⛔ NO-LOOP)</div>
+      <!-- ===== ÔN THI (Phase 4) ===== -->
+      <section class="page-section" id="page-exam" aria-labelledby="page-exam-title">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title" id="page-exam-title">📝 Trạm Ôn thi</h1>
+            <div class="section-subtitle">Đề ôn AI: 50 flashcard + 5 câu tự luận — cày quiz và lưu điểm</div>
+          </div>
         </div>
-      </div>
-      <div id="artifacts-root"></div>
-    </section>
+        <div id="exam-root"></div>
+      </section>
 
-    <!-- ===== SETTINGS ===== -->
-    <section class="page-section" id="page-settings" aria-labelledby="page-settings-title">
-      <div class="page-header">
-        <h1 class="page-title" id="page-settings-title">⚙ Cài đặt</h1>
-      </div>
-      <div class="card" style="max-width:600px">
-        <div style="font-weight:600; margin-bottom:16px">🔗 Cấu hình NotebookLM MCP</div>
-        <p class="text-muted" style="margin-bottom:12px">Để kích hoạt đồng bộ NotebookLM Plus, chạy lệnh sau trong terminal:</p>
-        <pre class="mono" style="background:var(--bg-elevated); padding:12px; border-radius:var(--r-sm); overflow-x:auto">pip install notebooklm-mcp-cli
+      <!-- ===== ARTIFACTS (Phase 4) ===== -->
+      <section class="page-section" id="page-artifacts" aria-labelledby="page-artifacts-title">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title" id="page-artifacts-title">📦 Xuất bản Artifacts</h1>
+            <div class="section-subtitle">Slide .pptx / tài liệu .docx do NotebookLM tạo — lưu trong 04_Ket_Qua_Xuat_Ban (⛔ NO-LOOP)</div>
+          </div>
+        </div>
+        <div id="artifacts-root"></div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section class="page-section" id="page-settings" aria-labelledby="page-settings-title">
+        <div class="page-header">
+          <h1 class="page-title" id="page-settings-title">⚙ Cài đặt</h1>
+        </div>
+        <div class="card" style="max-width:600px">
+          <div style="font-weight:600; margin-bottom:14px">🔗 Cấu hình NotebookLM MCP</div>
+          <p class="text-muted" style="margin-bottom:12px">Để kích hoạt đồng bộ NotebookLM Plus, chạy lệnh sau trong terminal:</p>
+          <pre class="mono" style="background:var(--bg-elevated); padding:12px; border-radius:var(--r-sm); overflow-x:auto; border:1px solid var(--border)">pip install notebooklm-mcp-cli
 nlm login</pre>
-        <p class="text-muted" style="margin-top:12px; font-size:0.875rem">Sau khi đăng nhập, Python Local Agent sẽ tự động đồng bộ tài liệu vào đúng Notebook.</p>
-      </div>
-    </section>
+          <p class="text-muted" style="margin-top:12px; font-size:0.85rem">Sau khi đăng nhập, Python Local Agent sẽ tự động đồng bộ tài liệu vào đúng Notebook.</p>
+        </div>
+      </section>
 
-  </main>
+    </main>
+
+    <!-- CỘT 3: STUDIO & GHI CHÚ (Studio Panel) -->
+    <aside class="panel-studio" id="panel-studio">
+      <div class="panel-header">
+        <div class="panel-title studio-hide-on-collapse">🎨 Studio & Ghi chú</div>
+        <button class="btn-icon btn-sm" id="btn-toggle-studio-panel" title="Thu gọn / Mở rộng Studio">◨</button>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="studio-quick-actions studio-hide-on-collapse">
+        <button class="btn-studio-action" id="studio-action-quiz">🎯 Tạo đề Quiz ôn thi</button>
+        <button class="btn-studio-action" id="studio-action-summary">📝 Tóm tắt bài học</button>
+        <button class="btn-studio-action" id="studio-action-outline">📋 Đề cương tổng hợp</button>
+        <button class="btn-studio-action" id="studio-action-slides">📊 Slide thuyết trình</button>
+      </div>
+
+      <!-- Danh sách ấn phẩm đã tạo -->
+      <div class="studio-artifacts-list studio-hide-on-collapse" id="studio-artifacts-list" style="margin-top:8px; overflow-y:auto; flex:1">
+        <div style="font-weight:600; font-size:0.8rem; margin-bottom:8px; color:var(--text-muted)">Ấn phẩm đã tạo</div>
+        <div id="studio-recent-items" class="flex flex-col gap-2">
+          <div class="text-muted" style="font-size:0.75rem">Chọn môn học để xem ấn phẩm...</div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
 </div>
 
 <!-- Toast Container -->
