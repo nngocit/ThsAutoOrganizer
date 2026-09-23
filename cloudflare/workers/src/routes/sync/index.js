@@ -8,7 +8,7 @@ import { withCors } from '../../lib/cors.js';
 
 const router = new Hono();
 const VALID_QUEUES = new Set(['nlm_task_queue', 'drive_task_queue']);
-const DEFAULT_DRIVE_ROOT = '12YHJZzM04Uq0rSKcg-pQGwdFMqKrXE3X'; // ThacSi_HTTT root folder
+const DEFAULT_DRIVE_ROOT = '1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg'; // ThacSi_HTTT root folder
 
 /**
  * GET /api/sync/reconcile
@@ -28,7 +28,10 @@ router.get('/reconcile', requireAuthOrAgent(async (c) => {
     // 1. Xác định Root Folder ID trên Drive
     let rootFolderId = DEFAULT_DRIVE_ROOT;
     try {
-      const configDoc = await firestoreGet(c.env, `users/${targetUid}/settings/config`);
+      let configDoc = await firestoreGet(c.env, `users/${targetUid}/settings/config`);
+      if (!configDoc) {
+        configDoc = await firestoreGet(c.env, 'system_config/default');
+      }
       if (configDoc) {
         const cfg = fromFirestoreDoc(configDoc);
         if (cfg.google_drive_root_folder_id) rootFolderId = cfg.google_drive_root_folder_id;

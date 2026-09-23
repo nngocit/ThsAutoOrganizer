@@ -7,7 +7,7 @@ import { createDriveFolder } from '../../lib/drive.js';
 import { withCors } from '../../lib/cors.js';
 
 const router = new Hono();
-const DEFAULT_DRIVE_ROOT = '12YHJZzM04Uq0rSKcg-pQGwdFMqKrXE3X'; // ThacSi_HTTT root folder
+const DEFAULT_DRIVE_ROOT = '1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg'; // ThacSi_HTTT root folder
 
 /**
  * GET /api/courses
@@ -93,7 +93,10 @@ router.post('/', requireAuth(async (c) => {
     // 1. Xác định Root Folder ID trên Google Drive
     let rootFolderId = DEFAULT_DRIVE_ROOT;
     try {
-      const configDoc = await firestoreGet(c.env, `users/${user.uid}/settings/config`);
+      let configDoc = await firestoreGet(c.env, `users/${user.uid}/settings/config`);
+      if (!configDoc) {
+        configDoc = await firestoreGet(c.env, 'system_config/default');
+      }
       if (configDoc) {
         const cfg = fromFirestoreDoc(configDoc);
         if (cfg.google_drive_root_folder_id) rootFolderId = cfg.google_drive_root_folder_id;
