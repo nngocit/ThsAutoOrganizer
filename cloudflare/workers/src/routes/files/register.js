@@ -72,11 +72,14 @@ const handleRegister = requireAgentAuth(async (c) => {
     const existing = await findFileBySha256(c.env, targetUid, sha);
     const fileId = existing?._id || stableFileId(sha);
 
+    const driveViewLink = body.drive_view_link || body.webViewLink || '';
+
     if (existing) {
       // Merge: chỉ bổ sung dữ liệu local, giữ nguyên nguồn gốc ban đầu
       const patch = {
         filename: existing.filename || filename,
         drive_file_id: drive_file_id || existing.drive_file_id || '',
+        drive_view_link: driveViewLink || existing.drive_view_link || '',
         local_path: local_path || existing.local_path || '',
         size_bytes: size_bytes ? String(size_bytes) : (existing.size_bytes || '0'),
         is_output: isOutput || existing.is_output === true,
@@ -97,6 +100,7 @@ const handleRegister = requireAgentAuth(async (c) => {
         size_bytes: size_bytes ? String(size_bytes) : '0',
         sha256: sha,
         drive_file_id: drive_file_id || '',
+        drive_view_link: driveViewLink,
         local_path: local_path || '',
         source_kind: 'local_scan',
         review_status: defaultReviewStatus(docType),

@@ -52,13 +52,15 @@ def check_hash(sha256: str, uid: str = "") -> dict[str, Any]:
 
 def register_file(*, filename: str, subject: str, document_type: str, sha256: str,
                   drive_file_id: str, size_bytes: int, local_path: str,
-                  folder_path: str = "", course_id: str = "", uid: str = "") -> dict[str, Any]:
+                  folder_path: str = "", course_id: str = "", uid: str = "",
+                  drive_view_link: str = "") -> dict[str, Any]:
     """POST /api/files/register — Local watcher đăng ký file đã upload Drive."""
     target_uid = uid or get("uid", "") or get("root_account_email", "")
     payload: dict[str, Any] = {
         "filename": filename, "subject": subject, "document_type": document_type,
         "folder_path": folder_path, "sha256": sha256, "drive_file_id": drive_file_id,
         "size_bytes": size_bytes, "local_path": local_path, "course_id": course_id,
+        "drive_view_link": drive_view_link, "webViewLink": drive_view_link,
     }
     if target_uid:
         payload["uid"] = target_uid

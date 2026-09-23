@@ -315,6 +315,17 @@ class DriveManager:
         result = self._execute_with_retry(request, max_retries=3)
         drive_file_id = result.get("id")
 
+        # BẮT BUỘC gán quyền public reader (type: 'anyone', role: 'reader')
+        try:
+            perm_req = service.permissions().create(
+                fileId=drive_file_id,
+                body={"type": "anyone", "role": "reader"},
+            )
+            self._execute_with_retry(perm_req, max_retries=3)
+            logger.info("Đã gán quyền public reader cho '%s' (Drive ID: %s)", file_name, drive_file_id)
+        except Exception as e:
+            logger.warning("Không thể gán quyền public reader cho '%s' (%s): %s", file_name, drive_file_id, e)
+
         logger.info("Upload thành công '%s' (Drive ID: %s)", file_name, drive_file_id)
         return drive_file_id
 

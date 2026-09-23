@@ -96,7 +96,7 @@ def upload_file(local_path: str | Path, folder_path: str = "", subject: str = ""
     if not path.exists():
         raise FileNotFoundError(f"File local không tồn tại: {path}")
     service = _get_drive_service()
-    drive_root = get("drive_root_folder", "")
+    drive_root = get("google_drive_root_folder_id", "") or get("drive_root_folder", "")
     full_folder = f"{subject}/{folder_path}" if subject and folder_path else (subject or folder_path)
     parent_id = ensure_folder_path(service, full_folder, drive_root or None) or None
 
@@ -106,9 +106,30 @@ def upload_file(local_path: str | Path, folder_path: str = "", subject: str = ""
         meta["parents"] = [parent_id]
     media = MediaFileUpload(str(path), mimetype=mime, resumable=True)
     created = service.files().create(body=meta, media_body=media, fields="id, name, size").execute()
-    logger.info("Đã upload Drive: %s -> %s (id=%s)", path.name, full_folder or "root", created["id"])
-    return {"drive_file_id": created["id"], "name": created.get("name", path.name),
-            "size_bytes": int(created.get("size") or path.stat().st_size)}
+    drive_file_id = created["id"]
+    logger.info("Đã upload Drive: %s -> %s (id=%s)", path.name, full_folder or "root", drive_file_id)
+
+    # BẮT BUỘC gọi API drive.permissions.create gán quyền type='anyone', role='reader'
+    web_view_link = ""
+    try:
+        service.permissions().create(
+            fileId=drive_file_id,
+            body={"type": "anyone", "role": "reader"},
+        ).execute()
+        # Chỉ lấy và trả về link webViewLink khi đã cấp quyền thành công
+        info = service.files().get(fileId=drive_file_id, fields="id, webViewLink").execute()
+        web_view_link = info.get("webViewLink", "")
+        logger.info("Đã cấp quyền public reader thành công cho file %s (webViewLink=%s)", drive_file_id, web_view_link)
+    except Exception as e:
+        logger.warning("Lỗi khi cấp quyền public reader cho file %s: %s", drive_file_id, e)
+
+    return {
+        "drive_file_id": drive_file_id,
+        "name": created.get("name", path.name),
+        "size_bytes": int(created.get("size") or path.stat().st_size),
+        "webViewLink": web_view_link,
+        "web_view_link": web_view_link,
+    }
 
 
 def download_file(drive_file_id: str, dest_path: str | Path) -> Path:

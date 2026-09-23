@@ -144,6 +144,7 @@ class FileWatcher:
             document_type=_infer_document_type(folder_path),
             folder_path=folder_path, sha256=digest,
             drive_file_id=uploaded["drive_file_id"],
+            drive_view_link=uploaded.get("webViewLink") or uploaded.get("web_view_link", ""),
             size_bytes=uploaded["size_bytes"], local_path=str(path.resolve()),
         )
         self._seen_hashes.add(digest)

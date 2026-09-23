@@ -89,3 +89,32 @@ def test_firestore_poller_marks_skipped_ext():
         assert mock_mark.call_count == 2
         mock_mark.assert_any_call("task_1", "processing")
         mock_mark.assert_any_call("task_1", "skipped_ext", result="skipped_ext")
+
+
+def test_upload_file_sets_public_reader_permission():
+    """upload_file trên Drive BẮT BUỘC gọi permissions().create(anyone, reader) và trả về webViewLink."""
+    from local_agent.drive_sync import upload_file
+
+    mock_service = MagicMock()
+    mock_files = MagicMock()
+    mock_permissions = MagicMock()
+    mock_service.files.return_value = mock_files
+    mock_service.permissions.return_value = mock_permissions
+
+    mock_files.create.return_value.execute.return_value = {"id": "file_123", "name": "doc.pdf", "size": "1024"}
+    mock_files.get.return_value.execute.return_value = {"id": "file_123", "webViewLink": "https://drive.google.com/file/d/file_123/view"}
+    mock_permissions.create.return_value.execute.return_value = {"id": "perm_1"}
+
+    with patch("local_agent.drive_sync._get_drive_service", return_value=mock_service), \
+         patch("local_agent.drive_sync.ensure_folder_path", return_value="folder_parent_1"):
+        res = upload_file("tests/test_classifier.py", folder_path="test", subject="Triet Hoc")
+
+        # Kiểm tra permissions.create được gọi với type: anyone, role: reader
+        mock_permissions.create.assert_called_once_with(
+            fileId="file_123",
+            body={"type": "anyone", "role": "reader"},
+        )
+        assert res["drive_file_id"] == "file_123"
+        assert res["webViewLink"] == "https://drive.google.com/file/d/file_123/view"
+        assert res["web_view_link"] == "https://drive.google.com/file/d/file_123/view"
+
