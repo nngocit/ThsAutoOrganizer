@@ -192,7 +192,11 @@ async function quickResearch() {
     const sessionId = sessionRes.id || sessionRes._id;
 
     if (sessionRes.orphan_warning) {
-      resultEl.innerHTML = `<div class="text-danger" style="margin-top:8px">⚠️ Môn học này chưa có NotebookLM liên kết. Vui lòng chọn môn khác hoặc cập nhật NotebookLM ID.</div>`;
+      resultEl.innerHTML = `
+        <div class="alert-callout warning">
+          <span class="alert-callout-icon">⚠️</span>
+          <span>Môn học này chưa có NotebookLM liên kết. Vui lòng chọn môn khác hoặc cập nhật ID.</span>
+        </div>`;
       return;
     }
 
@@ -275,12 +279,17 @@ async function quickResearch() {
 
         } else if (userMsg?.status === 'failed') {
           clearInterval(pollInterval);
-          resultEl.innerHTML = `<div class="text-danger" style="margin-top:8px">✗ NotebookLM không thể trả lời: ${escapeHtml(userMsg.error || 'Lỗi không xác định')}</div>`;
+          resultEl.innerHTML = `
+            <div class="alert-callout danger">
+              <span class="alert-callout-icon">✕</span>
+              <span>NotebookLM không thể trả lời: ${escapeHtml(userMsg.error || 'Lỗi không xác định')}</span>
+            </div>`;
         } else if (pollCount >= maxPolls) {
           clearInterval(pollInterval);
           resultEl.innerHTML = `
-            <div class="text-warning" style="margin-top:8px">
-              ⏳ Tác vụ đang mất nhiều thời gian hơn bình thường. Bạn có thể mở tab <strong>💬 Chat AI</strong> để kiểm tra kết quả khi hoàn tất.
+            <div class="alert-callout warning">
+              <span class="alert-callout-icon">⏳</span>
+              <span>Tác vụ đang mất nhiều thời gian hơn bình thường. Bạn có thể mở tab <strong>💬 Chat AI</strong> để kiểm tra kết quả khi hoàn tất.</span>
             </div>`;
         }
       } catch (pollErr) {
@@ -289,7 +298,11 @@ async function quickResearch() {
     }, 2000);
 
   } catch (err) {
-    resultEl.innerHTML = `<div class="text-danger" style="margin-top:8px">Lỗi: ${escapeHtml(err.message)}</div>`;
+    resultEl.innerHTML = `
+      <div class="alert-callout danger">
+        <span class="alert-callout-icon">✕</span>
+        <span>Lỗi: ${escapeHtml(err.message)}</span>
+      </div>`;
   }
 }
 
