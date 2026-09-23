@@ -1,7 +1,7 @@
 // src/routes/courses/index.js — CRUD courses (<150 lines)
 
 import { Hono } from 'hono';
-import { requireAuth } from '../../lib/auth.js';
+import { requireAuth, requireAuthOrAgent, resolveTargetUid, getFallbackUid } from '../../lib/auth.js';
 import { firestoreSet, firestoreList, firestoreGet, fromFirestoreDoc } from '../../lib/firebase.js';
 import { withCors } from '../../lib/cors.js';
 
@@ -22,6 +22,36 @@ router.get('/', requireAuth(async (c) => {
   } catch (err) {
     console.error('List courses error:', err);
     return withCors(c.json({ error: 'Không thể lấy danh sách môn học', detail: err.message }, 500), origin);
+  }
+}));
+
+/**
+ * GET /api/courses/:courseId
+ * Tra cứu 1 course theo ID (hỗ trợ cả Web User lẫn Local Agent bằng X-Agent-Secret).
+ */
+router.get('/:courseId', requireAuthOrAgent(async (c) => {
+  const courseId = c.req.param('courseId');
+  const origin = c.req.header('Origin') || '';
+  const targetUid = resolveTargetUid(c, null, c.req.query('uid')) || await getFallbackUid(c.env);
+
+  if (!targetUid) {
+    return withCors(c.json({ error: 'UID không xác định' }, 400), origin);
+  }
+
+  try {
+    const doc = await firestoreGet(c.env, `users/${targetUid}/courses/${courseId}`);
+    if (!doc) {
+      return withCors(c.json({ error: 'Môn học không tìm thấy' }, 404), origin);
+    }
+    const data = fromFirestoreDoc(doc);
+    return withCors(c.json({
+      id: courseId,
+      notebooklm_id: data.notebooklm_id || data.notebook_id || '',
+      ...data,
+    }), origin);
+  } catch (err) {
+    console.error(`Get course ${courseId} error:`, err);
+    return withCors(c.json({ error: 'Lỗi tra cứu môn học', detail: err.message }, 500), origin);
   }
 }));
 

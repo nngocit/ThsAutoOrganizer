@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 NLM_CMD = "nlm"
 
-SUPPORTED_NLM_EXTENSIONS = {".pdf", ".docx", ".pptx", ".txt", ".md", ".mp3"}
+# 1. BỘ LỌC FILE: Danh sách định dạng hỗ trợ NotebookLM
+SUPPORTED_EXTS = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.mp3']
+SUPPORTED_NLM_EXTENSIONS = set(SUPPORTED_EXTS)
 
 
 def _nlm_available() -> bool:
@@ -83,6 +85,57 @@ def _resolve_source_file(task: dict) -> Path:
                      f"drive_file_id={drive_file_id!r})")
 
 
+def lookup_notebook_id_from_course(course_id: str, uid: str = "") -> str:
+    """Tra cứu Firestore collection 'courses' để lấy notebooklm_id theo course_id.
+
+    Dùng Try/Catch đầy đủ, thử cả Worker API lẫn Firestore REST trực tiếp.
+    """
+    if not course_id:
+        return ""
+
+    # 1. Thử gọi Worker API
+    try:
+        from .api_client import get_course
+        course_data = get_course(course_id, uid=uid)
+        nb_id = course_data.get("notebooklm_id") or course_data.get("notebook_id") or ""
+        if nb_id:
+            logger.info("Đã tìm thấy notebooklm_id từ course %s qua API: %s", course_id, nb_id)
+            return nb_id
+    except Exception as e:
+        logger.debug("Lookup course qua API lỗi (%s): %s", course_id, e)
+
+    # 2. Fallback: truy vấn Firestore REST trực tiếp nếu có service account
+    try:
+        sa_files = list(Path(__file__).parent.parent.glob("firebase/*adminsdk*.json"))
+        if sa_files:
+            from google.oauth2 import service_account  # type: ignore
+            from google.auth.transport.requests import AuthorizedSession  # type: ignore
+            sa_path = sa_files[0]
+            creds = service_account.Credentials.from_service_account_file(
+                str(sa_path), scopes=["https://www.googleapis.com/auth/datastore"]
+            )
+            session = AuthorizedSession(creds)
+            project_id = creds.project_id
+
+            candidates = []
+            if uid:
+                candidates.append(f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/users/{uid}/courses/{course_id}")
+            candidates.append(f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/courses/{course_id}")
+
+            for url in candidates:
+                res = session.get(url, timeout=10)
+                if res.status_code == 200:
+                    fields = res.json().get("fields", {})
+                    nb_id = fields.get("notebooklm_id", {}).get("stringValue") or fields.get("notebook_id", {}).get("stringValue") or ""
+                    if nb_id:
+                        logger.info("Đã tìm thấy notebooklm_id từ Firestore REST cho course %s: %s", course_id, nb_id)
+                        return nb_id
+    except Exception as e:
+        logger.debug("Lookup course qua Firestore REST lỗi (%s): %s", course_id, e)
+
+    return ""
+
+
 def _resolve_notebook_id(subject: str) -> str:
     """Tự động tìm Notebook trên Google NotebookLM theo tên môn học (subject)."""
     if not _nlm_available() or not subject:
@@ -116,26 +169,49 @@ def _resolve_notebook_id(subject: str) -> str:
 def handle_source_add(task: dict) -> str:
     """Xử lý action='source_add': nlm source add <notebook_id> --file <path> --wait --json.
 
-    Returns: source_id (str) khi sync thành công, 'skipped:<lý do>' khi bỏ qua.
+    Returns: source_id (str) khi sync thành công, 'skipped_ext' khi bỏ qua định dạng file.
     Raises RuntimeError nếu thất bại — poller sẽ mark task 'failed' (không treo 'processing').
     """
+    filename = task.get("filename", "") or ""
+    local_path = task.get("local_path", "") or task.get("file_path", "") or ""
+    file_name = filename or Path(local_path).name
+
+    # 1. BỘ LỌC FILE: Kiểm tra file extension trước tiên
+    ext = Path(file_name).suffix.lower()
+    if file_name and ext not in SUPPORTED_EXTS:
+        logger.info("Bỏ qua file không thuộc SUPPORTED_EXTS: %s (ext=%s)", file_name, ext)
+        return "skipped_ext"
+
     if not _nlm_available():
         raise RuntimeError("nlm CLI không tìm thấy. Chạy: pip install notebooklm-mcp-cli")
 
     notebook_id = task.get("notebook_id", "")
+    course_id = task.get("course_id", "")
     subject = task.get("subject", "")
-    filename = task.get("filename", "")
+    uid = task.get("uid", "")
 
+    # 2. AUTO-LOOKUP NOTEBOOK_ID: nếu thiếu notebook_id nhưng có course_id -> chọc Firestore courses
+    if not notebook_id and course_id:
+        try:
+            nb_from_course = lookup_notebook_id_from_course(course_id, uid)
+            if nb_from_course:
+                notebook_id = nb_from_course
+                task["notebook_id"] = notebook_id
+                logger.info("Auto-lookup notebook_id từ Firestore course %s thành công: %s", course_id, notebook_id)
+        except Exception as e:
+            logger.warning("Lỗi khi auto-lookup notebook_id từ course %s: %s", course_id, e)
+
+    # Fallback tra cứu Notebook theo tên môn học (subject) nếu vẫn chưa có
     if not notebook_id and subject:
-        notebook_id = _resolve_notebook_id(subject)
+        try:
+            notebook_id = _resolve_notebook_id(subject)
+            if notebook_id:
+                task["notebook_id"] = notebook_id
+        except Exception as e:
+            logger.warning("Lỗi khi tra cứu notebook theo subject %s: %s", subject, e)
 
     if not notebook_id:
-        raise ValueError(f"source_add task thiếu notebook_id (subject={subject!r})")
-
-    ext = Path(filename or "").suffix.lower()
-    if filename and ext not in SUPPORTED_NLM_EXTENSIONS:
-        logger.info("Bỏ qua file không hỗ trợ: %s (ext=%s)", filename, ext)
-        return f"skipped:ext_{ext.lstrip('.')}_khong_ho_tro"
+        raise ValueError(f"source_add task thiếu notebook_id (course_id={course_id!r}, subject={subject!r})")
 
     source_path = _resolve_source_file(task)
 

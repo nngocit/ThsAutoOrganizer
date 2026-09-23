@@ -59,7 +59,7 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
     const body = await c.req.json();
     const { status, error: errorMsg, result } = body;
 
-    const validStatuses = new Set(['done', 'failed', 'processing']);
+    const validStatuses = new Set(['done', 'failed', 'processing', 'skipped_ext']);
     if (!validStatuses.has(status)) {
       return withCors(c.json({ error: `status không hợp lệ: ${status}` }, 400), origin);
     }
@@ -76,15 +76,14 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
 
     await firestoreSet(c.env, `${queueName}/${taskId}`, updateData);
 
-    // Nếu là NLM source_add done: cập nhật notebooklm_sync_status trên file
+    // Nếu là NLM source_add done hoặc skipped_ext: cập nhật notebooklm_sync_status trên file
     const taskData = fromFirestoreDoc(existingDoc);
-    if (queueName === 'nlm_task_queue' && taskData.action === 'source_add' && status === 'done') {
+    if (queueName === 'nlm_task_queue' && taskData.action === 'source_add' && (status === 'done' || status === 'skipped_ext')) {
       if (taskData.uid && taskData.file_id) {
         const resultStr = typeof result === 'string' ? result : (result ? JSON.stringify(result) : '');
-        // Agent trả 'skipped:<lý do>' khi ext không được NLM hỗ trợ (vd .jpg/.png)
-        const skipped = resultStr.startsWith('skipped');
+        const skipped = status === 'skipped_ext' || resultStr.startsWith('skipped');
         await firestoreSet(c.env, `users/${taskData.uid}/files/${taskData.file_id}`, {
-          notebooklm_sync_status: skipped ? 'skipped' : 'synced',
+          notebooklm_sync_status: status === 'skipped_ext' ? 'skipped_ext' : (skipped ? 'skipped' : 'synced'),
           notebooklm_source_id: skipped ? '' : resultStr,
           updated_at: now,
         });

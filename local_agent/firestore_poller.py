@@ -88,9 +88,14 @@ class FirestorePoller:
             for handler in self._handlers[action]:
                 r = handler(task)
                 if isinstance(r, str) and r:
-                    result = r  # giữ kết quả cuối cùng không rỗng (vd: source_id)
-            self._mark_task(task_id, "done", result=result or "")
-            logger.info("[%s] Task %s (%s) hoàn tất", self.queue_name, task_id, action)
+                    result = r  # giữ kết quả cuối cùng không rỗng (vd: source_id hoặc skipped_ext)
+            
+            if result == "skipped_ext":
+                self._mark_task(task_id, "skipped_ext", result="skipped_ext")
+                logger.info("[%s] Task %s (%s) bỏ qua (skipped_ext)", self.queue_name, task_id, action)
+            else:
+                self._mark_task(task_id, "done", result=result or "")
+                logger.info("[%s] Task %s (%s) hoàn tất", self.queue_name, task_id, action)
         except Exception as exc:
             logger.exception("[%s] Task %s (%s) thất bại: %s", self.queue_name, task_id, action, exc)
             self._mark_task(task_id, "failed", error=str(exc))

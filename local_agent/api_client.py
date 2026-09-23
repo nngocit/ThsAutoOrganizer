@@ -136,3 +136,10 @@ def post_exam_set(*, uid: str, course_id: str, title: str, flashcards: list,
 def format_citations(sources: list[dict], style: str = "auto") -> dict[str, Any]:
     """POST /api/ai/citations/format -> {style, references, reference_block, inline_markers}."""
     return _post("/api/ai/citations/format", {"sources": sources, "style": style, "inline": True})
+
+
+def get_course(course_id: str, uid: str = "") -> dict[str, Any]:
+    """GET /api/courses/:courseId — lấy thông tin course (kèm notebooklm_id)."""
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    query = f"?uid={target_uid}" if target_uid else ""
+    return _request("GET", f"/api/courses/{course_id}{query}")
