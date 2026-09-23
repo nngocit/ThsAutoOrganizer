@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { setPublicReaderPermission } from '../src/routes/files/upload_complete.js';
+import { setPublicReaderPermission } from '../src/lib/drive.js';
 
 describe('Google Drive Public Reader Permission', () => {
   it('BẮT BUỘC gọi drive.permissions.create với type: anyone, role: reader và trả về webViewLink', async () => {

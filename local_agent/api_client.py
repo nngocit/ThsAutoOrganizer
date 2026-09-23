@@ -140,6 +140,13 @@ def format_citations(sources: list[dict], style: str = "auto") -> dict[str, Any]
     return _post("/api/ai/citations/format", {"sources": sources, "style": style, "inline": True})
 
 
+def list_courses(uid: str = "") -> dict[str, Any]:
+    """GET /api/courses — lấy danh sách toàn bộ courses của user."""
+    target_uid = uid or get("uid", "") or get("root_account_email", "")
+    query = f"?uid={target_uid}" if target_uid else ""
+    return _request("GET", f"/api/courses{query}")
+
+
 def get_course(course_id: str, uid: str = "") -> dict[str, Any]:
     """GET /api/courses/:courseId — lấy thông tin course (kèm notebooklm_id)."""
     target_uid = uid or get("uid", "") or get("root_account_email", "")

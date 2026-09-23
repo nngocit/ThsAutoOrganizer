@@ -361,3 +361,69 @@ def handle_source_remove(task: dict) -> None:
     else:
         logger.warning("NLM source delete lỗi (code=%d): %s. Cascade vẫn tiếp tục.",
                        returncode, stderr or stdout)
+
+
+def handle_course_create(task: dict) -> str:
+    r"""Xử lý action='course_create' (Luồng 1: Master Creation Flow).
+
+    1. Chạy CLI: nlm notebook create "<display_name>" -> lấy notebooklm_id.
+    2. Dùng os.makedirs tạo thư mục vật lý H:\2026\Thac Sy\Mon_Hoc\<local_folder_name>.
+    3. Cập nhật notebooklm_id vào Firestore, chuyển trạng thái thành active.
+    """
+    display_name = (task.get("display_name") or task.get("name") or "").strip()
+    local_folder_name = (task.get("local_folder_name") or "").strip()
+    course_id = task.get("course_id", "")
+    uid = task.get("uid", "")
+
+    if not display_name:
+        raise ValueError("course_create task thiếu display_name")
+
+    if not _nlm_available():
+        raise RuntimeError("nlm CLI không tìm thấy. Chạy: pip install notebooklm-mcp-cli")
+
+    # 1. Chạy nlm notebook create "<display_name>"
+    ret, stdout, stderr = _run_nlm(["notebook", "create", display_name, "--json"], timeout=60)
+    notebooklm_id = ""
+    if ret == 0:
+        data = _parse_nlm_json(stdout)
+        notebooklm_id = data.get("notebook_id") or data.get("id") or ""
+        if not notebooklm_id and stdout:
+            for token in stdout.split():
+                if len(token) > 8 and not token.startswith("{"):
+                    notebooklm_id = token.strip()
+                    break
+
+    if not notebooklm_id:
+        ret2, stdout2, stderr2 = _run_nlm(["notebook", "create", display_name], timeout=60)
+        if ret2 == 0 and stdout2:
+            for part in stdout2.split():
+                if len(part) >= 10:
+                    notebooklm_id = part.strip()
+                    break
+
+    if not notebooklm_id:
+        raise RuntimeError(f"Không lấy được notebooklm_id từ nlm notebook create: {stderr or stdout}")
+
+    logger.info("Đã tạo sổ NotebookLM thành công cho môn '%s': %s", display_name, notebooklm_id)
+
+    # 2. Tạo thư mục vật lý local
+    from .config_loader import get
+    local_base = Path(get("local_base_path", "H:\\2026\\Thac Sy\\Mon_Hoc")).resolve()
+    if local_folder_name:
+        target_dir = local_base / local_folder_name
+        target_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Đã tạo thư mục vật lý local: %s", target_dir)
+
+    # 3. Cập nhật Firestore document của course qua Worker API
+    if course_id:
+        try:
+            from . import api_client
+            api_client._request("PUT", f"/api/courses/{course_id}/notebooklm", {
+                "notebooklm_id": notebooklm_id,
+                "status": "active",
+            })
+            logger.info("Đã cập nhật course %s lên Firestore: notebooklm_id=%s, status=active", course_id, notebooklm_id)
+        except Exception as e:
+            logger.warning("Cập nhật course qua API cảnh báo: %s", e)
+
+    return notebooklm_id

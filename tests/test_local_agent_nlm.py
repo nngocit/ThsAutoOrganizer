@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 from local_agent.nlm_task_handler import (
     SUPPORTED_EXTS,
     handle_source_add,
+    handle_course_create,
     lookup_notebook_id_from_course,
 )
 from local_agent.firestore_poller import FirestorePoller
@@ -256,6 +257,36 @@ def test_send_log_posts_to_worker_api():
         assert payload["level"] == "ERROR"
         assert payload["module"] == "nlm_task_handler"
         assert payload["message"] == "Test error message"
+
+
+def test_handle_course_create(tmp_path: Path):
+    """Kiểm tra handle_course_create chạy nlm notebook create và tạo thư mục local."""
+    task = {
+        "action": "course_create",
+        "course_id": "course_123",
+        "display_name": "Kiến Trúc Phần Mềm",
+        "local_folder_name": "Kien_Truc_Phan_Mem",
+    }
+    with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
+         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"id": "nb_ktpm_999"}', "")) as mock_run, \
+         patch("local_agent.config_loader.get", return_value=str(tmp_path)), \
+         patch("local_agent.api_client._request") as mock_api:
+
+        res = handle_course_create(task)
+        assert res == "nb_ktpm_999"
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert args == ["notebook", "create", "Kiến Trúc Phần Mềm", "--json"]
+        # Thư mục local phải được tạo ra
+        created_folder = tmp_path / "Kien_Truc_Phan_Mem"
+        assert created_folder.exists()
+        # API PUT /api/courses/:id/notebooklm phải được gọi
+        mock_api.assert_called_once()
+        method, url, data = mock_api.call_args[0]
+        assert method == "PUT"
+        assert "/api/courses/course_123/notebooklm" in url
+        assert data["notebooklm_id"] == "nb_ktpm_999"
+        assert data["status"] == "active"
 
 
 

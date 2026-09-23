@@ -7,7 +7,7 @@ import sys
 
 from .config_loader import load_config, get, sync_remote_config
 from .firestore_poller import FirestorePoller
-from .nlm_task_handler import handle_source_add, handle_source_remove
+from .nlm_task_handler import handle_source_add, handle_source_remove, handle_course_create
 from .chat_task_handler import handle_chat_query
 from .research_task_handler import handle_research_start
 from .artifact_task_handler import handle_artifact_download
@@ -75,6 +75,7 @@ def main():
 
     # --- NLM Task Queue Poller ---
     nlm_poller = FirestorePoller("nlm_task_queue")
+    nlm_poller.register("course_create", handle_course_create)
     nlm_poller.register("source_add", handle_source_add)
     nlm_poller.register("source_remove", handle_source_remove)
     nlm_poller.register("chat_query", handle_chat_query)

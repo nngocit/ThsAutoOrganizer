@@ -2,7 +2,7 @@
 // insights + citations + research (§3.5) + artifact (§3.6)
 
 import { Hono } from 'hono';
-import insightsRouter from '../insights/index.js';
+import insightsRouter from './insights.js';
 import citationsRouter from './citations.js';
 import researchRouter from './research.js';
 import researchSourcesRouter from './research_sources.js';

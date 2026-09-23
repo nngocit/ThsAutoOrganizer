@@ -42,6 +42,7 @@ app.route('/api/ai', aiRouter);       // insights + citations + research + artif
 app.route('/api/chat', chatRouter);   // chat sessions, messages, agent-reply, sources
 app.route('/api/courses', coursesRouter);
 app.route('/api/tasks', syncRouter);
+app.route('/api/sync', syncRouter);
 app.route('/api/exam', examRouter);   // Trạm Ôn Thi (§3.7)
 app.route('/api/settings', settingsRouter); // Global Settings (§1)
 app.route('/api/logs', logsRouter);         // System Logs Dashboard (§2)
