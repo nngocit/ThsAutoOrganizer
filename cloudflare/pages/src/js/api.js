@@ -1,6 +1,6 @@
 // cloudflare/pages/src/js/api.js — API client với Worker base URL (<150 lines)
 
-const WORKER_URL = 'https://ths-organizer-api.workers.dev';
+const WORKER_URL = 'https://ths-organizer-api.ths-organizer-nngocit.workers.dev';
 
 /**
  * Lấy Google ID Token hiện tại của user (từ Google Sign-In).
