@@ -7,6 +7,7 @@ import logging
 import subprocess
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 
 from .cascade_delete import resolve_local_path
@@ -166,8 +167,41 @@ def _resolve_notebook_id(subject: str) -> str:
     return ""
 
 
+def _async_download_worker(drive_file_id: str, dest_path: Path) -> None:
+    """Track 2: Tải file từ Drive xuống ổ cứng trong thread chạy ngầm (async/background)."""
+    try:
+        from .drive_sync import download_file
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info("[Track 2 Async] Bắt đầu tải ngầm file từ Drive: %s -> %s", drive_file_id, dest_path)
+        download_file(drive_file_id, dest_path)
+        logger.info("[Track 2 Async] Tải ngầm hoàn tất: %s", dest_path)
+    except Exception as e:
+        logger.warning("[Track 2 Async] Tải ngầm file %s thất bại: %s", drive_file_id, e)
+
+
+def _determine_local_dest_path(task: dict) -> Path | None:
+    """Xác định đường dẫn local đích để lưu file khi tải về."""
+    for key in ("local_path", "file_path"):
+        raw = task.get(key) or ""
+        if raw:
+            return Path(raw).resolve()
+
+    filename = task.get("filename", "")
+    if filename:
+        subject = task.get("subject", "")
+        folder_path = task.get("folder_path", "")
+        return resolve_local_path(subject, folder_path, filename).resolve()
+    return None
+
+
 def handle_source_add(task: dict) -> str:
-    """Xử lý action='source_add': nlm source add <notebook_id> --file <path> --wait --json.
+    """Xử lý action='source_add' theo mô hình Đa luồng (Dual-Track Injection).
+
+    Track 1 (Ưu tiên): Nạp NotebookLM bằng Drive URL ngay lập tức:
+        nlm source add <notebook_id> --url "<Drive_URL>" --wait --json.
+        Trả về source_id để cập nhật status 'synced' lên Firestore cho UI báo thành công liền.
+    Track 2 (Chạy ngầm/Async): Tải file vật lý từ Drive xuống ổ cứng trong background thread,
+        TUYỆT ĐỐI không block Track 1.
 
     Returns: source_id (str) khi sync thành công, 'skipped_ext' khi bỏ qua định dạng file.
     Raises RuntimeError nếu thất bại — poller sẽ mark task 'failed' (không treo 'processing').
@@ -189,6 +223,7 @@ def handle_source_add(task: dict) -> str:
     course_id = task.get("course_id", "")
     subject = task.get("subject", "")
     uid = task.get("uid", "")
+    drive_file_id = task.get("drive_file_id", "")
 
     # 2. AUTO-LOOKUP NOTEBOOK_ID: nếu thiếu notebook_id nhưng có course_id -> chọc Firestore courses
     if not notebook_id and course_id:
@@ -213,9 +248,51 @@ def handle_source_add(task: dict) -> str:
     if not notebook_id:
         raise ValueError(f"source_add task thiếu notebook_id (course_id={course_id!r}, subject={subject!r})")
 
-    source_path = _resolve_source_file(task)
+    # =========================================================================
+    # TRACK 2 (CHẠY NGẦM / ASYNC): Tải file vật lý từ Drive xuống ổ cứng (Local Path)
+    # TUYỆT ĐỐI KHÔNG block quá trình của Track 1
+    # =========================================================================
+    dest_path = _determine_local_dest_path(task)
+    if drive_file_id and dest_path and not dest_path.exists():
+        threading.Thread(
+            target=_async_download_worker,
+            args=(drive_file_id, dest_path),
+            name=f"track2-bg-dl-{drive_file_id[:8]}",
+            daemon=True,
+        ).start()
+        logger.info("[Track 2 Async] Đã kích hoạt tải ngầm file %s -> %s (non-blocking)", drive_file_id, dest_path)
 
-    # §7: notebook_id là ARGUMENT; --wait để chờ NLM xử lý xong source
+    # =========================================================================
+    # TRACK 1 (ƯU TIÊN): Nạp NotebookLM bằng Drive URL ngay lập tức
+    # =========================================================================
+    drive_url = (
+        task.get("drive_view_link")
+        or task.get("webViewLink")
+        or task.get("drive_url")
+        or task.get("url")
+        or ""
+    )
+    if not drive_url and drive_file_id:
+        drive_url = f"https://drive.google.com/file/d/{drive_file_id}/view"
+
+    if drive_url:
+        logger.info("[Track 1 Fast] Nạp NotebookLM bằng Drive URL: %s -> notebook %s", drive_url, notebook_id)
+        args = ["source", "add", notebook_id, "--url", drive_url,
+                "--wait", "--wait-timeout", "600", "--json"]
+        returncode, stdout, stderr = _run_nlm(args, timeout=660)
+
+        if returncode == 0:
+            data = _parse_nlm_json(stdout)
+            source_id = data.get("source_id") or data.get("id") or ""
+            logger.info("[Track 1 Fast] NLM source add URL OK: %s -> notebook %s (source_id=%s)",
+                        drive_url, notebook_id, source_id or "?")
+            return source_id
+        else:
+            logger.warning("[Track 1 Fast] nlm source add --url gặp lỗi (code=%d): %s. Thử fallback qua file cục bộ.",
+                           returncode, stderr or stdout)
+
+    # Fallback Track 1b: nạp bằng file local nếu không có Drive URL hoặc nạp URL không thành công
+    source_path = _resolve_source_file(task)
     args = ["source", "add", notebook_id, "--file", str(source_path),
             "--wait", "--wait-timeout", "600", "--json"]
     returncode, stdout, stderr = _run_nlm(args, timeout=660)
@@ -225,7 +302,7 @@ def handle_source_add(task: dict) -> str:
 
     data = _parse_nlm_json(stdout)
     source_id = data.get("source_id") or data.get("id") or ""
-    logger.info("NLM source add OK: %s -> notebook %s (source_id=%s)",
+    logger.info("NLM source add OK (file): %s -> notebook %s (source_id=%s)",
                 source_path.name, notebook_id, source_id or "?")
     return source_id
 

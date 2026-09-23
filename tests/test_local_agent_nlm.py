@@ -118,3 +118,56 @@ def test_upload_file_sets_public_reader_permission():
         assert res["webViewLink"] == "https://drive.google.com/file/d/file_123/view"
         assert res["web_view_link"] == "https://drive.google.com/file/d/file_123/view"
 
+
+def test_handle_source_add_track1_uses_drive_url():
+    """Track 1: Nạp NotebookLM bằng Drive URL ngay lập tức với nlm source add --url."""
+    task = {
+        "filename": "de_cuong.pdf",
+        "notebook_id": "nb_triet_hoc_123",
+        "drive_file_id": "1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd",
+        "drive_view_link": "https://drive.google.com/file/d/1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd/view",
+        "subject": "Triết học",
+    }
+
+    with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
+         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"source_id": "src_url_456"}', "")) as mock_run, \
+         patch("local_agent.nlm_task_handler.threading.Thread") as mock_thread:
+
+        res = handle_source_add(task)
+        assert res == "src_url_456"
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        # Bắt buộc dùng flag --url
+        assert "--url" in args
+        assert "https://drive.google.com/file/d/1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd/view" in args
+        assert "--file" not in args
+
+
+def test_handle_source_add_track2_triggers_async_download():
+    """Track 2: Khi local file chưa tồn tại, kích hoạt background thread tải file không block Track 1."""
+    task = {
+        "filename": "sach_giao_trinh.pdf",
+        "notebook_id": "nb_999",
+        "drive_file_id": "drive_id_xyz",
+        "subject": "Triết học",
+        "folder_path": "01_Giao_Trinh",
+    }
+
+    with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
+         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"source_id": "src_ok"}', "")), \
+         patch("local_agent.nlm_task_handler.threading.Thread") as mock_thread:
+
+        mock_instance = MagicMock()
+        mock_thread.return_value = mock_instance
+
+        res = handle_source_add(task)
+        assert res == "src_ok"
+
+        # Track 2 thread được khởi động trong background
+        mock_thread.assert_called_once()
+        mock_instance.start.assert_called_once()
+        call_kwargs = mock_thread.call_args[1]
+        assert call_kwargs.get("daemon") is True
+        assert "drive_id_xyz" in call_kwargs.get("args", ())
+
+
