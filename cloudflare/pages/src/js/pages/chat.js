@@ -82,7 +82,10 @@ async function loadSessions() {
       el.addEventListener('click', (e) => { if (!e.target.closest('.btn-rename')) selectSession(el.dataset.id); }));
     list.querySelectorAll('.btn-rename').forEach((btn) =>
       btn.addEventListener('click', () => renameSession(btn.dataset.id)));
-    if (!_currentId && _sessions.length) selectSession(_sessions[0].id);
+    // Chỉ auto-select khi session có id hợp lệ — tránh loop GET /sessions/undefined
+    if (!_currentId && _sessions.length && (_sessions[0].id || _sessions[0]._id)) {
+      selectSession(_sessions[0].id || _sessions[0]._id);
+    }
   } catch (err) {
     list.innerHTML = `<div class="text-danger">Lỗi: ${esc(err.message)}</div>`;
   }
@@ -199,6 +202,7 @@ function appendMessages(msgs) {
 }
 
 async function selectSession(id) {
+  if (!id || id === 'undefined') return; // chặn loop 404 khi doc thiếu field id
   _currentId = id;
   _unsubscribe?.(); _unsubscribe = null;
   _messages = []; _knownIds.clear();

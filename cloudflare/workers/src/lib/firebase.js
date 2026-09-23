@@ -77,6 +77,11 @@ export function fromFirestoreDoc(doc) {
     else if (v.nullValue !== undefined) obj[k] = null;
     else obj[k] = v;
   }
+  // Doc migrate từ SQLite không có field `id` — alias từ tên doc để client
+  // luôn dùng được (sửa: session 404, message dedupe, course/file/insight id).
+  if ((obj.id === undefined || obj.id === null || obj.id === '') && obj._id) {
+    obj.id = obj._id;
+  }
   return obj;
 }
 

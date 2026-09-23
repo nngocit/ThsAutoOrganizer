@@ -100,6 +100,8 @@ router.post('/:fileId/review', requireAuth(async (c) => {
           subject: file.subject || '',
           folderPath: file.folder_path || '',
           isOutput: file.is_output,
+          localPath: file.local_path || '',
+          driveFileId: file.drive_file_id || '',
         });
         steps.step_nlm_source_add = taskId
           ? { success: true, queued: true, task_id: taskId }

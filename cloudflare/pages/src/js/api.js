@@ -10,6 +10,13 @@ function getIdToken() {
   return window._googleIdToken || localStorage.getItem('ths_google_id_token') || null;
 }
 
+// ===== 401 handler hook (app.js đăng ký: dọn token hết hạn + prompt login lại) =====
+let _unauthorizedHandler = null;
+let _last401At = 0;
+
+/** app.js gọi 1 lần khi init để xử lý tập trung mọi response 401 */
+export function setUnauthorizedHandler(fn) { _unauthorizedHandler = fn; }
+
 /**
  * Tạo headers chuẩn cho API requests.
  */
@@ -40,6 +47,11 @@ async function apiFetch(path, options = {}) {
     data = {};
   }
   if (!resp.ok) {
+    // Debounce 5s để nhiều request 401 đồng thời không spam handler
+    if (resp.status === 401 && _unauthorizedHandler) {
+      const now = Date.now();
+      if (now - _last401At > 5000) { _last401At = now; _unauthorizedHandler(); }
+    }
     const msg = data.error || data.detail || `HTTP ${resp.status}`;
     throw Object.assign(new Error(msg), { status: resp.status, data });
   }

@@ -53,10 +53,11 @@ def handle_chat_query(task: dict) -> None:
     notebook_id = task.get("notebook_id", "")
     prompt = task.get("prompt", "")
     style = task.get("citation_style", "auto")
+    uid = task.get("uid", "")
 
     def _fail(error: str) -> None:
         try:
-            api_client.agent_fail(session_id, job_id=job_id, message_id=message_id, error=error)
+            api_client.agent_fail(session_id, job_id=job_id, message_id=message_id, error=error, uid=uid)
         except RuntimeError as e:
             logger.error("Không báo agent_fail được về Worker: %s", e)
 
@@ -91,7 +92,7 @@ def handle_chat_query(task: dict) -> None:
         api_client.agent_reply(
             session_id, job_id=job_id, message_id=message_id,
             content=answer + (f"\n\n<!-- conversation_id:{new_conv_id} -->" if new_conv_id else ""),
-            citations=citations, citation_style=used_style, model="notebooklm")
+            citations=citations, citation_style=used_style, model="notebooklm", uid=uid)
         logger.info("chat_query OK: session=%s, %d citations", session_id, len(citations))
     except Exception as exc:
         _fail(str(exc))

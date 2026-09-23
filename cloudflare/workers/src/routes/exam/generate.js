@@ -40,6 +40,12 @@ router.post('/generate', requireAuth(async (c) => {
       courseId: course_id,
     });
 
+    if (!notebookId) {
+      return withCors(c.json({
+        error: 'Môn học chưa liên kết NotebookLM (notebooklm_id trống)',
+      }, 400), origin);
+    }
+
     const jobId = crypto.randomUUID();
     const flashcardCount = clamp(body.flashcard_count, 50, MAX_FLASHCARDS);
     const essayCount = clamp(body.essay_count, 5, MAX_ESSAYS);

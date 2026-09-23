@@ -59,22 +59,29 @@ def register_file(*, filename: str, subject: str, document_type: str, sha256: st
 
 def agent_reply(session_id: str, *, job_id: str, message_id: str, content: str,
                 citations: list | None = None, citation_style: str = "",
-                model: str = "notebooklm") -> dict[str, Any]:
+                model: str = "notebooklm", uid: str = "") -> dict[str, Any]:
     """POST /api/chat/sessions/:id/agent-reply — append message assistant."""
-    return _post(f"/api/chat/sessions/{session_id}/agent-reply", {
+    body: dict[str, Any] = {
         "job_id": job_id, "message_id": message_id, "content": content,
         "citations": citations or [], "citation_style": citation_style, "model": model,
-    })
+    }
+    if uid:
+        body["uid"] = uid
+    return _post(f"/api/chat/sessions/{session_id}/agent-reply", body)
 
 
-def agent_fail(session_id: str, *, job_id: str, message_id: str, error: str) -> dict[str, Any]:
+def agent_fail(session_id: str, *, job_id: str, message_id: str, error: str,
+               uid: str = "") -> dict[str, Any]:
     """POST /api/chat/sessions/:id/agent-fail — đánh dấu message failed."""
-    return _post(f"/api/chat/sessions/{session_id}/agent-fail",
-                 {"job_id": job_id, "message_id": message_id, "error": error[:1000]})
+    body: dict[str, Any] = {"job_id": job_id, "message_id": message_id, "error": error[:1000]}
+    if uid:
+        body["uid"] = uid
+    return _post(f"/api/chat/sessions/{session_id}/agent-fail", body)
 
 
 def patch_research(job_id: str, *, status: str | None = None, progress: str = "",
-                   error: str = "", sources_found: int | None = None) -> dict[str, Any]:
+                   error: str = "", sources_found: int | None = None,
+                   uid: str = "") -> dict[str, Any]:
     """PATCH /api/ai/research/:jobId — cập nhật tiến độ Deep Research."""
     body: dict[str, Any] = {}
     if status:
@@ -85,12 +92,17 @@ def patch_research(job_id: str, *, status: str | None = None, progress: str = ""
         body["error"] = error[:1000]
     if sources_found is not None:
         body["sources_found"] = sources_found
+    if uid:
+        body["uid"] = uid
     return _request("PATCH", f"/api/ai/research/{job_id}", body)
 
 
-def post_research_sources(job_id: str, sources: list[dict]) -> dict[str, Any]:
+def post_research_sources(job_id: str, sources: list[dict], uid: str = "") -> dict[str, Any]:
     """POST /api/ai/research/:jobId/sources — đăng ký nguồn unverified_web."""
-    return _post(f"/api/ai/research/{job_id}/sources", {"sources": sources})
+    body: dict[str, Any] = {"sources": sources}
+    if uid:
+        body["uid"] = uid
+    return _post(f"/api/ai/research/{job_id}/sources", body)
 
 
 def artifact_complete(*, uid: str, course_id: str, filename: str, local_path: str,

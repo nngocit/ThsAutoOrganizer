@@ -65,7 +65,13 @@ class Migrator:
             return "done"
         if self.http.get(url, timeout=30).status_code == 200:
             return "skip"
-        resp = self.http.patch(url, json=_doc(fields), timeout=30)
+        doc_fields = dict(fields)
+        if "id" not in doc_fields:
+            doc_fields["id"] = doc_id
+        params = [f"updateMask.fieldPaths={k}" for k in doc_fields.keys()]
+        query = "&".join(params)
+        patch_url = f"{url}?{query}" if query else url
+        resp = self.http.patch(patch_url, json=_doc(doc_fields), timeout=30)
         if resp.status_code not in (200, 201):
             raise RuntimeError(f"PATCH {doc_id} -> {resp.status_code}: {resp.text[:200]}")
         return "done"
@@ -110,7 +116,9 @@ class Migrator:
 
     def migrate_insights(self):
         for r in self.rows("ai_insights"):
-            yield "ai_insights", f"mig_{r['id']}", {
+            iid = f"mig_{r['id']}"
+            yield "ai_insights", iid, {
+                "id": iid,
                 "course_id": f"mig_s_{r['subject_id']}", "insight_type": r["insight_type"],
                 "title": r["title"], "content": r["content"],
                 "citations": r["citations"] or "[]", "created_by": r["created_by"],

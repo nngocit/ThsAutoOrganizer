@@ -1,8 +1,22 @@
 // cloudflare/pages/src/js/app.js — Google Sign-In + tab router + auth state (<200 lines)
-import { authApi } from './api.js';
+import { authApi, setUnauthorizedHandler } from './api.js';
 
 // Google OAuth 2.0 Client ID
 const GOOGLE_CLIENT_ID = '437903639644-img3tmoj4hdji3nkocknmitmk197k3lv.apps.googleusercontent.com';
+
+/** Decode exp (giây) từ JWT — không verify chữ ký, chỉ đọc để check hạn */
+function decodeTokenExp(token) {
+  try {
+    const part = (token || '').split('.')[1];
+    const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+    return Number(payload.exp) || 0;
+  } catch { return 0; }
+}
+
+/** Token còn dùng được (còn hạn > 30s nữa)? Google ID token TTL = 1 giờ */
+function isTokenUsable(token) {
+  return !!token && decodeTokenExp(token) > Math.floor(Date.now() / 1000) + 30;
+}
 
 // ============================
 // Toast Notifications
@@ -102,6 +116,19 @@ function signOut() {
   showToast('Đã đăng xuất.', 'info');
 }
 
+/** Token hết hạn giữa phiên (401 từ bất kỳ API nào) → dọn dẹp + thử One Tap lấy token mới */
+function handleSessionExpired() {
+  window._googleIdToken = null;
+  _currentUser = null;
+  localStorage.removeItem('ths_google_id_token');
+  localStorage.removeItem('ths_user_data');
+  renderAuthScreen();
+  showToast('Phiên đăng nhập đã hết hạn — đang đăng nhập lại...', 'error', 6000);
+  // auto_select + session Google còn hiệu lực → One Tap tự cấp token mới, không cần click
+  try { google.accounts.id.prompt(); } catch { /* GIS chưa sẵn sàng — user click nút sign-in */ }
+}
+setUnauthorizedHandler(handleSessionExpired);
+
 // ============================
 // NLM Connection Badge
 // ============================
@@ -157,11 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       google.accounts.id.prompt();   // Show One Tap nếu có session cũ
     }
-    // Khôi phục phiên đăng nhập nếu đã có token từ trước
+    // Khôi phục phiên đăng nhập nếu token còn hạn (Google ID token TTL = 1 giờ)
     const savedToken = localStorage.getItem('ths_google_id_token');
     const savedUser = localStorage.getItem('ths_user_data');
 
-    if (savedToken && savedUser) {
+    if (savedToken && savedUser && isTokenUsable(savedToken)) {
       try {
         window._googleIdToken = savedToken;
         const user = JSON.parse(savedUser);
@@ -169,6 +196,13 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) {
         signOut();
       }
+    } else if (savedToken || savedUser) {
+      // Token đã hết hạn → KHÔNG restore; dọn dẹp + One Tap silent lấy token mới
+      localStorage.removeItem('ths_google_id_token');
+      localStorage.removeItem('ths_user_data');
+      renderAuthScreen();
+      showToast('Phiên đăng nhập đã hết hạn — đang đăng nhập lại...', 'info');
+      google.accounts.id.prompt();
     } else {
       renderAuthScreen();
     }

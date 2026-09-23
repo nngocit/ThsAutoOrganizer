@@ -80,9 +80,12 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
     const taskData = fromFirestoreDoc(existingDoc);
     if (queueName === 'nlm_task_queue' && taskData.action === 'source_add' && status === 'done') {
       if (taskData.uid && taskData.file_id) {
+        const resultStr = typeof result === 'string' ? result : (result ? JSON.stringify(result) : '');
+        // Agent trả 'skipped:<lý do>' khi ext không được NLM hỗ trợ (vd .jpg/.png)
+        const skipped = resultStr.startsWith('skipped');
         await firestoreSet(c.env, `users/${taskData.uid}/files/${taskData.file_id}`, {
-          notebooklm_sync_status: 'synced',
-          notebooklm_source_id: result || '',
+          notebooklm_sync_status: skipped ? 'skipped' : 'synced',
+          notebooklm_source_id: skipped ? '' : resultStr,
           updated_at: now,
         });
       }

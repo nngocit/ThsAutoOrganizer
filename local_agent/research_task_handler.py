@@ -22,9 +22,9 @@ MAX_PDF_DOWNLOADS = 20
 PDF_TIMEOUT = 60
 
 
-def _patch(job_id: str, **kwargs) -> None:
+def _patch(job_id: str, uid: str = "", **kwargs) -> None:
     try:
-        api_client.patch_research(job_id, **kwargs)
+        api_client.patch_research(job_id, uid=uid, **kwargs)
     except RuntimeError as e:
         logger.warning("patch_research lỗi (bỏ qua): %s", e)
 
@@ -78,6 +78,7 @@ def handle_research_start(task: dict) -> None:
     notebook_id = task.get("notebook_id", "")
     query = task.get("query", "")
     mode = task.get("mode", "deep")
+    uid = task.get("uid", "")
 
     try:
         if not _nlm_available():
@@ -87,7 +88,7 @@ def handle_research_start(task: dict) -> None:
         if mode != "deep":
             logger.warning("mode=%s: CLI 0.11.6 chỉ hỗ trợ deep (--source web) — ép về deep", mode)
 
-        _patch(job_id, status="running", progress="Khởi động deep research")
+        _patch(job_id, uid=uid, status="running", progress="Khởi động deep research")
 
         # §7: nlm research start "<query>" --mode deep --notebook-id <NB> --source web [--force]
         rc, stdout, stderr = _run_nlm(
@@ -110,7 +111,7 @@ def handle_research_start(task: dict) -> None:
             status_data = _parse_nlm_json(stdout)
             state = str(status_data.get("status", "")).lower()
             found = _extract_sources(status_data)
-            _patch(job_id, status="running",
+            _patch(job_id, uid=uid, status="running",
                    progress=f"Đang nghiên cứu ({state or 'running'})",
                    sources_found=len(found) or None)
             if state in ("completed", "complete", "done", "succeeded"):
@@ -121,7 +122,7 @@ def handle_research_start(task: dict) -> None:
             raise RuntimeError(f"Deep research timeout sau {MAX_WAIT_SECONDS}s")
 
         # §7: import nguồn vào notebook
-        _patch(job_id, status="running", progress="Import nguồn vào notebook")
+        _patch(job_id, uid=uid, status="running", progress="Import nguồn vào notebook")
         import_args = ["research", "import", notebook_id]
         if nlm_task_id:
             import_args.append(nlm_task_id)
@@ -148,10 +149,10 @@ def handle_research_start(task: dict) -> None:
             payload.append(entry)
 
         if payload:
-            api_client.post_research_sources(job_id, payload)
-        _patch(job_id, status="done", progress="Hoàn tất", sources_found=len(payload))
+            api_client.post_research_sources(job_id, payload, uid=uid)
+        _patch(job_id, uid=uid, status="done", progress="Hoàn tất", sources_found=len(payload))
         logger.info("research_start OK: job=%s, %d nguồn", job_id, len(payload))
     except Exception as exc:
         if job_id:
-            _patch(job_id, status="failed", error=str(exc))
+            _patch(job_id, uid=uid, status="failed", error=str(exc))
         raise

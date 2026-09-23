@@ -50,6 +50,8 @@ data/*.db-shm
 
 # Application Logs
 logs/*.log
+*.log
+data/artifacts/
 
 # Cloudflare Tunnel Binary
 cloudflared.exe

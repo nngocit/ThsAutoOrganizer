@@ -83,9 +83,10 @@ def _resolve_source_file(task: dict) -> Path:
                      f"drive_file_id={drive_file_id!r})")
 
 
-def handle_source_add(task: dict) -> None:
+def handle_source_add(task: dict) -> str:
     """Xử lý action='source_add': nlm source add <notebook_id> --file <path> --wait --json.
 
+    Returns: source_id (str) khi sync thành công, 'skipped:<lý do>' khi bỏ qua.
     Raises RuntimeError nếu thất bại — poller sẽ mark task 'failed' (không treo 'processing').
     """
     if not _nlm_available():
@@ -100,7 +101,7 @@ def handle_source_add(task: dict) -> None:
     ext = Path(filename or "").suffix.lower()
     if filename and ext not in SUPPORTED_NLM_EXTENSIONS:
         logger.info("Bỏ qua file không hỗ trợ: %s (ext=%s)", filename, ext)
-        return  # done nhưng skipped
+        return f"skipped:ext_{ext.lstrip('.')}_khong_ho_tro"
 
     source_path = _resolve_source_file(task)
 
@@ -116,6 +117,7 @@ def handle_source_add(task: dict) -> None:
     source_id = data.get("source_id") or data.get("id") or ""
     logger.info("NLM source add OK: %s -> notebook %s (source_id=%s)",
                 source_path.name, notebook_id, source_id or "?")
+    return source_id
 
 
 def handle_source_remove(task: dict) -> None:

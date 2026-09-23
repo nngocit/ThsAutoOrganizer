@@ -74,8 +74,12 @@
   gap: var(--sp-4);
 }
 
+/* Grid item mặc định min-width:auto → tên file dài đẩy vỡ track.
+   min-width:0 cho phép co lại để text-overflow: ellipsis hoạt động. */
+.card-grid > * { min-width: 0; }
+
 /* File Card */
-.file-card { cursor: default; }
+.file-card { cursor: default; min-width: 0; overflow: hidden; }
 
 .file-card-top {
   display: flex;
@@ -83,6 +87,11 @@
   justify-content: space-between;
   gap: var(--sp-2);
 }
+
+/* Cho phép cụm icon+tên co lại; nút xoá luôn bám trong card */
+.file-card-top > .flex { flex: 1 1 auto; min-width: 0; }
+.file-card-top > .flex > div:not(.file-icon) { min-width: 0; }
+.file-card-top .btn-delete-file { flex-shrink: 0; }
 
 .file-icon {
   width: 40px; height: 40px;

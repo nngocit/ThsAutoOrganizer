@@ -89,6 +89,8 @@ router.post('/complete', requireAuth(async (c) => {
       subject: meta.subject || '',
       folderPath: meta.folder_path || '',
       isOutput,
+      localPath: meta.local_path || '',
+      driveFileId: drive_file_id || meta.drive_file_id || '',
     });
 
     return withCors(c.json({

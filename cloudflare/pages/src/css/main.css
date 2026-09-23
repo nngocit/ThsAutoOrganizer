@@ -5,6 +5,9 @@
    Design Tokens — Obsidian Minimalist
    ============================ */
 :root {
+  /* Khai báo dark ở cấp trang → Chrome/Windows render popup <select> theo dark theme */
+  color-scheme: dark;
+
   /* Colors */
   --bg:          #111113;
   --bg-card:     #18181B;
@@ -57,6 +60,19 @@ a { color: var(--accent); text-decoration: none; transition: color var(--t-fast)
 a:hover { color: #D8B4FE; }
 
 img { max-width: 100%; display: block; }
+
+/* Native select theo dark theme (kể cả popup option trên Windows/Chrome) */
+select {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color-scheme: dark;
+}
+select option { background: var(--bg-elevated); color: var(--text); }
 
 /* ============================
    Layout

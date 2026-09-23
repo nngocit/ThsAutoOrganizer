@@ -1,37 +1,44 @@
 // src/routes/insights/create.js — POST /api/ai/insights (<120 lines)
 
 import { Hono } from 'hono';
-import { requireAuth } from '../../lib/auth.js';
+import { requireAuthOrAgent, resolveTargetUid } from '../../lib/auth.js';
 import { firestoreSet } from '../../lib/firebase.js';
 import { withCors } from '../../lib/cors.js';
 
 const router = new Hono();
-const VALID_TYPES = new Set(['quiz', 'summary', 'outline', 'qa']);
+const VALID_TYPES = new Set(['quiz', 'summary', 'outline', 'qa', 'deep_research']);
 
 /**
  * POST /api/ai/insights
- * Body: { course_id, insight_type, title, content, citations?, created_by? }
+ * Body: { id?, course_id?, insight_type, title, content, citations?, created_by?, created_at?, uid? }
+ * course_id rỗng → 'all' (câu hỏi Quick Research phạm vi "Tất cả môn học")
  * Returns: { id, status: "created" }
  */
-router.post('/', requireAuth(async (c) => {
-  const user = c.get('user');
+router.post('/', requireAuthOrAgent(async (c) => {
   const origin = c.req.header('Origin') || '';
 
   try {
     const body = await c.req.json();
+    const uid = resolveTargetUid(c, body.uid, c.req.query('uid'));
+    if (!uid) {
+      return withCors(c.json({
+        error: 'Thiếu uid',
+        detail: 'Agent gọi bằng X-Agent-Secret phải gửi uid (body.uid hoặc ?uid=)',
+      }, 400), origin);
+    }
     const {
-      course_id,
       insight_type,
       title,
       content,
       citations = '[]',
       created_by = 'agent',
     } = body;
+    const course_id = String(body.course_id || '').trim() || 'all';
 
     // Validate required fields
-    if (!course_id || !insight_type || !title || !content) {
+    if (!insight_type || !title || !content) {
       return withCors(c.json({
-        error: 'Thiếu trường bắt buộc: course_id, insight_type, title, content',
+        error: 'Thiếu trường bắt buộc: insight_type, title, content',
       }, 400), origin);
     }
 
@@ -45,7 +52,7 @@ router.post('/', requireAuth(async (c) => {
     const validCreatedBy = new Set(['agent', 'web_user']);
     const safeCreatedBy = validCreatedBy.has(created_by) ? created_by : 'agent';
 
-    const docId = crypto.randomUUID();
+    const docId = String(body.id || '').trim() || crypto.randomUUID();
     const now = new Date().toISOString();
 
     // Chuẩn hóa citations về string JSON
@@ -53,7 +60,7 @@ router.post('/', requireAuth(async (c) => {
       ? citations
       : JSON.stringify(citations);
 
-    await firestoreSet(c.env, `users/${user.uid}/ai_insights/${docId}`, {
+    await firestoreSet(c.env, `users/${uid}/ai_insights/${docId}`, {
       id: docId,
       course_id,
       insight_type,
@@ -61,7 +68,7 @@ router.post('/', requireAuth(async (c) => {
       content,
       citations: citationsStr,
       created_by: safeCreatedBy,
-      created_at: now,
+      created_at: body.created_at || now,
       updated_at: now,
     });
 

@@ -29,7 +29,7 @@ export async function enqueueTask(env, queue, payload) {
  * Lớp 2 NO-LOOP: TUYỆT ĐỐI không queue source_add cho file trong 04_Ket_Qua_Xuat_Ban.
  * @returns {Promise<string|null>} task_id hoặc null nếu bị chặn/thiếu dữ liệu
  */
-export async function enqueueSourceAdd(env, { uid, fileId, courseId, notebookId, filename, subject, folderPath, isOutput }) {
+export async function enqueueSourceAdd(env, { uid, fileId, courseId, notebookId, filename, subject, folderPath, isOutput, localPath, driveFileId }) {
   if (isOutput === true || isOutputFolder(folderPath)) {
     console.log(`[NoLoop] Bỏ qua source_add cho file output: ${filename || fileId}`);
     return null;
@@ -43,6 +43,10 @@ export async function enqueueSourceAdd(env, { uid, fileId, courseId, notebookId,
     notebook_id: notebookId || '',
     filename: filename || '',
     subject: subject || '',
+    // Agent cần các field này để resolve file vật lý (local trước, Drive fallback)
+    folder_path: folderPath || '',
+    local_path: localPath || '',
+    drive_file_id: driveFileId || '',
   });
 }
 

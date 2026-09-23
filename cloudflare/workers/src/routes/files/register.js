@@ -118,6 +118,8 @@ router.post('/', requireAgentAuth(async (c) => {
         subject: subject || existing?.subject || '',
         folderPath,
         isOutput,
+        localPath: local_path || existing?.local_path || '',
+        driveFileId: drive_file_id || existing?.drive_file_id || '',
       });
 
     return withCors(c.json({

@@ -12,8 +12,8 @@ from .config_loader import get
 
 logger = logging.getLogger(__name__)
 
-# Type alias cho handler function
-TaskHandler = Callable[[dict], None]
+# Type alias cho handler function — return str (kết quả) hoặc None
+TaskHandler = Callable[[dict], str | None]
 
 
 class FirestorePoller:
@@ -84,9 +84,12 @@ class FirestorePoller:
         # Mark processing trước khi chạy
         self._mark_task(task_id, "processing")
         try:
+            result: str | None = None
             for handler in self._handlers[action]:
-                handler(task)
-            self._mark_task(task_id, "done")
+                r = handler(task)
+                if isinstance(r, str) and r:
+                    result = r  # giữ kết quả cuối cùng không rỗng (vd: source_id)
+            self._mark_task(task_id, "done", result=result or "")
             logger.info("[%s] Task %s (%s) hoàn tất", self.queue_name, task_id, action)
         except Exception as exc:
             logger.exception("[%s] Task %s (%s) thất bại: %s", self.queue_name, task_id, action, exc)
