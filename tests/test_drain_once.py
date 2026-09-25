@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from local_agent.drain_once import CLOUD_ACTIONS, build_poller, main
+from local_agent.drain_once import CLOUD_ACTIONS, FOREIGN_ACTIONS, build_poller, main
 from local_agent.firestore_poller import FirestorePoller
 
 
@@ -16,12 +16,17 @@ def test_cloud_actions_exclude_local_only_actions():
     assert "chat_query" in CLOUD_ACTIONS
     assert "artifact_download" not in CLOUD_ACTIONS
     assert "reconcile_local" not in CLOUD_ACTIONS
+    # Task PC-only phải là FOREIGN (bỏ qua, GIỮ pending) chứ không rơi vào
+    # no_handler → bị mark failed (bug từng làm mất 5 task reconcile_local).
+    assert FOREIGN_ACTIONS == {"reconcile_local", "artifact_download"}
+    assert FOREIGN_ACTIONS.isdisjoint(CLOUD_ACTIONS)
 
 
 def test_build_poller_registers_cloud_actions():
     poller = build_poller()
     for action in CLOUD_ACTIONS:
         assert action in poller._handlers
+    assert poller._foreign_actions == FOREIGN_ACTIONS
 
 
 def test_process_task_returns_skipped_ext():
@@ -54,7 +59,46 @@ def test_run_once_aggregates_statuses():
          patch.object(poller, "_process_task", side_effect=["done", "failed", "skipped_ext"]):
         summary = poller.run_once()
 
-    assert summary == {"processed": 3, "done": 1, "failed": 1, "skipped": 1, "no_handler": 0}
+    assert summary == {"processed": 3, "done": 1, "failed": 1, "skipped": 1,
+                       "no_handler": 0, "foreign": 0}
+
+
+def test_foreign_task_left_pending_not_marked():
+    """Task foreign: KHÔNG claim, KHÔNG mark — PC (máy có handler) sẽ nhặt lại."""
+    poller = FirestorePoller("nlm_task_queue", foreign_actions={"reconcile_local"})
+
+    with patch.object(poller, "_mark_task") as mock_mark:
+        status = poller._process_task({"id": "t9", "action": "reconcile_local"})
+
+    assert status == "foreign"
+    mock_mark.assert_not_called()
+
+
+def test_run_once_counts_foreign_separately():
+    """foreign không được tính vào processed (không thì vòng drain không dừng)."""
+    poller = FirestorePoller("nlm_task_queue", foreign_actions={"reconcile_local"})
+    tasks = [{"id": "a", "action": "reconcile_local"}, {"id": "b", "action": "x"}]
+
+    with patch.object(poller, "_get_pending_tasks", return_value=tasks), \
+         patch.object(poller, "_process_task", side_effect=["foreign", "done"]):
+        summary = poller.run_once()
+
+    assert summary == {"processed": 1, "done": 1, "failed": 0, "skipped": 0,
+                       "no_handler": 0, "foreign": 1}
+
+
+def test_run_until_idle_stops_when_only_foreign_left():
+    """Hàng đợi chỉ còn task foreign → dừng ngay vòng 1, không quay max_passes lần."""
+    poller = _poller()
+    only_foreign = {"processed": 0, "done": 0, "failed": 0, "skipped": 0,
+                    "no_handler": 0, "foreign": 5}
+
+    with patch.object(poller, "run_once", return_value=only_foreign) as mock_once:
+        total = poller.run_until_idle(max_passes=30, idle_sleep=0)
+
+    assert mock_once.call_count == 1
+    assert total["foreign"] == 5
+    assert total["passes"] == 1
 
 
 def test_run_until_idle_stops_when_queue_empty():

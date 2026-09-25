@@ -6,9 +6,8 @@ import mimetypes
 from pathlib import Path
 from typing import Any
 
-from googleapiclient.discovery import build  # type: ignore
-from googleapiclient.http import MediaFileUpload  # type: ignore
-from google.oauth2.credentials import Credentials  # type: ignore
+# googleapiclient / google-auth được import LAZY trong từng hàm:
+# runner GitHub Actions không cài 2 gói này — nó CHỈ cần download_file (tier requests).
 
 from .config_loader import get
 from .cascade_delete import hard_delete_file, move_to_recycle_bin
@@ -30,6 +29,9 @@ def _get_drive_service() -> Any:
     Tự động refresh token nếu hết hạn và cập nhật lại vào token.json.
     Raises RuntimeError nếu token không tồn tại hoặc không hợp lệ.
     """
+    from googleapiclient.discovery import build  # type: ignore (lazy — cloud không cài)
+    from google.oauth2.credentials import Credentials  # type: ignore
+
     if not TOKEN_FILE.exists():
         raise RuntimeError(f"Drive token không tìm thấy: {TOKEN_FILE}. Chạy lại xác thực OAuth.")
 
@@ -104,6 +106,7 @@ def upload_file(local_path: str | Path, folder_path: str = "", subject: str = ""
     meta: dict[str, Any] = {"name": path.name}
     if parent_id:
         meta["parents"] = [parent_id]
+    from googleapiclient.http import MediaFileUpload  # type: ignore (lazy — cloud không cài)
     media = MediaFileUpload(str(path), mimetype=mime, resumable=True)
     created = service.files().create(body=meta, media_body=media, fields="id, name, size").execute()
     drive_file_id = created["id"]

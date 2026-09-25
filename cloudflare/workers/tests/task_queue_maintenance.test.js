@@ -203,6 +203,39 @@ describe('Endpoint bảo trì', () => {
     expect(data).toHaveProperty('recovered');
   });
 
+  it('include_failed=true chuyển failed → pending; mặc định (cron) thì không', async () => {
+    firestoreGet.mockResolvedValue(null);
+    firestoreRunQuery.mockImplementation(async (_env, _queue, cond) => (
+      cond.value === 'failed' ? [{ id: 'bad_task' }] : []
+    ));
+
+    // (1) Giống CRON — không truyền include_failed → không được đụng task failed
+    let res = await worker.fetch(new Request('http://localhost/api/tasks/maintenance/recover', {
+      method: 'POST',
+      headers: { 'X-Agent-Secret': 'test-secret' },
+    }), BASE_ENV);
+    let data = await res.json();
+    expect(data.failed_recovered).toBe(0);
+    expect(firestoreSet).not.toHaveBeenCalled();
+
+    // (2) Gọi tay với include_failed=true → chuyển failed → pending
+    firestoreSet.mockClear();
+    res = await worker.fetch(new Request('http://localhost/api/tasks/maintenance/recover?include_failed=true', {
+      method: 'POST',
+      headers: { 'X-Agent-Secret': 'test-secret' },
+    }), BASE_ENV);
+    data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.failed_recovered).toBe(2); // 2 queue × bad_task
+    const paths = firestoreSet.mock.calls.map((c) => c[1]);
+    expect(paths).toContain('nlm_task_queue/bad_task');
+    expect(paths).toContain('drive_task_queue/bad_task');
+    expect(firestoreSet.mock.calls[0][2]).toMatchObject({
+      status: 'pending',
+      recovered_from: 'failed',
+    });
+  });
+
   it('GET + PUT /api/settings/task-flags hoạt động', async () => {
     firestoreGet.mockResolvedValue(null);
     firestoreSet.mockResolvedValue({});

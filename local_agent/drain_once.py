@@ -37,12 +37,16 @@ CLOUD_ACTIONS = {
     "exam_generate": handle_exam_generate,
 }
 
+# Task PC-only: runner cloud PHẢI bỏ qua và GIỮ NGUYÊN pending
+# (không được mark failed — nếu không PC sẽ không bao giờ nhặt lại).
+FOREIGN_ACTIONS = {"reconcile_local", "artifact_download"}
+
 DEFAULT_QUEUE = "nlm_task_queue"
 
 
 def build_poller(queue_name: str = DEFAULT_QUEUE) -> FirestorePoller:
     """Tạo poller cho queue NLM với đúng bộ handler chạy được trên cloud."""
-    poller = FirestorePoller(queue_name)
+    poller = FirestorePoller(queue_name, foreign_actions=FOREIGN_ACTIONS)
     for action, handler in CLOUD_ACTIONS.items():
         poller.register(action, handler)
     return poller
@@ -117,6 +121,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(json.dumps(summary, ensure_ascii=False))
+    if summary.get("foreign"):
+        logger.info("Bỏ qua %d task của runner khác (foreign) — giữ nguyên pending",
+                    summary["foreign"])
     if summary["failed"] or summary["no_handler"]:
         logger.error("Có %d task lỗi và %d task không có handler",
                      summary["failed"], summary["no_handler"])

@@ -24,9 +24,13 @@ class FirestorePoller:
     Agent chạy mỗi queue trong một thread daemon riêng.
     """
 
-    def __init__(self, queue_name: str, interval: float | None = None):
+    def __init__(self, queue_name: str, interval: float | None = None,
+                 foreign_actions: set[str] | None = None):
         self.queue_name = queue_name
         self.interval = interval or float(get("poll_interval_seconds", 10))
+        # Action mà runner NÀY không được xử lý (vd: task PC-only trên runner cloud).
+        # Bỏ qua KHÔNG mark → giữ nguyên 'pending' cho máy có handler nhặt lại.
+        self._foreign_actions: set[str] = set(foreign_actions or ())
         self._handlers: dict[str, list[TaskHandler]] = {}
         self._running = False
         self._thread: threading.Thread | None = None
@@ -85,10 +89,17 @@ class FirestorePoller:
 
         Returns:
             Trạng thái đã báo về Worker: 'done' | 'skipped_ext' |
-            'skipped_no_course' | 'failed' | 'no_handler'.
+            'skipped_no_course' | 'failed' | 'no_handler' | 'foreign'.
         """
         task_id = task.get("id", "unknown")
         action = task.get("action", "")
+
+        # Task không thuộc runner này (vd: reconcile_local trên GitHub Actions):
+        # KHÔNG claim, KHÔNG mark — giữ nguyên pending để máy có handler nhặt lại.
+        if action in self._foreign_actions:
+            logger.info("[%s] Bỏ qua task %s (%s) — không thuộc runner này",
+                        self.queue_name, task_id, action)
+            return "foreign"
 
         if action not in self._handlers:
             logger.warning("[%s] Không có handler cho action '%s'", self.queue_name, action)
@@ -131,11 +142,16 @@ class FirestorePoller:
         """Xử lý đúng MỘT vòng: nhặt toàn bộ task pending hiện có rồi trả về thống kê.
 
         Returns:
-            {"processed": n, "done": n, "failed": n, "skipped": n, "no_handler": n}
+            {"processed": n, "done": n, "failed": n, "skipped": n, "no_handler": n,
+             "foreign": n}   # foreign: bỏ qua, KHÔNG tính vào processed
         """
-        summary = {"processed": 0, "done": 0, "failed": 0, "skipped": 0, "no_handler": 0}
+        summary = {"processed": 0, "done": 0, "failed": 0, "skipped": 0,
+                   "no_handler": 0, "foreign": 0}
         for task in self._get_pending_tasks():
             status = self._process_task(task)
+            if status == "foreign":
+                summary["foreign"] += 1
+                continue
             summary["processed"] += 1
             if status == "done":
                 summary["done"] += 1
@@ -158,12 +174,14 @@ class FirestorePoller:
             idle_sleep: giây nghỉ giữa 2 vòng để không dồn dập API.
         """
         total = {"processed": 0, "done": 0, "failed": 0, "skipped": 0,
-                 "no_handler": 0, "passes": 0}
+                 "no_handler": 0, "foreign": 0, "passes": 0}
         for _ in range(max(1, int(max_passes))):
             one = self.run_once()
             total["passes"] += 1
-            for key in ("processed", "done", "failed", "skipped", "no_handler"):
-                total[key] += one[key]
+            # foreign KHÔNG nằm trong processed → vòng chỉ toàn task foreign sẽ
+            # có processed==0 và dừng ngay (không quay max_passes lần vô ích).
+            for key in ("processed", "done", "failed", "skipped", "no_handler", "foreign"):
+                total[key] += one.get(key, 0)
             if one["processed"] == 0:
                 break
             if idle_sleep > 0:

@@ -15,16 +15,18 @@ export const RECOVERABLE_QUEUES = ['nlm_task_queue', 'drive_task_queue'];
  * Trả các task 'processing' đã quá hạn về 'pending'.
  *
  * @param {Object} env
- * @param {{force?: boolean, now?: string|Date}} options
+ * @param {{force?: boolean, now?: string|Date, includeFailed?: boolean}} options
  *        force=true → chạy bỏ qua công tắc (nút "Hồi phục ngay" trên Web UI)
- * @returns {Promise<{enabled: boolean, checked: number, recovered: number, errors: number, stale_minutes: number}>}
+ *        includeFailed=true → thêm task 'failed' → 'pending' (CHỈ endpoint thủ công,
+ *        KHÔNG BAO GIỜ truyền từ cron — tránh vòng lặp retry vô hạn task lỗi thật)
+ * @returns {Promise<{enabled: boolean, checked: number, recovered: number, failed_recovered: number, errors: number, stale_minutes: number}>}
  */
-export async function recoverStaleTasks(env, { force = false, now = null } = {}) {
+export async function recoverStaleTasks(env, { force = false, now = null, includeFailed = false } = {}) {
   const flags = await getTaskFlags(env, { forceRefresh: force });
 
   if (!force && !flags.recoveryEnabled) {
     console.log('[TaskRecovery] Đang TẮT (tasks_recovery_enabled=false) — bỏ qua');
-    return { enabled: false, checked: 0, recovered: 0, errors: 0, stale_minutes: flags.staleMinutes };
+    return { enabled: false, checked: 0, recovered: 0, failed_recovered: 0, errors: 0, stale_minutes: flags.staleMinutes };
   }
 
   const nowMs = now ? new Date(now).getTime() : Date.now();
@@ -33,6 +35,7 @@ export async function recoverStaleTasks(env, { force = false, now = null } = {})
     enabled: true,
     checked: 0,
     recovered: 0,
+    failed_recovered: 0,
     errors: 0,
     stale_minutes: flags.staleMinutes,
   };
@@ -76,10 +79,44 @@ export async function recoverStaleTasks(env, { force = false, now = null } = {})
         console.error(`[TaskRecovery] Lỗi hồi phục ${queue}/${taskId}:`, err.message);
       }
     }
+
+    // 'failed' → 'pending': CHỈ khi include_failed=true (endpoint thủ công bấm nút).
+    // Cron KHÔNG truyền → không bao giờ tự retry task lỗi thật (tránh loop vô hạn).
+    if (includeFailed) {
+      let failedTasks = [];
+      try {
+        failedTasks = await firestoreRunQuery(env, queue, {
+          fieldPath: 'status',
+          value: 'failed',
+          limit: 200,
+        });
+      } catch (err) {
+        stats.errors++;
+        console.error(`[TaskRecovery] Không truy vấn failed của ${queue}:`, err.message);
+      }
+      stats.checked += failedTasks.length;
+      for (const task of failedTasks) {
+        const taskId = task.id || task._id || '';
+        if (!taskId) continue;
+        try {
+          await firestoreSet(env, `${queue}/${taskId}`, {
+            status: 'pending',
+            error: '',
+            recovered_at: new Date(nowMs).toISOString(),
+            recovered_from: 'failed',
+          });
+          stats.failed_recovered++;
+          console.log(`[TaskRecovery] Chuyển failed → pending: ${queue}/${taskId}`);
+        } catch (err) {
+          stats.errors++;
+          console.error(`[TaskRecovery] Lỗi hồi phục failed ${queue}/${taskId}:`, err.message);
+        }
+      }
+    }
   }
 
   console.log(
-    `[TaskRecovery] checked=${stats.checked} recovered=${stats.recovered} errors=${stats.errors} (ngưỡng ${stats.stale_minutes} phút)`
+    `[TaskRecovery] checked=${stats.checked} recovered=${stats.recovered} failed_recovered=${stats.failed_recovered} errors=${stats.errors} (ngưỡng ${stats.stale_minutes} phút)`
   );
   return stats;
 }

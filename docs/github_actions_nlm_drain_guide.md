@@ -171,6 +171,7 @@ Chưa khai token → Worker bỏ qua im lặng, cron ở (b) vẫn chạy. (Tu�
    GET  /api/settings/task-flags            # xem cờ hiện hành
    PUT  /api/settings/task-flags            # {"queryMode":"legacy","recoveryEnabled":false,"staleMinutes":30}
    POST /api/tasks/maintenance/recover?force=true   # hồi phục ngay (bỏ qua công tắc)
+   POST /api/tasks/maintenance/recover?force=true&include_failed=true   # thêm: task failed → pending (CHỈ bấm tay; cron không truyền để tránh retry loop)
    ```
 3. **Biến môi trường Worker** — `wrangler.toml` `[vars]`: `TASKS_QUERY_MODE`, `TASKS_RECOVERY_ENABLED`, `TASKS_STALE_MINUTES`. Cờ trong Firestore **ưu tiên cao hơn** env, nên env chỉ dùng làm mặc định/ép cứng khi Firestore trống.
 

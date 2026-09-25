@@ -2204,7 +2204,7 @@
 
     async function runTaskRecoveryNow() {
       try {
-        const resp = await fetch(`${WORKER_URL}/api/tasks/maintenance/recover?force=true`, {
+        const resp = await fetch(`${WORKER_URL}/api/tasks/maintenance/recover?force=true&include_failed=true`, {
           method: 'POST',
           headers: buildHeaders({ 'Content-Type': 'application/json' }),
         });

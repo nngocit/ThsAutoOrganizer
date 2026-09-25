@@ -271,16 +271,18 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
  * POST /api/tasks/maintenance/recover
  * G2: hồi phục (thủ công) các task kẹt 'processing' về 'pending'.
  * Query: ?force=true → chạy dù công tắc tasks_recovery_enabled đang tắt.
+ *        ?include_failed=true → thêm task 'failed' → 'pending' (CHỈ gọi tay/nút bấm;
+ *        cron không truyền → không retry loop task lỗi thật).
  * Cho phép cả user (Bearer) lẫn agent (X-Agent-Secret).
  */
 router.post('/maintenance/recover', requireAuthOrAgent(async (c) => {
   const origin = c.req.header('Origin') || '';
 
   try {
-    const force = ['1', 'true', 'yes'].includes(
-      String(c.req.query('force') || '').trim().toLowerCase()
-    );
-    const stats = await recoverStaleTasks(c.env, { force });
+    const truthy = (v) => ['1', 'true', 'yes'].includes(String(v || '').trim().toLowerCase());
+    const force = truthy(c.req.query('force'));
+    const includeFailed = truthy(c.req.query('include_failed'));
+    const stats = await recoverStaleTasks(c.env, { force, includeFailed });
     return withCors(c.json({ status: 'ok', ...stats }), origin);
   } catch (err) {
     console.error('Task recovery error:', err);
