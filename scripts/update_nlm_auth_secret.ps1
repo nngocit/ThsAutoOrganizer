@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Cập nhật phiên NotebookLM lên GitHub Secret NOTEBOOKLM_AUTH_B64 (dùng khi cookie hết hạn).
 
@@ -64,16 +64,25 @@ data = {
 }
 out = pathlib.Path.home() / ".notebooklm-mcp-cli" / "auth.json"
 out.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-print(f"Đã sinh {out} ({out.stat().st_size} bytes, {len(cookies)} cookies)")
+# In ASCII thuần để không bị mojibake trên console Windows (cp1252)
+print("OK %s (%d bytes, %d cookies)" % (out, out.stat().st_size, len(cookies)))
 '@
 $py | python -
 if ($LASTEXITCODE -ne 0) { throw "Sinh auth.json thất bại (cần python trong PATH)." }
 
 # 2) Đẩy lên GitHub Secret (pipe để tránh giới hạn độ dài lệnh)
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "Chưa cài gh CLI: winget install GitHub.cli" }
-$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($authJson))
-$b64 | gh secret set NOTEBOOKLM_AUTH_B64 --repo $Repo
-if ($LASTEXITCODE -ne 0) { throw "gh secret set thất bại — kiểm tra đã 'gh auth login' chưa." }
+# Gh CLI có thể chưa có trong PATH của session PowerShell cũ (MSI thêm PATH cho process MỚI) → tự tìm.
+$ghCmd = (Get-Command gh -ErrorAction SilentlyContinue).Source
+if (-not $ghCmd) {
+  $cands = @((Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe'))
+  if (${env:ProgramFiles(x86)}) { $cands += (Join-Path ${env:ProgramFiles(x86)} 'GitHub CLI\gh.exe') }
+  foreach ($cand in $cands) { if (Test-Path $cand) { $ghCmd = $cand; break } }
+}
+if (-not $ghCmd) { throw "Chua cai gh CLI: winget install GitHub.cli" }
 
-Write-Host "OK — đã cập nhật NOTEBOOKLM_AUTH_B64 ($($b64.Length) ký tự base64) trên repo $Repo." -ForegroundColor Green
-Write-Host "Chạy thử: gh workflow run nlm-drain.yml -f dry_run=false -f max_passes=1"
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($authJson))
+$b64 | & $ghCmd secret set NOTEBOOKLM_AUTH_B64 --repo $Repo
+if ($LASTEXITCODE -ne 0) { throw "gh secret set that bai — kiem tra da 'gh auth login' chua." }
+
+Write-Host "OK — da cap nhat NOTEBOOKLM_AUTH_B64 ($($b64.Length) ky tu base64) tren repo $Repo." -ForegroundColor Green
+Write-Host "Chay thu: gh workflow run nlm-drain.yml -f dry_run=false -f max_passes=1"
