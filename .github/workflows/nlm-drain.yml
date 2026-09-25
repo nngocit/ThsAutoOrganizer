@@ -96,7 +96,8 @@ jobs:
         run: echo '{}' > config.json
 
       - name: Khôi phục phiên Google (auth.json) từ Secret
-        # CLI (notebooklm-mcp-cli >= 0.11) đọc ~/.notebooklm-mcp-cli/auth.json (GỐC).
+        # CLI (notebooklm-mcp-cli >= 0.11) đọc ~/.notebooklm-mcp-cli/auth.json (GỐC)
+        # VÀ yêu cầu profile tồn tại (thiếu → "Profile 'default' not found").
         # File profiles/default/auth.json không bao giờ được đọc → không được ghi vào đó.
         if: steps.quickcheck.outputs.skip != 'true'
         env:
@@ -107,6 +108,18 @@ jobs:
           printf '%s' "$AUTH_B64" | base64 -d > "$HOME/.notebooklm-mcp-cli/auth.json"
           chmod 600 "$HOME/.notebooklm-mcp-cli/auth.json"
           echo "Đã ghi auth.json ($(wc -c < "$HOME/.notebooklm-mcp-cli/auth.json") bytes)"
+          # Runner sạch không có profile → tự dựng profiles/default từ auth.json
+          python - <<'PY'
+          import json, pathlib
+          storage = pathlib.Path.home() / ".notebooklm-mcp-cli"
+          data = json.loads((storage / "auth.json").read_text(encoding="utf-8"))
+          profile = storage / "profiles" / "default"
+          profile.mkdir(parents=True, exist_ok=True)
+          (profile / "cookies.json").write_text(json.dumps(data["cookies"], ensure_ascii=False), encoding="utf-8")
+          meta = {k: (data.get(k) or None) for k in ("csrf_token", "session_id", "build_label", "base_host")}
+          (profile / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+          print("Da ghi profile: cookies=%d" % len(data["cookies"]))
+          PY
 
       - name: Smoke test phiên NotebookLM
         if: steps.quickcheck.outputs.skip != 'true' && inputs.dry_run != 'true'

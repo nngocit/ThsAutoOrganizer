@@ -50,7 +50,7 @@
 | `AGENT_SECRET` | (chuỗi 64 ký tự) | `config.json` → `agent_secret` |
 | `NOTEBOOKLM_AUTH_B64` | base64 của **`%USERPROFILE%\.notebooklm-mcp-cli\auth.json`** (file GỐC) | xem lệnh dưới |
 
-> ⚠️ **Đường dẫn quan trọng:** CLI (`notebooklm-mcp-cli` ≥ 0.11) chỉ đọc `~/.notebooklm-mcp-cli/auth.json` ở **thư mục gốc** — file `profiles\default\auth.json` **không bao giờ được đọc**. File gốc do `nlm login` tự tạo; nếu máy bạn chưa có (phiên bản cũ chỉ ghi `profiles\default\cookies.json`), sinh nó một lần bằng đoạn này rồi mới mã hoá base64:
+> ⚠️ **Đường dẫn quan trọng:** CLI (`notebooklm-mcp-cli` ≥ 0.11) chỉ đọc `~/.notebooklm-mcp-cli/auth.json` ở **thư mục gốc** — file `profiles\default\auth.json` **không bao giờ được đọc**. Ngoài ra CLI **bắt buộc có profile** (`profiles\default\cookies.json`), nếu thiếu sẽ báo `Profile 'default' not found` → workflow **tự dựng profile từ `auth.json`** sau khi decode (không cần khôi phục thủ công). File gốc do `nlm login` tự tạo; nếu máy bạn chưa có (phiên bản cũ chỉ ghi `profiles\default\cookies.json`), sinh nó một lần bằng đoạn này rồi mới mã hoá base64:
 
 ```powershell
 python -c "import json,time,pathlib; p=pathlib.Path.home()/'.notebooklm-mcp-cli/profiles/default'; c=json.loads((p/'cookies.json').read_text(encoding='utf-8')); m=json.loads((p/'metadata.json').read_text(encoding='utf-8')) if (p/'metadata.json').exists() else {}; d={'cookies':c,'csrf_token':m.get('csrf_token') or '','session_id':m.get('session_id') or '','build_label':m.get('build_label') or '','base_host':m.get('base_host') or '','extracted_at':time.time()}; out=pathlib.Path.home()/'.notebooklm-mcp-cli/auth.json'; out.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding='utf-8'); print('OK',out,out.stat().st_size,'bytes')"
