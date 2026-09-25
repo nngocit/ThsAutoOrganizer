@@ -44,6 +44,7 @@ app.route('/api/tasks', syncRouter);          // Task queues polling & status up
 app.route('/api/sync', syncRouter);           // Luồng 3: Reconciliation & Drive Folder Import
 app.route('/api/exam', examRouter);           // Trạm Ôn Thi
 app.route('/api/settings', settingsRouter);   // Global Settings
+app.route('/api/drive', settingsRouter);      // Drive operations (init-root, provision-drive)
 app.route('/api/logs', logsRouter);           // System Logs Dashboard
 
 // 404 fallback với CORS headers đầy đủ

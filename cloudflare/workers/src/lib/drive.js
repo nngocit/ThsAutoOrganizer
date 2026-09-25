@@ -1,61 +1,95 @@
-// src/lib/drive.js — Google Drive API Client bằng Service Account (<180 lines)
-// Sử dụng JWT Bearer để xác thực trực tiếp 24/7 với Google Drive REST API v3
+// src/lib/drive.js — Google Drive API Client bằng OAuth 2.0 User Refresh Token
+// Xác thực thông qua User OAuth 2.0 Refresh Token (full quota Google Drive cá nhân, triệt tiêu 403 quota)
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 
+// Module-level in-memory token cache (sống trong vòng đời Worker instance)
+let cachedDriveToken = null;
+let driveTokenExpiry = 0;
+
 /**
- * Lấy Access Token Google Drive từ Service Account JSON (env.FIREBASE_SERVICE_ACCOUNT)
+ * Lấy Access Token Google Drive độc quyền bằng OAuth 2.0 Refresh Token.
+ * KHÔNG sử dụng Service Account JWT (giải quyết triệt để 403 storageQuotaExceeded).
+ * Cache token 1 tiếng (trừ 60s an toàn).
  */
 export async function getDriveAccessToken(env) {
-  let sa = env.FIREBASE_SERVICE_ACCOUNT;
-  if (!sa) throw new Error('Biến môi trường FIREBASE_SERVICE_ACCOUNT chưa được cấu hình');
-  if (typeof sa === 'string') {
-    try { sa = JSON.parse(sa); } catch (e) { throw new Error('FIREBASE_SERVICE_ACCOUNT không đúng định dạng JSON: ' + e.message); }
+  const now = Date.now();
+  if (cachedDriveToken && now < driveTokenExpiry - 60000) {
+    return cachedDriveToken;
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: sa.client_email,
-    sub: sa.client_email,
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.file',
-  };
+  const clientId = env.GOOGLE_CLIENT_ID;
+  const clientSecret = env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = env.GOOGLE_REFRESH_TOKEN;
 
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const enc = (obj) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const signingInput = `${enc(header)}.${enc(payload)}`;
-
-  const keyData = sa.private_key
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\s/g, '');
-  const binaryKey = Uint8Array.from(atob(keyData), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8', binaryKey,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, ['sign']
-  );
-  const sig = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput)
-  );
-  const encodedSig = btoa(String.fromCharCode(...new Uint8Array(sig)))
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const jwt = `${signingInput}.${encodedSig}`;
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      `Thiếu cấu hình Google OAuth credentials cho Google Drive: ` +
+      `GOOGLE_CLIENT_ID=${Boolean(clientId)}, GOOGLE_CLIENT_SECRET=${Boolean(clientSecret)}, GOOGLE_REFRESH_TOKEN=${Boolean(refreshToken)}`
+    );
+  }
 
   const resp = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }).toString(),
   });
+
   const data = await resp.json();
-  if (!data.access_token) {
-    throw new Error(`Google Drive Service Account auth thất bại: ${JSON.stringify(data)}`);
+  if (!resp.ok || !data.access_token) {
+    const errorMsg = data.error_description || data.error || JSON.stringify(data);
+    throw new Error(`Google OAuth Refresh Token exchange thất bại (${resp.status}): ${errorMsg}`);
   }
-  return data.access_token;
+
+  cachedDriveToken = data.access_token;
+  driveTokenExpiry = now + (data.expires_in || 3600) * 1000;
+  return cachedDriveToken;
+}
+
+/**
+ * Reset token cache (phục vụ unit test)
+ */
+export function _resetDriveTokenCache() {
+  cachedDriveToken = null;
+  driveTokenExpiry = 0;
+}
+
+/**
+ * Tìm kiếm thư mục theo tên trên Google Drive (Idempotency - chống tạo trùng lặp)
+ */
+export async function findDriveFolderByName(env, folderName, parentId = '') {
+  if (!folderName) return null;
+  try {
+    const token = await getDriveAccessToken(env);
+    const escapedName = folderName.replace(/'/g, "\\'");
+    let query = `mimeType = 'application/vnd.google-apps.folder' and name = '${escapedName}' and trashed = false`;
+    if (parentId) {
+      query += ` and '${parentId}' in parents`;
+    }
+    const q = encodeURIComponent(query);
+    const resp = await fetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name,createdTime)&pageSize=10`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.warn(`Tìm thư mục Drive thất bại (${resp.status}): ${err}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    const files = data.files || [];
+    return files.length > 0 ? files[0] : null;
+  } catch (err) {
+    console.warn(`Ngoại lệ khi tìm thư mục Drive: ${err.message}`);
+    return null;
+  }
 }
 
 /**
@@ -124,7 +158,6 @@ export async function uploadFileToDrive(env, { filename, mimeType, parentId, con
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': `multipart/related; boundary=${boundary}`,
-      'Content-Length': String(totalLength),
     },
     body: combined,
   });
@@ -228,6 +261,34 @@ export async function setDriveWriterPermission(env, fileId, email) {
   if (!resp.ok) {
     const errText = await resp.text();
     throw new Error(`Cấp quyền writer Drive cho ${email} thất bại (${resp.status}): ${errText}`);
+  }
+
+  return await resp.json();
+}
+
+/**
+ * Cấp quyền truy cập bất kỳ ai có link (anyone -> writer/reader) cho file/thư mục Google Drive
+ */
+export async function setDriveAnyonePermission(env, fileId, role = 'writer') {
+  if (!fileId) throw new Error('fileId là bắt buộc');
+
+  const token = await getDriveAccessToken(env);
+  const resp = await fetch(`${DRIVE_API}/files/${fileId}/permissions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      role: role,
+      type: 'anyone',
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.warn(`Cấp quyền anyone (${role}) cho ${fileId} cảnh báo (${resp.status}): ${errText}`);
+    return null;
   }
 
   return await resp.json();

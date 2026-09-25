@@ -30,6 +30,15 @@ class FirestorePoller:
         self._handlers: dict[str, list[TaskHandler]] = {}
         self._running = False
         self._thread: threading.Thread | None = None
+        self._session = requests.Session()
+        try:
+            from requests.adapters import HTTPAdapter
+            from urllib3.util.retry import Retry
+            retries = Retry(total=2, backoff_factor=1, status_forcelist=[502, 503, 504])
+            adapter = HTTPAdapter(max_retries=retries, pool_connections=5, pool_maxsize=10)
+            self._session.mount("https://", adapter)
+        except Exception:
+            pass
 
     def register(self, action: str, handler: TaskHandler) -> None:
         """Đăng ký handler cho action type."""
@@ -50,7 +59,7 @@ class FirestorePoller:
         limit = get("task_queue_limit", 10)
         url = f"{worker_url}/api/tasks/{self.queue_name}?limit={limit}"
         try:
-            resp = requests.get(url, headers=self._auth_headers(), timeout=15)
+            resp = self._session.get(url, headers=self._auth_headers(), timeout=30)
             resp.raise_for_status()
             return resp.json().get("tasks", [])
         except requests.RequestException as e:
@@ -67,7 +76,7 @@ class FirestorePoller:
         if result:
             payload["result"] = result
         try:
-            requests.patch(url, json=payload, headers=self._auth_headers(), timeout=15)
+            self._session.patch(url, json=payload, headers=self._auth_headers(), timeout=30)
         except requests.RequestException as e:
             logger.warning("[%s] Không thể mark task %s: %s", self.queue_name, task_id, e)
 

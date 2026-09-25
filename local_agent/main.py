@@ -14,6 +14,8 @@ from .artifact_task_handler import handle_artifact_download
 from .exam_task_handler import handle_exam_generate
 from .drive_sync import handle_drive_task
 from .file_watcher import FileWatcher
+from .local_reconciler import handle_reconcile_local, reconcile_with_firestore
+import threading
 
 # Ép stdout/stderr về UTF-8 để log tiếng Việt không lỗi khi redirect sang file (Windows cp1252)
 if hasattr(sys.stdout, "reconfigure"):
@@ -82,6 +84,7 @@ def main():
     nlm_poller.register("research_start", handle_research_start)
     nlm_poller.register("artifact_download", handle_artifact_download)
     nlm_poller.register("exam_generate", handle_exam_generate)
+    nlm_poller.register("reconcile_local", handle_reconcile_local)
     _pollers.append(nlm_poller)
 
     # --- Drive Task Queue Poller ---
@@ -107,6 +110,13 @@ def main():
         p.start()
     if _watcher:
         _watcher.start()
+
+    # Tự động đối soát đĩa Local trên nền background ngay khi khởi động
+    threading.Thread(
+        target=reconcile_with_firestore,
+        name="bg-disk-reconcile-startup",
+        daemon=True,
+    ).start()
 
     logger.info("Agent đang chạy. Nhấn Ctrl+C để dừng.")
 

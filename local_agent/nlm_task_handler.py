@@ -11,6 +11,7 @@ import threading
 from pathlib import Path
 
 from .cascade_delete import resolve_local_path
+from .config_loader import get_config, get
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,24 @@ NLM_CMD = "nlm"
 # 1. BỘ LỌC FILE: Danh sách định dạng hỗ trợ NotebookLM
 SUPPORTED_EXTS = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.mp3']
 SUPPORTED_NLM_EXTENSIONS = set(SUPPORTED_EXTS)
+
+
+def _resolve_profile_args(owner_email: str) -> list[str]:
+    """Xác định cờ --profile tương ứng với owner_email hoặc cảnh báo dùng default session."""
+    owner_email = (owner_email or "").strip()
+    if not owner_email:
+        return []
+
+    cfg = get_config() if callable(get_config) else {}
+    profiles = cfg.get("nlm_profiles", {}) if isinstance(cfg, dict) else {}
+    profile = profiles.get(owner_email, "")
+
+    if profile:
+        logger.info("Đã khớp profile '%s' cho tài khoản %s", profile, owner_email)
+        return ["--profile", str(profile)]
+
+    logger.warning("Task thuộc về %s, đang xử lý bằng Local Session mặc định của máy", owner_email)
+    return []
 
 
 def _nlm_available() -> bool:
@@ -63,14 +82,27 @@ def _resolve_source_file(task: dict) -> Path:
     Raises ValueError nếu không lấy được file.
     """
     # 1. local_path / file_path trực tiếp trong task
+    base = Path(get("local_base_path", "D:\\ThacSi_HTTT\\Mon_Hoc"))
     for key in ("local_path", "file_path"):
         raw = task.get(key) or ""
-        if raw and Path(raw).exists():
-            return Path(raw).resolve()
+        if raw:
+            p = Path(raw)
+            if p.exists():
+                return p.resolve()
+            if not p.is_absolute():
+                candidate = (base / p).resolve()
+                if candidate.exists():
+                    return candidate
 
     # 2. Suy ra từ local_base_path + subject + folder_path + filename
     filename = task.get("filename", "")
-    candidate = resolve_local_path(task.get("subject", ""), task.get("folder_path", ""), filename)
+    subject = (
+        task.get("local_folder_name")
+        or task.get("subject")
+        or task.get("course_name")
+        or ""
+    )
+    candidate = resolve_local_path(subject, task.get("folder_path", ""), filename)
     if filename and candidate.exists():
         return candidate.resolve()
 
@@ -78,8 +110,8 @@ def _resolve_source_file(task: dict) -> Path:
     drive_file_id = task.get("drive_file_id", "")
     if drive_file_id and filename:
         from .drive_sync import download_file  # lazy import tránh vòng lặp
-        dest = Path(tempfile.gettempdir()) / "ths_agent_nlm" / filename
-        logger.info("File local không có — tải fallback từ Drive: %s", drive_file_id)
+        dest = _determine_local_dest_path(task) or (Path(tempfile.gettempdir()) / "ths_agent_nlm" / filename)
+        logger.info("File local không có — tải fallback từ Drive: %s -> %s", drive_file_id, dest)
         return download_file(drive_file_id, dest).resolve()
 
     raise ValueError(f"Không resolve được file local (filename={filename!r}, "
@@ -167,7 +199,38 @@ def _resolve_notebook_id(subject: str) -> str:
     return ""
 
 
-def _async_download_worker(drive_file_id: str, dest_path: Path) -> None:
+def _report_local_sync_status(file_id: str, local_path: str, uid: str = "", status: str = "synced") -> bool:
+    """Báo cáo trạng thái đồng bộ file local lên Cloudflare Worker & Firestore."""
+    if not file_id:
+        return False
+    try:
+        import requests
+        worker_url = get("worker_url", "").rstrip("/")
+        if not worker_url:
+            return False
+        headers = {
+            "X-Agent-Secret": get("agent_secret", ""),
+            "Content-Type": "application/json",
+        }
+        url = f"{worker_url}/api/files/{file_id}/local-status"
+        payload = {
+            "local_sync_status": status,
+            "local_path": local_path,
+        }
+        if uid:
+            payload["uid"] = uid
+        resp = requests.patch(url, json=payload, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            logger.info("Đã cập nhật local_sync_status='%s' cho file %s (%s)", status, file_id, local_path)
+            return True
+        else:
+            logger.warning("Cập nhật local_sync_status thất bại: HTTP %s - %s", resp.status_code, resp.text)
+    except Exception as e:
+        logger.warning("Lỗi kết nối khi cập nhật local_sync_status cho file %s: %s", file_id, e)
+    return False
+
+
+def _async_download_worker(drive_file_id: str, dest_path: Path, file_id: str = "", rel_local_path: str = "", uid: str = "") -> None:
     """Track 2: Tải file từ Drive xuống ổ cứng trong thread chạy ngầm (async/background)."""
     try:
         from .drive_sync import download_file
@@ -175,20 +238,33 @@ def _async_download_worker(drive_file_id: str, dest_path: Path) -> None:
         logger.info("[Track 2 Async] Bắt đầu tải ngầm file từ Drive: %s -> %s", drive_file_id, dest_path)
         download_file(drive_file_id, dest_path)
         logger.info("[Track 2 Async] Tải ngầm hoàn tất: %s", dest_path)
+        if dest_path.exists() and dest_path.stat().st_size > 0 and file_id:
+            _report_local_sync_status(file_id, rel_local_path or str(dest_path), uid, "synced")
     except Exception as e:
         logger.warning("[Track 2 Async] Tải ngầm file %s thất bại: %s", drive_file_id, e)
+        if file_id:
+            _report_local_sync_status(file_id, rel_local_path or str(dest_path), uid, "failed")
 
 
 def _determine_local_dest_path(task: dict) -> Path | None:
     """Xác định đường dẫn local đích để lưu file khi tải về."""
+    base = Path(task.get("local_base_path") or get("local_base_path", "D:\\ThacSi_HTTT\\Mon_Hoc"))
     for key in ("local_path", "file_path"):
         raw = task.get(key) or ""
         if raw:
-            return Path(raw).resolve()
+            p = Path(raw)
+            if not p.is_absolute():
+                return (base / p).resolve()
+            return p.resolve()
 
     filename = task.get("filename", "")
     if filename:
-        subject = task.get("subject", "")
+        subject = (
+            task.get("local_folder_name")
+            or task.get("subject")
+            or task.get("course_name")
+            or ""
+        )
         folder_path = task.get("folder_path", "")
         return resolve_local_path(subject, folder_path, filename).resolve()
     return None
@@ -210,15 +286,23 @@ def handle_source_add(task: dict) -> str:
     local_path = task.get("local_path", "") or task.get("file_path", "") or ""
     file_name = filename or Path(local_path).name
 
-    # 1. BỘ LỌC FILE: Kiểm tra file extension trước tiên
+    raw_url = (task.get("url") or task.get("web_url") or "").strip()
+    is_generic_web = bool(raw_url and "drive.google.com" not in raw_url)
+
+    # 1. BỘ LỌC FILE: Kiểm tra file extension trước tiên (nếu không phải là web url)
     ext = Path(file_name).suffix.lower()
-    if file_name and ext not in SUPPORTED_EXTS:
+    if not is_generic_web and file_name and ext not in SUPPORTED_EXTS:
         logger.info("Bỏ qua file không thuộc SUPPORTED_EXTS: %s (ext=%s)", file_name, ext)
         return "skipped_ext"
 
     # 2. GUARD CLAUSE: Bỏ qua nếu file không thuộc môn học cụ thể (course_id rỗng hoặc subject == 'Tài liệu chung')
     course_id = (task.get("course_id") or "").strip() if task.get("course_id") is not None else ""
-    subject = (task.get("subject") or "").strip() if task.get("subject") is not None else ""
+    subject = (
+        task.get("local_folder_name")
+        or task.get("subject")
+        or task.get("course_name")
+        or ""
+    ).strip()
 
     if not course_id or subject == "Tài liệu chung":
         logger.info("Bỏ qua nạp NLM do file không thuộc môn học cụ thể (course_id rỗng)")
@@ -226,7 +310,6 @@ def handle_source_add(task: dict) -> str:
         if task_id:
             try:
                 import requests
-                from .config_loader import get
                 worker_url = get("worker_url", "").rstrip("/")
                 if worker_url:
                     headers = {"X-Agent-Secret": get("agent_secret", ""), "Content-Type": "application/json"}
@@ -274,52 +357,55 @@ def handle_source_add(task: dict) -> str:
         raise ValueError(msg)
 
     # =========================================================================
-    # TRACK 2 (CHẠY NGẦM / ASYNC): Tải file vật lý từ Drive xuống ổ cứng (Local Path)
-    # TUYỆT ĐỐI KHÔNG block quá trình của Track 1
+    # NẠP TÀI LIỆU VÀO NOTEBOOKLM: Direct File Ingestion (--file)
+    # Tuyệt đối KHÔNG truyền link drive.google.com vào cờ --url vì bot protection của Google sẽ chặn
+    # và NotebookLM sẽ nạp nội dung trang lỗi Captcha "unusual traffic" thay vì file thật.
     # =========================================================================
+    file_id = task.get("file_id", "")
     dest_path = _determine_local_dest_path(task)
-    if drive_file_id and dest_path and not dest_path.exists():
-        threading.Thread(
-            target=_async_download_worker,
-            args=(drive_file_id, dest_path),
-            name=f"track2-bg-dl-{drive_file_id[:8]}",
-            daemon=True,
-        ).start()
-        logger.info("[Track 2 Async] Đã kích hoạt tải ngầm file %s -> %s (non-blocking)", drive_file_id, dest_path)
+    base = Path(get("local_base_path", "D:\\ThacSi_HTTT\\Mon_Hoc"))
+    rel_local_path = ""
+    if dest_path:
+        try:
+            rel_local_path = str(dest_path.relative_to(base)).replace("\\", "/")
+        except Exception:
+            rel_local_path = str(dest_path)
 
-    # =========================================================================
-    # TRACK 1 (ƯU TIÊN): Nạp NotebookLM bằng Drive URL ngay lập tức
-    # =========================================================================
-    drive_url = (
-        task.get("drive_view_link")
-        or task.get("webViewLink")
-        or task.get("drive_url")
-        or task.get("url")
-        or ""
-    )
-    if not drive_url and drive_file_id:
-        drive_url = f"https://drive.google.com/file/d/{drive_file_id}/view"
+    # Đảm bảo file có mặt trên ổ cứng trước khi nạp vào NotebookLM
+    if not dest_path or not dest_path.exists() or dest_path.stat().st_size == 0:
+        if drive_file_id and dest_path:
+            logger.info("File local chưa có hoặc rỗng — tải từ Drive: %s -> %s", drive_file_id, dest_path)
+            from .drive_sync import download_file
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            download_file(drive_file_id, dest_path)
 
-    if drive_url:
-        logger.info("[Track 1 Fast] Nạp NotebookLM bằng Drive URL: %s -> notebook %s", drive_url, notebook_id)
-        args = ["source", "add", notebook_id, "--url", drive_url,
-                "--wait", "--wait-timeout", "600", "--json"]
+    if dest_path and dest_path.exists() and dest_path.stat().st_size > 0:
+        logger.info("[Local Verified] File vật lý đã sẵn sàng trên đĩa: %s (%d bytes)", dest_path, dest_path.stat().st_size)
+        if file_id:
+            _report_local_sync_status(file_id, rel_local_path, uid, "synced")
+
+    owner_email = (task.get("owner_email") or "").strip()
+    profile_args = _resolve_profile_args(owner_email)
+
+    # 1. Trường hợp là URL web công khai thông thường (KHÔNG phải link drive.google.com)
+    raw_url = (task.get("url") or task.get("web_url") or "").strip()
+    if raw_url and "drive.google.com" not in raw_url:
+        logger.info("Nạp NotebookLM bằng Web URL công khai: %s -> notebook %s", raw_url, notebook_id)
+        args = ["source", "add", notebook_id, "--url", raw_url,
+                "--wait", "--wait-timeout", "600", "--json"] + profile_args
         returncode, stdout, stderr = _run_nlm(args, timeout=660)
-
         if returncode == 0:
             data = _parse_nlm_json(stdout)
             source_id = data.get("source_id") or data.get("id") or ""
-            logger.info("[Track 1 Fast] NLM source add URL OK: %s -> notebook %s (source_id=%s)",
-                        drive_url, notebook_id, source_id or "?")
             return source_id
         else:
-            logger.warning("[Track 1 Fast] nlm source add --url gặp lỗi (code=%d): %s. Thử fallback qua file cục bộ.",
-                           returncode, stderr or stdout)
+            logger.warning("NLM source add --url lỗi: %s. Chuyển sang fallback file.", stderr or stdout)
 
-    # Fallback Track 1b: nạp bằng file local nếu không có Drive URL hoặc nạp URL không thành công
-    source_path = _resolve_source_file(task)
-    args = ["source", "add", notebook_id, "--file", str(source_path),
-            "--wait", "--wait-timeout", "600", "--json"]
+    # 2. Trường hợp là Tệp tin tài liệu: Luôn dùng --file <local_path>
+    source_path = dest_path if (dest_path and dest_path.exists() and dest_path.stat().st_size > 0) else _resolve_source_file(task)
+    logger.info("Nạp NotebookLM trực tiếp qua tệp tin (--file): %s -> notebook %s", source_path.name, notebook_id)
+    args = ["source", "add", notebook_id, "--file", str(source_path.resolve()),
+            "--wait", "--wait-timeout", "600", "--json"] + profile_args
     returncode, stdout, stderr = _run_nlm(args, timeout=660)
 
     if returncode != 0:
@@ -381,8 +467,11 @@ def handle_course_create(task: dict) -> str:
     if not _nlm_available():
         raise RuntimeError("nlm CLI không tìm thấy. Chạy: pip install notebooklm-mcp-cli")
 
+    owner_email = (task.get("owner_email") or "").strip()
+    profile_args = _resolve_profile_args(owner_email)
+
     # 1. Chạy nlm notebook create "<display_name>"
-    ret, stdout, stderr = _run_nlm(["notebook", "create", display_name, "--json"], timeout=60)
+    ret, stdout, stderr = _run_nlm(["notebook", "create", display_name, "--json"] + profile_args, timeout=60)
     notebooklm_id = ""
     if ret == 0:
         data = _parse_nlm_json(stdout)
@@ -394,7 +483,7 @@ def handle_course_create(task: dict) -> str:
                     break
 
     if not notebooklm_id:
-        ret2, stdout2, stderr2 = _run_nlm(["notebook", "create", display_name], timeout=60)
+        ret2, stdout2, stderr2 = _run_nlm(["notebook", "create", display_name] + profile_args, timeout=60)
         if ret2 == 0 and stdout2:
             for part in stdout2.split():
                 if len(part) >= 10:
@@ -408,7 +497,7 @@ def handle_course_create(task: dict) -> str:
 
     # 2. Tạo thư mục vật lý local
     from .config_loader import get
-    local_base = Path(get("local_base_path", "H:\\2026\\Thac Sy\\Mon_Hoc")).resolve()
+    local_base = Path(task.get("local_base_path") or get("local_base_path", "D:\\ThacSi_HTTT\\Mon_Hoc")).resolve()
     if local_folder_name:
         target_dir = local_base / local_folder_name
         target_dir.mkdir(parents=True, exist_ok=True)

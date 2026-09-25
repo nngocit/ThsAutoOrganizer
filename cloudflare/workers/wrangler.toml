@@ -5,6 +5,9 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ENVIRONMENT = "production"
+DEFAULT_DRIVE_ROOT = "1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg"
+DEFAULT_LOCAL_PATH = "D:\\ThacSi_HTTT\\Mon_Hoc"
+
 
 [triggers]
 crons = ["0 2 * * *"]

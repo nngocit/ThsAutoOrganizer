@@ -4,7 +4,7 @@
 import { Hono } from 'hono';
 import { requireAuthOrAgent, resolveTargetUid, getFallbackUid } from '../../lib/auth.js';
 import { firestoreGet, firestoreSet, fromFirestoreDoc } from '../../lib/firebase.js';
-import { uploadFileToDrive, setDrivePublicReader } from '../../lib/drive.js';
+import { uploadFileToDrive, setDrivePublicReader, setDriveWriterPermission } from '../../lib/drive.js';
 import { withCors } from '../../lib/cors.js';
 
 const router = new Hono();
@@ -30,6 +30,7 @@ router.post('/', requireAuthOrAgent(async (c) => {
     const file = formData.get('file');
     const courseId = formData.get('course_id');
     const documentType = formData.get('document_type') || 'giao_trinh';
+    const localBasePath = formData.get('local_base_path') || '';
 
     if (!file || !(file instanceof File)) {
       return withCors(c.json({ error: 'file là bắt buộc và phải là tệp tin hợp lệ' }, 400), origin);
@@ -70,7 +71,7 @@ router.post('/', requireAuthOrAgent(async (c) => {
       });
     } catch (uploadErr) {
       console.error('Lỗi upload file lên Google Drive:', uploadErr);
-      return withCors(c.json({ error: 'Không thể upload file lên Google Drive', detail: uploadErr.message }, 502), origin);
+      return withCors(c.json({ error: 'Không thể upload file lên Google Drive', detail: uploadErr.message }, 500), origin);
     }
 
     const driveFileId = driveRes.id;
@@ -82,6 +83,11 @@ router.post('/', requireAuthOrAgent(async (c) => {
     } catch (permErr) {
       console.warn('Cấp quyền Public Reader Drive cảnh báo:', permErr);
       webViewLink = driveRes.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
+    }
+
+    const uEmail = c.get('user')?.email;
+    if (uEmail) {
+      await setDriveWriterPermission(c.env, driveFileId, uEmail).catch((e) => console.warn(e.message));
     }
 
     const fileId = crypto.randomUUID();
@@ -109,6 +115,7 @@ router.post('/', requireAuthOrAgent(async (c) => {
 
     // 6. Tạo task trong nlm_task_queue cho Local Agent nạp AI và tải bản sao local
     const taskId = crypto.randomUUID();
+    const courseName = course.display_name || course.name || '';
     await firestoreSet(c.env, `nlm_task_queue/${taskId}`, {
       id: taskId,
       action: 'source_add',
@@ -118,8 +125,14 @@ router.post('/', requireAuthOrAgent(async (c) => {
       drive_file_id: driveFileId,
       notebooklm_id: notebooklmId,
       course_id: courseId,
+      course_name: courseName,
+      subject: localFolderName || courseName,
       local_folder_name: localFolderName,
+      document_type: documentType,
+      local_path: localFolderName ? `${localFolderName}/${file.name}` : file.name,
+      local_base_path: localBasePath,
       uid: targetUid,
+      owner_email: c.get('user')?.email || '',
       status: 'pending',
       created_at: now,
     });

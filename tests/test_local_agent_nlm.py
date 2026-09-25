@@ -121,8 +121,11 @@ def test_upload_file_sets_public_reader_permission():
         assert res["web_view_link"] == "https://drive.google.com/file/d/file_123/view"
 
 
-def test_handle_source_add_track1_uses_drive_url():
-    """Track 1: Nạp NotebookLM bằng Drive URL ngay lập tức với nlm source add --url."""
+def test_handle_source_add_avoids_drive_url_and_uses_file(tmp_path):
+    """Tệp tin Drive: Bắt buộc dùng flag --file (tải về trước) và TUYỆT ĐỐI không dùng --url để tránh bị Google bot block."""
+    local_file = tmp_path / "de_cuong.pdf"
+    local_file.write_bytes(b"PDF CONTENT" * 50)
+
     task = {
         "filename": "de_cuong.pdf",
         "notebook_id": "nb_triet_hoc_123",
@@ -130,49 +133,72 @@ def test_handle_source_add_track1_uses_drive_url():
         "drive_file_id": "1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd",
         "drive_view_link": "https://drive.google.com/file/d/1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd/view",
         "subject": "Triết học",
+        "local_path": str(local_file),
     }
 
     with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
-         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"source_id": "src_url_456"}', "")) as mock_run, \
-         patch("local_agent.nlm_task_handler.threading.Thread") as mock_thread:
+         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"source_id": "src_file_456"}', "")) as mock_run:
 
         res = handle_source_add(task)
-        assert res == "src_url_456"
+        assert res == "src_file_456"
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
-        # Bắt buộc dùng flag --url
+        # Bắt buộc dùng flag --file
+        assert "--file" in args
+        assert str(local_file.resolve()) in args
+        # Tuyệt đối không dùng --url cho link drive.google.com
+        assert "--url" not in args
+
+
+def test_handle_source_add_uses_url_for_generic_web():
+    """Với Web URL công khai (không phải drive.google.com), sử dụng cờ --url bình thường."""
+    task = {
+        "filename": "article",
+        "notebook_id": "nb_web_123",
+        "course_id": "course_web_123",
+        "url": "https://vietnamnet.vn/giao-duc-thac-si-2026.html",
+        "subject": "Tin tức",
+        "local_path": "tests/test_classifier.py",
+    }
+
+    with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
+         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"source_id": "src_web_789"}', "")) as mock_run:
+
+        res = handle_source_add(task)
+        assert res == "src_web_789"
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
         assert "--url" in args
-        assert "https://drive.google.com/file/d/1UTcXSlhYKXuIpVObDzZ6ejKxINdxkQrd/view" in args
-        assert "--file" not in args
+        assert "https://vietnamnet.vn/giao-duc-thac-si-2026.html" in args
 
 
-def test_handle_source_add_track2_triggers_async_download():
-    """Track 2: Khi local file chưa tồn tại, kích hoạt background thread tải file không block Track 1."""
+def test_handle_source_add_downloads_if_local_not_present(tmp_path):
+    """Khi local file chưa tồn tại trên đĩa, tự động tải qua drive_sync trước khi nạp vào NLM."""
+    dest_file = tmp_path / "sach_giao_trinh.pdf"
+
     task = {
         "filename": "sach_giao_trinh.pdf",
         "notebook_id": "nb_999",
         "course_id": "course_triet_hoc_123",
         "drive_file_id": "drive_id_xyz",
         "subject": "Triết học",
-        "folder_path": "01_Giao_Trinh",
+        "local_path": str(dest_file),
     }
 
-    with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
-         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"source_id": "src_ok"}', "")), \
-         patch("local_agent.nlm_task_handler.threading.Thread") as mock_thread:
+    def fake_download(drive_id, dest):
+        dest.write_bytes(b"DOWNLOADED_PDF")
+        return dest
 
-        mock_instance = MagicMock()
-        mock_thread.return_value = mock_instance
+    with patch("local_agent.nlm_task_handler._nlm_available", return_value=True), \
+         patch("local_agent.drive_sync.download_file", side_effect=fake_download) as mock_dl, \
+         patch("local_agent.nlm_task_handler._run_nlm", return_value=(0, '{"source_id": "src_ok"}', "")) as mock_run:
 
         res = handle_source_add(task)
         assert res == "src_ok"
-
-        # Track 2 thread được khởi động trong background
-        mock_thread.assert_called_once()
-        mock_instance.start.assert_called_once()
-        call_kwargs = mock_thread.call_args[1]
-        assert call_kwargs.get("daemon") is True
-        assert "drive_id_xyz" in call_kwargs.get("args", ())
+        assert mock_dl.called
+        assert dest_file.exists()
+        args = mock_run.call_args[0][0]
+        assert "--file" in args
 
 
 def test_handle_source_add_skips_when_course_id_empty():

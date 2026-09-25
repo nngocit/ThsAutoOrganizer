@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../src/lib/drive.js', () => ({
   createDriveFolder: vi.fn().mockResolvedValue({ id: 'mock_drive_folder_id_123', name: 'ThacSi_HTTT - Nguyen Van A' }),
   setDriveWriterPermission: vi.fn().mockResolvedValue({ id: 'perm_id_123' }),
+  setDriveAnyonePermission: vi.fn().mockResolvedValue({ id: 'perm_anyone_123' }),
+  findDriveFolderByName: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../src/lib/firebase.js', () => ({

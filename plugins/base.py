@@ -8,8 +8,10 @@ COLOR_RESET = "\033[0m"
 COLOR_BLUE = "\033[94m"     # [POLLER]
 COLOR_PURPLE = "\033[95m"   # [AI_CLI]
 COLOR_YELLOW = "\033[93m"   # [STORAGE]
-COLOR_GREEN = "\033[92m"    # [BUS]
-COLOR_RED = "\033[91m"
+COLOR_GREEN = "\033[92m"    # [BUS] / [RESTORE]
+COLOR_RED = "\033[91m"      # [PURGE]
+COLOR_ORANGE = "\033[38;5;208m"  # [ARCHIVE]
+COLOR_CYAN = "\033[96m"
 
 
 class EventBus:

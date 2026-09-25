@@ -1,13 +1,21 @@
-# plugins/local_storage.py — Plugin Quản lý Lưu trữ Vật lý Cục bộ (<140 dòng)
 import logging
 import os
+import shutil
 import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse, unquote
 import requests
 
-from .base import COLOR_YELLOW, EventBus, PluginBase
+from .base import (
+    COLOR_GREEN,
+    COLOR_ORANGE,
+    COLOR_RED,
+    COLOR_RESET,
+    COLOR_YELLOW,
+    EventBus,
+    PluginBase,
+)
 
 DEFAULT_BASE_PATH = r"H:\2026\Thac Sy\Mon_Hoc"
 
@@ -15,7 +23,8 @@ DEFAULT_BASE_PATH = r"H:\2026\Thac Sy\Mon_Hoc"
 class LocalStoragePlugin(PluginBase):
     """
     Plugin Lưu trữ Vật lý: Lắng nghe ON_COURSE_CREATE để tạo thư mục,
-    và ON_SOURCE_ADD để tải file trực tiếp về ổ đĩa trên luồng phụ (Non-blocking).
+    ON_SOURCE_ADD để tải file trực tiếp về ổ đĩa trên luồng phụ (Non-blocking),
+    và quản lý vòng đời dữ liệu (ARCHIVE, RESTORE, HARD_DELETE).
     """
 
     def __init__(self, event_bus: EventBus, base_path: str = DEFAULT_BASE_PATH) -> None:
@@ -25,22 +34,28 @@ class LocalStoragePlugin(PluginBase):
         # Đăng ký lắng nghe sự kiện từ EventBus
         self.event_bus.on("ON_COURSE_CREATE", self.on_course_create)
         self.event_bus.on("ON_SOURCE_ADD", self.on_source_add)
+        self.event_bus.on("ON_COURSE_ARCHIVE", self.on_course_archive)
+        self.event_bus.on("ON_COURSE_RESTORE", self.on_course_restore)
+        self.event_bus.on("ON_COURSE_HARD_DELETE", self.on_course_hard_delete)
 
-    def on_course_create(self, payload: Dict[str, Any]) -> None:
-        r"""
-        Xử lý sự kiện ON_COURSE_CREATE:
-        Dùng os.makedirs tạo thư mục cục bộ H:\2026\Thac Sy\Mon_Hoc\<local_folder_name>.
-        """
+    def _extract_folder_name(self, payload: Dict[str, Any]) -> str:
+        """Trích xuất tên thư mục cục bộ an toàn từ payload."""
         if not isinstance(payload, dict):
-            return
-
-        folder_name = (
+            return ""
+        return (
             payload.get("local_folder_name")
             or payload.get("folder_name")
             or payload.get("display_name")
             or payload.get("name")
             or ""
         ).strip()
+
+    def on_course_create(self, payload: Dict[str, Any]) -> None:
+        r"""
+        Xử lý sự kiện ON_COURSE_CREATE:
+        Dùng os.makedirs tạo thư mục cục bộ H:\2026\Thac Sy\Mon_Hoc\<local_folder_name>.
+        """
+        folder_name = self._extract_folder_name(payload)
 
         if not folder_name:
             self.log("Bỏ qua ON_COURSE_CREATE vì không tìm thấy tên thư mục cục bộ.", level=logging.WARNING)
@@ -53,6 +68,89 @@ class LocalStoragePlugin(PluginBase):
             self.log(f"✓ Đã tạo (hoặc sẵn sàng) thư mục: {target_dir}")
         except Exception as e:
             self.log(f"✗ Lỗi khi tạo thư mục '{target_dir}': {e}", level=logging.ERROR)
+
+    def on_course_archive(self, payload: Dict[str, Any]) -> None:
+        r"""
+        Xử lý sự kiện ON_COURSE_ARCHIVE:
+        KHÔNG XÓA. Dùng os.rename di chuyển thư mục vào H:\2026\Thac Sy\Mon_Hoc\_Archived\<local_folder_name>.
+        """
+        folder_name = self._extract_folder_name(payload)
+        if not folder_name:
+            self.log("Bỏ qua ON_COURSE_ARCHIVE vì thiếu tên thư mục.", level=logging.WARNING)
+            return
+
+        source_dir = self.base_path / folder_name
+        archive_root = self.base_path / "_Archived"
+        target_dir = archive_root / folder_name
+
+        try:
+            if not source_dir.exists():
+                self.log(f"Thư mục nguồn '{source_dir}' không tồn tại, bỏ qua di chuyển.", level=logging.WARNING)
+                return
+
+            os.makedirs(archive_root, exist_ok=True)
+
+            if target_dir.exists():
+                # Xử lý trường hợp thư mục đích trong _Archived đã tồn tại trước đó
+                shutil.rmtree(target_dir)
+
+            os.rename(str(source_dir), str(target_dir))
+            prefix = f"{COLOR_ORANGE}[ARCHIVE]{COLOR_RESET}"
+            self.logger.info(f"{self.color}[{self.name}]{COLOR_RESET} {prefix} Đã di chuyển vào lưu trữ: '{source_dir}' -> '{target_dir}'")
+        except Exception as e:
+            self.log(f"✗ Lỗi ngoại lệ khi lưu trữ thư mục '{source_dir}': {e}", level=logging.ERROR)
+
+    def on_course_restore(self, payload: Dict[str, Any]) -> None:
+        r"""
+        Xử lý sự kiện ON_COURSE_RESTORE:
+        Di chuyển thư mục từ _Archived trở lại vị trí gốc.
+        """
+        folder_name = self._extract_folder_name(payload)
+        if not folder_name:
+            self.log("Bỏ qua ON_COURSE_RESTORE vì thiếu tên thư mục.", level=logging.WARNING)
+            return
+
+        source_dir = self.base_path / "_Archived" / folder_name
+        target_dir = self.base_path / folder_name
+
+        try:
+            if not source_dir.exists():
+                self.log(f"Thư mục lưu trữ '{source_dir}' không tồn tại, không thể khôi phục.", level=logging.WARNING)
+                return
+
+            os.makedirs(self.base_path, exist_ok=True)
+
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+
+            os.rename(str(source_dir), str(target_dir))
+            prefix = f"{COLOR_GREEN}[RESTORE]{COLOR_RESET}"
+            self.logger.info(f"{self.color}[{self.name}]{COLOR_RESET} {prefix} Đã khôi phục thư mục: '{source_dir}' -> '{target_dir}'")
+        except Exception as e:
+            self.log(f"✗ Lỗi ngoại lệ khi khôi phục thư mục '{source_dir}': {e}", level=logging.ERROR)
+
+    def on_course_hard_delete(self, payload: Dict[str, Any]) -> None:
+        r"""
+        Xử lý sự kiện ON_COURSE_HARD_DELETE:
+        Dùng shutil.rmtree xóa sạch cây thư mục tương ứng BÊN TRONG thư mục _Archived.
+        """
+        folder_name = self._extract_folder_name(payload)
+        if not folder_name:
+            self.log("Bỏ qua ON_COURSE_HARD_DELETE vì thiếu tên thư mục.", level=logging.WARNING)
+            return
+
+        target_dir = self.base_path / "_Archived" / folder_name
+
+        try:
+            if not target_dir.exists():
+                self.log(f"Thư mục cần xóa '{target_dir}' không tồn tại trong _Archived.", level=logging.WARNING)
+                return
+
+            shutil.rmtree(target_dir)
+            prefix = f"{COLOR_RED}[PURGE]{COLOR_RESET}"
+            self.logger.info(f"{self.color}[{self.name}]{COLOR_RESET} {prefix} Đã xóa vĩnh viễn thư mục: '{target_dir}'")
+        except Exception as e:
+            self.log(f"✗ Lỗi ngoại lệ khi xóa vĩnh viễn thư mục '{target_dir}': {e}", level=logging.ERROR)
 
     def on_source_add(self, payload: Dict[str, Any]) -> None:
         """

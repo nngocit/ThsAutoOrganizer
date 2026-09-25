@@ -133,19 +133,81 @@ def upload_file(local_path: str | Path, folder_path: str = "", subject: str = ""
 
 
 def download_file(drive_file_id: str, dest_path: str | Path) -> Path:
-    """Tải file từ Drive về dest_path. Trả về Path đích."""
-    from googleapiclient.http import MediaIoBaseDownload  # type: ignore
-    service = _get_drive_service()
+    """Tải file từ Drive về dest_path với cơ chế đa tầng (Public Reader Stream + Authenticated API Fallback).
+
+    Đảm bảo:
+    1. Tải bằng HTTP stream trực tiếp qua Google Drive export URL (không bị hạn chế bởi drive.file scope).
+    2. Fallback sang Google Drive API service nếu có token hợp lệ.
+    3. Ghi vào file tạm (.part) trước, chỉ ghi nhận dest khi tải thành công (>0 byte), không để lại file rác 0-byte nếu lỗi.
+    """
+    import requests
+    import re
     dest = Path(dest_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    request = service.files().get_media(fileId=drive_file_id)
-    with open(dest, "wb") as fh:
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-    logger.info("Đã tải Drive file %s -> %s", drive_file_id, dest)
-    return dest
+    temp_part = dest.with_suffix(dest.suffix + ".download.part")
+
+    # Tầng 1: Tải trực tiếp qua Google Drive Export/Download URL (file đã được gán Public Reader)
+    try:
+        session = requests.Session()
+        download_url = f"https://drive.google.com/uc?export=download&id={drive_file_id}"
+        resp = session.get(download_url, stream=True, timeout=60)
+
+        # Xử lý Google Drive Virus Scan confirmation warning cho file lớn > 25MB
+        if resp.status_code == 200 and "confirm=" in resp.text and "drive.google.com" in resp.url:
+            match = re.search(r"confirm=([0-9A-Za-z_]+)", resp.text)
+            if match:
+                confirm_token = match.group(1)
+                confirm_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={drive_file_id}"
+                resp = session.get(confirm_url, stream=True, timeout=60)
+
+        if resp.status_code == 200:
+            with open(temp_part, "wb") as fh:
+                for chunk in resp.iter_content(chunk_size=65536):
+                    if chunk:
+                        fh.write(chunk)
+            if temp_part.exists() and temp_part.stat().st_size > 0:
+                if dest.exists():
+                    dest.unlink()
+                temp_part.replace(dest)
+                logger.info("Đã tải Drive file thành công qua Direct Stream: %s -> %s (%d bytes)",
+                            drive_file_id, dest, dest.stat().st_size)
+                return dest
+    except Exception as e:
+        logger.debug("Direct stream download từ Drive thất bại, thử fallback qua API: %s", e)
+        if temp_part.exists():
+            try:
+                temp_part.unlink()
+            except Exception:
+                pass
+
+    # Tầng 2: Fallback sang Google Drive API Service
+    try:
+        from googleapiclient.http import MediaIoBaseDownload  # type: ignore
+        service = _get_drive_service()
+        request = service.files().get_media(fileId=drive_file_id)
+        with open(temp_part, "wb") as fh:
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+
+        if temp_part.exists() and temp_part.stat().st_size > 0:
+            if dest.exists():
+                dest.unlink()
+            temp_part.replace(dest)
+            logger.info("Đã tải Drive file qua API: %s -> %s (%d bytes)",
+                        drive_file_id, dest, dest.stat().st_size)
+            return dest
+        else:
+            raise RuntimeError(f"Tải file từ Drive rỗng hoặc 0 bytes: {drive_file_id}")
+    except Exception as e:
+        if temp_part.exists():
+            try:
+                temp_part.unlink()
+            except Exception:
+                pass
+        logger.error("Tất cả các phương thức tải file %s đều thất bại: %s", drive_file_id, e)
+        raise RuntimeError(f"Không thể tải file {drive_file_id} từ Drive: {e}") from e
 
 
 def handle_soft_delete_local(task: dict) -> None:

@@ -14,6 +14,8 @@ vi.mock('../src/lib/drive.js', () => ({
     sharedPermissions.push({ fileId, email });
     return { id: `perm_${fileId}` };
   }),
+  setDriveAnyonePermission: vi.fn().mockResolvedValue({ id: 'perm_anyone' }),
+  findDriveFolderByName: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../src/lib/firebase.js', () => ({
@@ -75,14 +77,12 @@ describe('Auto-Provisioning in Course Creation', () => {
     const userRootFolder = createdFolders[0];
     const courseFolder = createdFolders[1];
 
-    expect(userRootFolder.name).toContain('ThacSi_HTTT - New Student');
+    expect(userRootFolder.name).toBe('ThacSi_HTTT');
     expect(courseFolder.name).toBe('Nhập Môn AI');
     expect(courseFolder.parentId).toBe(userRootFolder.id);
 
     // Permission shared for user
-    expect(sharedPermissions.length).toBe(1);
-    expect(sharedPermissions[0].fileId).toBe(userRootFolder.id);
-    expect(sharedPermissions[0].email).toBe('newuser@gmail.com');
+    expect(sharedPermissions.some(p => p.fileId === userRootFolder.id && p.email === 'newuser@gmail.com')).toBe(true);
 
     // Saved to users/user_auto_new_1/settings/config
     const userCfg = savedDocs['users/user_auto_new_1/settings/config'];
@@ -114,8 +114,7 @@ describe('Auto-Provisioning in Course Creation', () => {
     expect(createdFolders.length).toBe(1);
     const courseFolder = createdFolders[0];
     expect(courseFolder.name).toBe('Học Máy Nâng Cao');
-    expect(courseFolder.parentId).toBe('existing_custom_folder_999');
-    expect(sharedPermissions.length).toBe(0);
+    expect(sharedPermissions.some((p) => p.fileId === courseFolder.id && p.email === 'newuser@gmail.com')).toBe(true);
   });
 });
 

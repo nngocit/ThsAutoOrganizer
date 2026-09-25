@@ -3,7 +3,7 @@
 import { Hono } from 'hono';
 import { requireAuth, requireAuthOrAgent, resolveTargetUid, getFallbackUid } from '../../lib/auth.js';
 import { firestoreSet, firestoreList, firestoreGet, fromFirestoreDoc } from '../../lib/firebase.js';
-import { createDriveFolder, setDriveWriterPermission } from '../../lib/drive.js';
+import { createDriveFolder, setDriveWriterPermission, setDriveAnyonePermission, findDriveFolderByName } from '../../lib/drive.js';
 import { withCors } from '../../lib/cors.js';
 
 const router = new Hono();
@@ -73,6 +73,7 @@ router.get('/:courseId', requireAuthOrAgent(async (c) => {
  */
 router.post('/', requireAuth(async (c) => {
   const user = c.get('user');
+  const userEmail = user?.email || '';
   const origin = c.req.header('Origin') || '';
   try {
     const body = await c.req.json();
@@ -105,45 +106,61 @@ router.post('/', requireAuth(async (c) => {
     }
 
     // Nếu user chưa có root folder riêng, tự động tạo và chia sẻ quyền Editor qua email
+    const masterRoot = c.env?.DEFAULT_DRIVE_ROOT || DEFAULT_DRIVE_ROOT;
+    const defaultLocal = c.env?.DEFAULT_LOCAL_PATH || 'D:\\ThacSi_HTTT\\Mon_Hoc';
+
     if (!rootFolderId) {
       try {
-        const userEmail = user.email || '';
-        const emailPrefix = userEmail ? userEmail.split('@')[0] : (user.name || user.uid.slice(0, 8));
-        const userRootName = `ThacSi_HTTT - ${user.name || emailPrefix}`;
+        const userRootName = 'ThacSi_HTTT';
 
-        // 1.1 Tạo thư mục riêng cho user trong DEFAULT_DRIVE_ROOT
-        const userFolder = await createDriveFolder(c.env, userRootName, DEFAULT_DRIVE_ROOT);
-        rootFolderId = userFolder.id;
-
-        // 1.2 Phân quyền writer cho email của user
-        if (userEmail) {
-          try {
-            await setDriveWriterPermission(c.env, rootFolderId, userEmail);
-          } catch (permErr) {
-            console.warn(`Lỗi phân quyền Drive cho user ${userEmail}:`, permErr.message);
-          }
+        // Kiểm tra xem thư mục này đã tồn tại trên Drive chưa trước khi tạo mới (Idempotency)
+        const existingFolder = await findDriveFolderByName(c.env, userRootName, masterRoot) || await findDriveFolderByName(c.env, userRootName);
+        if (existingFolder && existingFolder.id) {
+          console.log(`[Drive Idempotency] Đã tìm thấy thư mục user '${userRootName}' -> ID: ${existingFolder.id}`);
+          rootFolderId = existingFolder.id;
+        } else {
+          // 1.1 Tạo thư mục riêng cho user trong masterRoot
+          const userFolder = await createDriveFolder(c.env, userRootName, masterRoot);
+          rootFolderId = userFolder.id;
         }
+
+        // 1.2 Phân quyền writer cho email của user đang đăng nhập và anyone
+        if (userEmail) {
+          await setDriveWriterPermission(c.env, rootFolderId, userEmail).catch((e) => console.warn(e.message));
+        }
+        const adminEmail = c.env?.ROOT_ADMIN_EMAIL;
+        if (adminEmail && userEmail !== adminEmail) {
+          await setDriveWriterPermission(c.env, rootFolderId, adminEmail).catch(() => {});
+        }
+        await setDriveAnyonePermission(c.env, rootFolderId, 'writer').catch(() => {});
 
         // 1.3 Lưu vào users/${user.uid}/settings/config
         await firestoreSet(c.env, `users/${user.uid}/settings/config`, {
           google_drive_root_folder_id: rootFolderId,
+          drive_root_folder: rootFolderId,
           google_drive_root_name: userRootName,
           user_email: userEmail,
-          local_base_path: 'H:\\2026\\Thac Sy\\Mon_Hoc',
+          local_base_path: defaultLocal,
+          root_folder: defaultLocal,
           updated_at: new Date().toISOString(),
           updated_by: userEmail,
         });
       } catch (provErr) {
-        console.warn('Tự động cấp phát thư mục Drive riêng thất bại, fallback về DEFAULT_DRIVE_ROOT:', provErr.message);
-        rootFolderId = DEFAULT_DRIVE_ROOT;
+        console.warn('Tự động cấp phát thư mục Drive riêng thất bại, fallback về masterRoot:', provErr.message);
+        rootFolderId = masterRoot;
       }
     }
 
-    // 2. Tạo thư mục Drive bằng Service Account
+    // 2. Tạo thư mục môn học trên Drive
     let driveFolderId = '';
     try {
       const folderRes = await createDriveFolder(c.env, displayName, rootFolderId);
       driveFolderId = folderRes.id;
+      // Cấp quyền writer cho user đang đăng nhập và anyone để truy cập môn học trực tiếp
+      if (userEmail) {
+        await setDriveWriterPermission(c.env, driveFolderId, userEmail).catch((e) => console.warn(e.message));
+      }
+      await setDriveAnyonePermission(c.env, driveFolderId, 'writer').catch(() => {});
     } catch (driveErr) {
       console.error('Lỗi tạo thư mục Google Drive:', driveErr);
       let detailMsg = driveErr.message;
@@ -184,8 +201,10 @@ router.post('/', requireAuth(async (c) => {
       course_id: docId,
       display_name: displayName,
       local_folder_name: localFolderName,
+      local_base_path: body.local_base_path || '',
       drive_folder_id: driveFolderId,
       uid: user.uid,
+      owner_email: user.email || '',
       status: 'pending',
       created_at: now,
     });

@@ -47,11 +47,31 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
     # Merge: defaults → raw config
     merged = {**_DEFAULTS, **raw}
 
+    # Aliases 2 chiều cho local path: 'local_base_path' <-> 'root_folder'
+    local_path = raw.get("local_base_path") or raw.get("root_folder") or _DEFAULTS.get("local_base_path")
+    if local_path:
+        merged["local_base_path"] = local_path
+        merged["root_folder"] = local_path
+
+    # Aliases 2 chiều cho drive root: 'google_drive_root_folder_id' <-> 'drive_root_folder'
+    drive_root = raw.get("google_drive_root_folder_id") or raw.get("drive_root_folder") or _DEFAULTS.get("google_drive_root_folder_id")
+    if drive_root:
+        merged["google_drive_root_folder_id"] = drive_root
+        merged["drive_root_folder"] = drive_root
+
     # Ghi đè từ environment variables (ưu tiên cao nhất)
     if os.environ.get("WORKER_URL"):
         merged["worker_url"] = os.environ["WORKER_URL"]
     if os.environ.get("AGENT_SECRET"):
         merged["agent_secret"] = os.environ["AGENT_SECRET"]
+    env_local = os.environ.get("LOCAL_BASE_PATH") or os.environ.get("ROOT_FOLDER")
+    if env_local:
+        merged["local_base_path"] = env_local
+        merged["root_folder"] = env_local
+    env_drive = os.environ.get("GOOGLE_DRIVE_ROOT_FOLDER_ID") or os.environ.get("DRIVE_ROOT_FOLDER")
+    if env_drive:
+        merged["google_drive_root_folder_id"] = env_drive
+        merged["drive_root_folder"] = env_drive
 
     _config = merged
     return merged
@@ -80,10 +100,22 @@ def sync_remote_config(uid: str = "") -> dict[str, Any]:
         remote_cfg = res.get("config", {})
         if remote_cfg:
             # Ghi đè các key cấu hình quan trọng từ Cloud
-            for k in ("local_base_path", "google_drive_root_folder_id", "google_drive_root_name",
-                      "file_watcher_enabled", "auto_sync_nlm", "poll_interval_seconds"):
+            for k in ("local_base_path", "root_folder", "google_drive_root_folder_id", "drive_root_folder",
+                      "google_drive_root_name", "file_watcher_enabled", "auto_sync_nlm", "poll_interval_seconds"):
                 if k in remote_cfg and remote_cfg[k] is not None:
                     cfg[k] = remote_cfg[k]
+
+            # Đồng bộ hai chiều cho alias sau khi nhận remote
+            if "local_base_path" in remote_cfg and remote_cfg["local_base_path"]:
+                cfg["root_folder"] = remote_cfg["local_base_path"]
+            elif "root_folder" in remote_cfg and remote_cfg["root_folder"]:
+                cfg["local_base_path"] = remote_cfg["root_folder"]
+
+            if "google_drive_root_folder_id" in remote_cfg and remote_cfg["google_drive_root_folder_id"]:
+                cfg["drive_root_folder"] = remote_cfg["google_drive_root_folder_id"]
+            elif "drive_root_folder" in remote_cfg and remote_cfg["drive_root_folder"]:
+                cfg["google_drive_root_folder_id"] = remote_cfg["drive_root_folder"]
+
             _config = cfg
             return cfg
     except Exception as e:

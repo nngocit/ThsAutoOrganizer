@@ -25,7 +25,7 @@ router.get('/reconcile', requireAuthOrAgent(async (c) => {
 
   try {
     // 1. Xác định Root Folder ID trên Drive
-    let rootFolderId = DEFAULT_DRIVE_ROOT;
+    let rootFolderId = c.env?.DEFAULT_DRIVE_ROOT || DEFAULT_DRIVE_ROOT;
     try {
       let configDoc = await firestoreGet(c.env, `users/${targetUid}/settings/config`);
       if (!configDoc) {
@@ -33,7 +33,9 @@ router.get('/reconcile', requireAuthOrAgent(async (c) => {
       }
       if (configDoc) {
         const cfg = fromFirestoreDoc(configDoc);
-        if (cfg.google_drive_root_folder_id) rootFolderId = cfg.google_drive_root_folder_id;
+        if (cfg.google_drive_root_folder_id || cfg.drive_root_folder) {
+          rootFolderId = cfg.google_drive_root_folder_id || cfg.drive_root_folder;
+        }
       }
     } catch (e) {
       console.warn('Lỗi đọc settings config, dùng root fallback:', e);
@@ -206,16 +208,25 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
     const taskData = fromFirestoreDoc(existingDoc);
 
     // Cập nhật trạng thái file nếu là source_add
-    if (queueName === 'nlm_task_queue' && taskData.action === 'source_add' && (status === 'done' || status === 'skipped_ext' || status === 'skipped_no_course')) {
+    if (queueName === 'nlm_task_queue' && taskData.action === 'source_add') {
       if (taskData.uid && taskData.file_id) {
-        const resultStr = typeof result === 'string' ? result : (result ? JSON.stringify(result) : '');
-        const skipped = status === 'skipped_ext' || status === 'skipped_no_course' || resultStr.startsWith('skipped');
-        const finalStatus = (status === 'skipped_ext' || status === 'skipped_no_course') ? status : (skipped ? 'skipped' : 'synced');
-        await firestoreSet(c.env, `users/${taskData.uid}/files/${taskData.file_id}`, {
-          notebooklm_sync_status: finalStatus,
-          notebooklm_source_id: skipped ? '' : resultStr,
-          updated_at: now,
-        });
+        if (status === 'done' || status === 'skipped_ext' || status === 'skipped_no_course') {
+          const resultStr = typeof result === 'string' ? result : (result ? JSON.stringify(result) : '');
+          const skipped = status === 'skipped_ext' || status === 'skipped_no_course' || resultStr.startsWith('skipped');
+          const finalStatus = (status === 'skipped_ext' || status === 'skipped_no_course') ? status : (skipped ? 'skipped' : 'synced');
+          await firestoreSet(c.env, `users/${taskData.uid}/files/${taskData.file_id}`, {
+            notebooklm_sync_status: finalStatus,
+            notebooklm_source_id: skipped ? '' : resultStr,
+            local_sync_status: 'synced',
+            updated_at: now,
+          });
+        } else if (status === 'failed') {
+          await firestoreSet(c.env, `users/${taskData.uid}/files/${taskData.file_id}`, {
+            notebooklm_sync_status: 'failed',
+            notebooklm_error: errorMsg || 'Lỗi nạp NLM',
+            updated_at: now,
+          });
+        }
       }
     }
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ThsAutoOrganizer — Đài Chỉ Huy Đồng Bộ 3 Chiều</title>
+  <title>ThsAutoOrganizer — Sổ Ghi Chú Môn Học</title>
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -45,6 +45,12 @@
     .animate-pulse-subtle {
       animation: pulse-subtle 2s infinite ease-in-out;
     }
+    #user-profile:not(.hidden) {
+      display: flex !important;
+    }
+    #gsi-container.hidden {
+      display: none !important;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col antialiased selection:bg-brand-500 selection:text-white">
@@ -62,7 +68,7 @@
           <div class="flex items-center gap-2">
             <span class="font-bold text-base sm:text-lg tracking-tight text-white">ThsAutoOrganizer</span>
             <span class="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              Đài chỉ huy
+              Sổ Ghi Chú Môn Học
             </span>
           </div>
           <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
@@ -78,7 +84,7 @@
       <nav class="hidden md:flex items-center p-1 rounded-xl bg-slate-800/80 border border-slate-700/60 shadow-inner" role="tablist">
         <button id="nav-btn-courses" onclick="switchTab('courses')" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 bg-blue-600 text-white shadow-md">
           <span>📚</span>
-          <span>Quản lý Sổ Hộ Khẩu</span>
+          <span>Sổ Ghi Chú Môn Học</span>
         </button>
         <button id="nav-btn-upload" onclick="switchTab('upload')" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center gap-2">
           <span>☁️</span>
@@ -86,15 +92,15 @@
         </button>
         <button id="nav-btn-sync" onclick="switchTab('sync')" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center gap-2">
           <span>🔄</span>
-          <span>Reconcile / Khám Sức Khỏe</span>
+          <span>Kiểm Tra & Đồng Bộ Drive</span>
         </button>
       </nav>
 
       <!-- User / Auth Profile -->
       <div class="flex items-center gap-3">
-        <div id="gsi-container" class="hidden sm:block"></div>
-        <div id="user-profile" class="hidden flex items-center gap-2 pl-2 border-l border-slate-800">
-          <img id="user-avatar" class="w-8 h-8 rounded-full border border-slate-700" src="" alt="User" />
+        <div id="gsi-container" class="transition-all"></div>
+        <div id="user-profile" class="hidden items-center gap-2 pl-2 border-l border-slate-800">
+          <img id="user-avatar" class="w-8 h-8 rounded-full border border-slate-700 object-cover" src="" alt="User" />
           <span id="user-name" class="text-xs font-medium text-slate-300 hidden lg:inline-block"></span>
           <button onclick="openSettingsModal()" class="text-xs text-slate-300 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 shadow-sm" title="Cài đặt Google Drive & Hệ thống">
             <span>⚙️</span>
@@ -110,23 +116,23 @@
 
     <!-- Mobile Nav Tabs -->
     <div class="md:hidden flex border-t border-slate-800 bg-slate-900 px-2 py-1.5 justify-around text-xs font-medium">
-      <button onclick="switchTab('courses')" class="mobile-tab-btn flex-1 py-1.5 text-center text-blue-400 font-semibold" data-tab="courses">📚 Sổ Hộ Khẩu</button>
+      <button onclick="switchTab('courses')" class="mobile-tab-btn flex-1 py-1.5 text-center text-blue-400 font-semibold" data-tab="courses">📚 Sổ Ghi Chú Môn Học</button>
       <button onclick="switchTab('upload')" class="mobile-tab-btn flex-1 py-1.5 text-center text-slate-400" data-tab="upload">☁️ Kéo Thả</button>
-      <button onclick="switchTab('sync')" class="mobile-tab-btn flex-1 py-1.5 text-center text-slate-400" data-tab="sync">🔄 Khám SK</button>
+      <button onclick="switchTab('sync')" class="mobile-tab-btn flex-1 py-1.5 text-center text-slate-400" data-tab="sync">🔄 Đồng Bộ Drive</button>
     </div>
   </header>
 
   <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    <!-- ==================== SECTION 1: QUẢN LÝ SỔ HỘ KHẨU (COURSES) ==================== -->
+    <!-- ==================== SECTION 1: SỔ GHI CHÚ MÔN HỌC (COURSES) ==================== -->
     <section id="section-courses" class="space-y-6">
       
       <!-- Action Bar -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 sm:p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur">
         <div>
           <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <span>📚</span> Quản lý Sổ Hộ Khẩu (Courses)
+            <span>📚</span> Sổ Ghi Chú Môn Học (Courses)
           </h1>
           <p class="text-xs sm:text-sm text-slate-400 mt-1">
             Quy trình tạo môn học 3 chiều: Web UI ➔ Google Drive API ➔ Firestore ➔ Local Agent (NLM & Ổ đĩa)
@@ -160,8 +166,21 @@
           <span>☁️</span> Kéo Thả Upload Tài Liệu (Upload Center)
         </h1>
         <p class="text-xs sm:text-sm text-slate-400 mt-1">
-          Stream file trực tiếp lên Google Drive qua Service Account 24/7, gán Public Reader và kích hoạt Local Agent nạp vào NotebookLM Plus.
+          Stream file trực tiếp lên Google Drive cá nhân (OAuth 2.0 User Quota), gán Public Reader và kích hoạt Local Agent nạp vào NotebookLM Plus.
         </p>
+
+        <!-- Storage Target Notice & Switcher -->
+        <div class="mt-4 p-3 rounded-xl bg-slate-800/40 border border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="text-base">💻</span>
+            <span class="text-slate-400">Thư mục tải về máy tính:</span>
+            <span id="upload-local-path-display" class="font-mono text-emerald-400 font-medium">D:\ThacSi_HTTT\Mon_Hoc</span>
+          </div>
+          <button type="button" onclick="openSettingsModal()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition flex items-center gap-1 self-start sm:self-auto shadow-sm" title="Bấm để chọn ổ C, D hoặc tùy chỉnh đường dẫn máy tính">
+            <span>⚙️</span>
+            <span>Đổi ổ đĩa / thư mục lưu</span>
+          </button>
+        </div>
 
         <!-- Form controls -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
@@ -170,7 +189,7 @@
               1. Chọn Môn học mục tiêu <span class="text-rose-400">*</span>
             </label>
             <select id="upload-course-select" class="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
-              <option value="">-- Đang nạp danh sách môn học --</option>
+              <option value="" disabled selected>-- Chọn môn học mục tiêu --</option>
             </select>
           </div>
           <div>
@@ -202,14 +221,24 @@
             <p class="text-xs text-slate-400 mt-1.5">
               Hỗ trợ định dạng PDF, DOCX, PPTX, TXT, MD, MP3 (Tối đa 100MB mỗi file)
             </p>
+            <div id="dropzone-status-badge" class="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              <span>⚠️</span> <span>Bước 1: Vui lòng chọn môn học mục tiêu ở trên trước khi chọn tệp</span>
+            </div>
           </div>
         </div>
 
         <!-- Selected files queue -->
         <div id="file-queue-container" class="hidden mt-6 space-y-3">
-          <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
-            <span>Danh sách hàng đợi tải lên (<span id="queue-count">0</span> file)</span>
-            <button onclick="clearQueue()" class="text-rose-400 hover:text-rose-300">Xóa tất cả</button>
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-300">
+            <span id="queue-header-text">Danh sách hàng đợi tải lên (<span id="queue-count">0</span> file)</span>
+            <div class="flex items-center gap-2">
+              <button id="btn-clear-done" onclick="clearDoneQueue()" class="hidden px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 transition">
+                ✓ Dọn tệp đã xong
+              </button>
+              <button onclick="clearQueue()" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 hover:bg-slate-700 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition">
+                Xóa tất cả
+              </button>
+            </div>
           </div>
           <div id="file-queue-list" class="space-y-2"></div>
 
@@ -226,7 +255,7 @@
     </section>
 
 
-    <!-- ==================== SECTION 3: RECONCILE / KHÁM SỨC KHỎE (SYNC SYSTEM) ==================== -->
+    <!-- ==================== SECTION 3: KIỂM TRA & ĐỒNG BỘ DRIVE (3-WAY SYNC) ==================== -->
     <section id="section-sync" class="hidden space-y-6">
       
       <!-- Top Overview Box -->
@@ -234,51 +263,80 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <span>🔄</span> Reconcile / Khám Sức Khỏe Hệ Thống
+              <span>🔄</span> Kiểm Tra & Đồng Bộ Drive
             </h1>
             <p class="text-xs sm:text-sm text-slate-400 mt-1">
-              So khớp cây thư mục thực tế trên Google Drive với cơ sở dữ liệu hệ thống, phát hiện các thư mục lạc trôi để liên kết 1-chạm.
+              Trung tâm kiểm soát & đối soát 3 chiều: Google Drive cá nhân ⇄ Ổ đĩa máy tính Local ⇄ Sổ ghi chú AI NotebookLM.
             </p>
           </div>
-          <button id="btn-run-reconcile" onclick="runReconcile()" class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 transition flex items-center gap-2 whitespace-nowrap self-start sm:self-auto">
-            <span id="reconcile-spinner" class="hidden animate-spin">⏳</span>
-            <span>🔍 Khám sức khỏe đồng bộ</span>
-          </button>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <button id="btn-run-reconcile" onclick="runReconcile()" class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition flex items-center gap-2 whitespace-nowrap">
+              <span id="reconcile-spinner" class="hidden animate-spin">⏳</span>
+              <span>🔍 Quét So Khớp Drive</span>
+            </button>
+            <button id="btn-run-reconcile-all-local" onclick="handleReconcileAllLocal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 transition flex items-center gap-2 whitespace-nowrap" title="Yêu cầu Local Agent quét toàn bộ ổ đĩa máy tính">
+              <span id="reconcile-local-spinner" class="hidden animate-spin">⏳</span>
+              <span>💻 Đối Soát Ổ Đĩa Local</span>
+            </button>
+          </div>
         </div>
 
         <!-- Metrics Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60">
-            <div class="text-xs text-slate-400 font-medium">Thư mục trên Drive</div>
+            <div class="text-xs text-slate-400 font-medium flex items-center justify-between">
+              <span>☁️ Thư mục Drive</span>
+              <a id="stat-drive-link" href="#" target="_blank" class="text-[11px] text-blue-400 hover:underline hidden">Mở Drive ↗</a>
+            </div>
             <div id="stat-drive-folders" class="text-2xl font-bold text-white mt-1">—</div>
           </div>
           <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60">
-            <div class="text-xs text-slate-400 font-medium">Môn học Hệ thống</div>
+            <div class="text-xs text-slate-400 font-medium">📚 Môn học Hệ thống</div>
             <div id="stat-system-courses" class="text-2xl font-bold text-white mt-1">—</div>
           </div>
           <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60">
-            <div class="text-xs text-slate-400 font-medium">Thư mục Lạc trôi (Chưa import)</div>
-            <div id="stat-unimported-folders" class="text-2xl font-bold text-amber-400 mt-1">—</div>
+            <div class="text-xs text-slate-400 font-medium">🧠 Sổ AI NotebookLM</div>
+            <div id="stat-nlm-courses" class="text-2xl font-bold text-purple-400 mt-1">—</div>
           </div>
           <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60">
-            <div class="text-xs text-slate-400 font-medium">Trạng thái Sức khỏe</div>
-            <div id="stat-health-status" class="text-sm font-bold text-slate-300 mt-2">Chưa kiểm tra</div>
+            <div class="text-xs text-slate-400 font-medium">Trạng thái 3 Chiều</div>
+            <div id="stat-health-status" class="text-xs sm:text-sm font-bold text-slate-300 mt-2">Chưa kiểm tra</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Bảng Giám Sát Chi Tiết Đồng Bộ Từng Môn Học (3-Way Sync Matrix) -->
+      <div class="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span>📋</span> Bảng Đối Soát Trạng Thái Môn Học (3-Way Sync Matrix)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Trạng thái liên kết thực tế giữa Google Drive cá nhân, Thư mục máy tính và Sổ AI NotebookLM</p>
+          </div>
+          <span id="courses-sync-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">0 môn học</span>
+        </div>
+
+        <div id="courses-sync-matrix" class="overflow-x-auto">
+          <!-- Rendered dynamically -->
         </div>
       </div>
 
       <!-- Unimported Folders Section -->
       <div class="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-            <span>📁</span> Thư mục Google Drive Chưa Liên kết (Lạc trôi)
-          </h2>
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span>📁</span> Thư mục Google Drive Chưa Liên Kết (Thư mục Lạc Trôi)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Các thư mục tạo trực tiếp trên Drive chưa được ghi nhận trên Web</p>
+          </div>
           <span id="unimported-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">0 thư mục</span>
         </div>
 
         <div id="unimported-list" class="space-y-3">
-          <div class="text-center py-10 text-slate-500 text-sm">
-            Bấm "Khám sức khỏe đồng bộ" ở trên để quét thư mục thực tế từ Google Drive...
+          <div class="text-center py-8 text-slate-500 text-sm">
+            Bấm "Quét So Khớp Drive" ở trên để quét thư mục thực tế từ Google Drive...
           </div>
         </div>
       </div>
@@ -331,9 +389,12 @@
             placeholder="Tự động sinh (VD: Mon_Co_so_du_lieu_phan_tan)" 
             class="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-emerald-400 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
           />
-          <p class="text-[11px] text-slate-500 mt-1">
-            Local Agent sẽ tự động tạo: <code class="text-slate-400">H:\2026\Thac Sy\Mon_Hoc\&lt;tên_thư_mục&gt;</code>
-          </p>
+          <div class="flex items-center justify-between mt-1 text-[11px] text-slate-500">
+            <span>Local Agent sẽ tự động tạo: <code id="create-course-local-base-display" class="text-emerald-400 font-mono">D:\ThacSi_HTTT\Mon_Hoc</code>\<code class="text-slate-400">&lt;tên_thư_mục&gt;</code></span>
+            <button type="button" onclick="closeCreateCourseModal(); openSettingsModal();" class="text-blue-400 hover:underline flex items-center gap-1 font-medium">
+              <span>Đổi ổ đĩa ⚙️</span>
+            </button>
+          </div>
         </div>
 
         <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
@@ -353,6 +414,113 @@
           </button>
         </div>
       </form>
+
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CHI TIẾT TỆP TIN MÔN HỌC (COURSE FILES) ==================== -->
+  <div id="modal-course-files" onclick="if (event.target === this) closeCourseFilesModal()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+      
+      <!-- Close button -->
+      <button onclick="closeCourseFilesModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-800 transition" title="Đóng (ESC)">
+        ✕
+      </button>
+
+      <!-- Modal Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800 pr-8">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl shadow-inner">
+            📚
+          </div>
+          <div>
+            <h3 id="modal-course-title" class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              Chi tiết Môn học
+            </h3>
+            <div class="flex flex-wrap items-center gap-2 mt-1">
+              <span class="text-xs text-slate-400">Thư mục máy:</span>
+              <span id="modal-course-folder-badge" class="font-mono text-[11px] text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                —
+              </span>
+              <a id="modal-course-nlm-badge" href="#" target="_blank" rel="noopener noreferrer" class="hidden text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition flex items-center gap-1" title="Bấm để mở trực tiếp NotebookLM trên trình duyệt">
+                <span>🧠 Mở NotebookLM</span> <span>↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions: Reconcile Local & Upload -->
+        <div class="flex items-center gap-2">
+          <button id="modal-btn-reconcile-local" onclick="handleReconcileLocal()" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1.5 whitespace-nowrap shadow-sm" title="Quét đối soát thực tế với thư mục ổ cứng máy tính">
+            <span>🔍 Đối soát Local</span>
+          </button>
+          <button id="modal-btn-upload-more" onclick="handleModalUploadMore()" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition flex items-center gap-1.5 whitespace-nowrap">
+            <span>☁️ Nạp thêm tệp tin</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats Bar & Filters -->
+      <div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border-b border-slate-800/80">
+        
+        <!-- Stats Badges -->
+        <div class="flex items-center gap-3 text-slate-400">
+          <span class="flex items-center gap-1.5 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700/50">
+            <span>📄</span>
+            <span>Tổng: <b id="modal-course-file-count" class="text-white">0</b> tệp</span>
+          </span>
+          <span class="flex items-center gap-1.5 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700/50">
+            <span>💾</span>
+            <span>Dung lượng: <b id="modal-course-total-size" class="text-emerald-400">0 B</b></span>
+          </span>
+        </div>
+
+        <!-- Search & Type Filter -->
+        <div class="flex items-center gap-2 flex-1 sm:max-w-md justify-end">
+          <div class="relative flex-1">
+            <input 
+              type="text" 
+              id="modal-files-search" 
+              placeholder="🔍 Tìm tên tệp tin..." 
+              oninput="filterCourseFiles()" 
+              class="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition"
+            />
+          </div>
+          <select 
+            id="modal-files-type-filter" 
+            onchange="filterCourseFiles()" 
+            class="bg-slate-800/80 border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 transition"
+          >
+            <option value="">Tất cả loại</option>
+            <option value="giao_trinh">📚 Giáo trình</option>
+            <option value="slide">📊 Slide bài giảng</option>
+            <option value="bai_bao">🔬 Bài báo</option>
+            <option value="ket_qua">✅ Ấn phẩm</option>
+          </select>
+          <button onclick="reloadModalCourseFiles()" title="Làm mới danh sách" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+            🔄
+          </button>
+        </div>
+      </div>
+
+      <!-- File List Area (Scrollable) -->
+      <div id="modal-course-files-list" class="flex-1 overflow-y-auto py-3 space-y-2.5 min-h-[220px] max-h-[50vh] pr-1">
+        <!-- Rendered via JS -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <div class="text-[11px] text-slate-500">
+          💡 Tệp nạp thành công sẽ tự động đồng bộ 3 chiều: Drive cá nhân, NotebookLM và Local PC.
+        </div>
+        <button 
+          type="button" 
+          onclick="closeCourseFilesModal()" 
+          class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+        >
+          Đóng
+        </button>
+      </div>
 
     </div>
   </div>
@@ -414,7 +582,7 @@
               onclick="handleProvisionDrive()" 
               class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-1.5 whitespace-nowrap"
             >
-              <span>⚡ Tạo Thư Mục Riêng Tự Động</span>
+              <span id="btn-provision-drive-text">⚡ Tạo Thư Mục Riêng Tự Động</span>
             </button>
           </div>
 
@@ -425,28 +593,47 @@
             <input 
               type="text" 
               id="settings-input-drive-id" 
-              placeholder="VD: 1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg" 
+              placeholder="VD: 1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg hoặc dán link Drive" 
               class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-amber-300 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
             />
             <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-              💡 <span class="text-slate-400">Mẹo:</span> Khi bấm <b>Tạo Thư Mục Riêng Tự Động</b>, hệ thống sẽ tự sinh thư mục riêng và phân quyền <i>Editor</i> cho email của bạn. Nếu nhập ID thủ công từ Drive của bạn, nhớ chia sẻ quyền Editor cho: <code class="text-blue-300 select-all">firebase-adminsdk-fbsvc@thsautoorganizer.iam.gserviceaccount.com</code>.
+              💡 <span class="text-slate-400">Mẹo:</span> Khi bấm <b>Tạo Thư Mục Riêng Tự Động</b>, hệ thống sẽ tự sinh/kết nối thư mục <code>ThacSi_HTTT</code> và cấp quyền <i>Editor</i> cho email của bạn. Nếu nhập ID thủ công từ Drive của bạn, nhớ chia sẻ quyền Editor cho: <code class="text-blue-300 select-all">firebase-adminsdk-fbsvc@thsautoorganizer.iam.gserviceaccount.com</code>.
             </p>
           </div>
         </div>
 
         <!-- Local Path Section -->
-        <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2">
-          <label class="block text-xs font-semibold text-slate-200 uppercase tracking-wider">
-            💻 Đường Dẫn Thư Mục Local Trên PC
-          </label>
+        <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-slate-200 uppercase tracking-wider">
+              💻 Đường Dẫn Thư Mục Local Trên PC
+            </label>
+            <span class="text-[11px] text-slate-400">Chọn nhanh ổ đĩa:</span>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="setLocalPathPreset('D:\\\\ThacSi_HTTT\\\\Mon_Hoc')" class="px-2.5 py-1 rounded-lg text-xs bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500 transition flex items-center gap-1.5 shadow-sm">
+              <span>💾 Ổ D:</span>
+              <span class="font-mono text-emerald-400 text-[11px]">D:\ThacSi_HTTT\Mon_Hoc</span>
+            </button>
+            <button type="button" onclick="setLocalPathPreset('C:\\\\ThacSi_HTTT\\\\Mon_Hoc')" class="px-2.5 py-1 rounded-lg text-xs bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500 transition flex items-center gap-1.5 shadow-sm">
+              <span>💾 Ổ C:</span>
+              <span class="font-mono text-emerald-400 text-[11px]">C:\ThacSi_HTTT\Mon_Hoc</span>
+            </button>
+            <button type="button" onclick="setLocalPathPreset('H:\\\\2026\\\\Thac Sy\\\\Mon_Hoc')" class="px-2.5 py-1 rounded-lg text-xs bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500 transition flex items-center gap-1.5 shadow-sm">
+              <span>🛠️ Ổ H (Dev):</span>
+              <span class="font-mono text-emerald-400 text-[11px]">H:\2026\Thac Sy\Mon_Hoc</span>
+            </button>
+          </div>
+
           <input 
             type="text" 
             id="settings-input-local-path" 
-            placeholder="H:\2026\Thac Sy\Mon_Hoc" 
+            placeholder="D:\ThacSi_HTTT\Mon_Hoc" 
             class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-emerald-400 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
           />
           <p class="text-[11px] text-slate-500">
-            Nơi Local Agent tự động tạo các thư mục môn học vật lý khi được kích hoạt.
+            Nơi Local Agent tự động tạo các thư mục môn học vật lý và tải bài giảng về máy khi được kích hoạt.
           </p>
         </div>
 
@@ -468,6 +655,89 @@
           </button>
         </div>
       </form>
+
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: THIẾT LẬP THƯ MỤC LƯU TRỮ BAN ĐẦU (FIRST-TIME ONBOARDING) ==================== -->
+  <div id="modal-storage-onboarding" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+      
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center text-2xl shadow-inner">
+          💻
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white tracking-tight">Chọn Thư Mục Lưu Trữ Trên Máy Tính</h3>
+          <p class="text-xs text-slate-400">Thiết lập 1 lần duy nhất cho Local Agent trên máy bạn</p>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-300 leading-relaxed mb-4">
+        Khi bạn tải tài liệu lên hoặc tạo môn học mới, Local Agent sẽ tự động tạo thư mục và tải bản sao về máy tính của bạn. Vui lòng chọn ổ đĩa phù hợp với máy của bạn:
+      </p>
+
+      <div class="space-y-2.5 mb-4">
+        <button type="button" onclick="selectOnboardingPreset('D:\\\\ThacSi_HTTT\\\\Mon_Hoc')" class="w-full p-3 rounded-xl bg-slate-800/80 hover:bg-blue-600/10 border border-slate-700 hover:border-blue-500 text-left transition flex items-center justify-between group">
+          <div>
+            <div class="text-xs font-bold text-white group-hover:text-blue-400 flex items-center gap-2">
+              <span>💾 Ổ D: (Khuyên dùng)</span>
+            </div>
+            <div class="text-[11px] font-mono text-emerald-400 mt-0.5">D:\ThacSi_HTTT\Mon_Hoc</div>
+          </div>
+          <span class="text-xs text-blue-400 font-semibold group-hover:translate-x-1 transition">Chọn ➔</span>
+        </button>
+
+        <button type="button" onclick="selectOnboardingPreset('C:\\\\ThacSi_HTTT\\\\Mon_Hoc')" class="w-full p-3 rounded-xl bg-slate-800/80 hover:bg-blue-600/10 border border-slate-700 hover:border-blue-500 text-left transition flex items-center justify-between group">
+          <div>
+            <div class="text-xs font-bold text-white group-hover:text-blue-400 flex items-center gap-2">
+              <span>💾 Ổ C: (Mặc định phổ biến)</span>
+            </div>
+            <div class="text-[11px] font-mono text-emerald-400 mt-0.5">C:\ThacSi_HTTT\Mon_Hoc</div>
+          </div>
+          <span class="text-xs text-blue-400 font-semibold group-hover:translate-x-1 transition">Chọn ➔</span>
+        </button>
+
+        <button type="button" onclick="selectOnboardingPreset('H:\\\\2026\\\\Thac Sy\\\\Mon_Hoc')" class="w-full p-3 rounded-xl bg-slate-800/80 hover:bg-blue-600/10 border border-slate-700 hover:border-blue-500 text-left transition flex items-center justify-between group">
+          <div>
+            <div class="text-xs font-bold text-white group-hover:text-blue-400 flex items-center gap-2">
+              <span>🛠️ Ổ H: (Máy Dev)</span>
+            </div>
+            <div class="text-[11px] font-mono text-emerald-400 mt-0.5">H:\2026\Thac Sy\Mon_Hoc</div>
+          </div>
+          <span class="text-xs text-blue-400 font-semibold group-hover:translate-x-1 transition">Chọn ➔</span>
+        </button>
+      </div>
+
+      <div class="mb-5">
+        <label class="block text-[11px] font-semibold text-slate-400 mb-1">
+          Hoặc đường dẫn thư mục tùy chỉnh trên máy bạn:
+        </label>
+        <input 
+          type="text" 
+          id="onboarding-input-local-path" 
+          value="D:\ThacSi_HTTT\Mon_Hoc"
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-emerald-400 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        />
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+        <button 
+          type="button" 
+          onclick="skipOnboardingStorage()" 
+          class="text-xs text-slate-400 hover:text-slate-200 transition"
+        >
+          Để sau (Dùng mặc định Ổ D)
+        </button>
+        <button 
+          type="button" 
+          id="btn-confirm-onboarding-storage"
+          onclick="handleConfirmOnboardingStorage()" 
+          class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25 transition flex items-center gap-2"
+        >
+          <span>✓ Xác Nhận & Tiếp Tục</span>
+        </button>
+      </div>
 
     </div>
   </div>
@@ -549,10 +819,13 @@
       });
 
       if (tabName === 'courses') loadCourses();
-      if (tabName === 'sync') runReconcile();
+      if (tabName === 'sync') {
+        renderCoursesSyncMatrix();
+        runReconcile();
+      }
     }
 
-    // ===== 3. SECTION 1: QUẢN LÝ SỔ HỘ KHẨU (COURSES) CONTROLLER =====
+    // ===== 3. SECTION 1: SỔ GHI CHÚ MÔN HỌC (COURSES) CONTROLLER =====
     async function loadCourses() {
       const grid = document.getElementById('courses-grid');
       const select = document.getElementById('upload-course-select');
@@ -584,12 +857,17 @@
 
         // Update dropdown for Upload Tab
         if (select) {
+          const prevVal = select.value;
           if (!_courses.length) {
-            select.innerHTML = '<option value="">-- Chưa có môn học nào --</option>';
+            select.innerHTML = '<option value="" disabled selected>-- Chưa có môn học nào --</option>';
           } else {
-            select.innerHTML = '<option value="">-- Chọn môn học mục tiêu --</option>' +
+            select.innerHTML = '<option value="" disabled selected>-- Chọn môn học mục tiêu --</option>' +
               _courses.map(c => `<option value="${c.id}">${c.display_name || c.name} (${c.local_folder_name || 'N/A'})</option>`).join('');
+            if (prevVal && _courses.some(c => c.id === prevVal)) {
+              select.value = prevVal;
+            }
           }
+          updateUploadDropzoneState();
         }
 
         // Render Courses Grid Cards
@@ -621,7 +899,7 @@
                   <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${badgeClass}">
                     ${statusText}
                   </span>
-                  ${nlmId ? `<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20" title="Đã liên kết NotebookLM: ${nlmId}">🧠 NLM Linked</span>` : ''}
+                  ${nlmId ? `<a href="https://notebooklm.google.com/notebook/${nlmId}" target="_blank" rel="noopener noreferrer" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1 transition" title="Bấm để mở trực tiếp sổ NotebookLM trên trình duyệt"><span>🧠 Mở NLM</span> <span>↗</span></a>` : ''}
                 </div>
                 <h3 class="font-bold text-base text-white tracking-tight leading-snug">
                   ${c.display_name || c.name || 'Không tên'}
@@ -638,8 +916,10 @@
                 </div>
               </div>
 
-              <div class="pt-4 mt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <span class="text-slate-500 text-[11px]">${c.created_at ? new Date(c.created_at).toLocaleDateString('vi-VN') : ''}</span>
+              <div class="pt-4 mt-4 border-t border-slate-800/80 flex items-center justify-between text-xs gap-2">
+                <button onclick="openCourseFilesModal('${c.id}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+                  <span>📂 Xem tệp tin</span>
+                </button>
                 <button onclick="selectCourseToUpload('${c.id}')" class="text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1">
                   <span>Nạp file</span> <span>→</span>
                 </button>
@@ -714,19 +994,470 @@
     function selectCourseToUpload(courseId) {
       switchTab('upload');
       const sel = document.getElementById('upload-course-select');
-      if (sel) sel.value = courseId;
+      if (sel) {
+        sel.value = courseId;
+        updateUploadDropzoneState();
+        renderQueue();
+      }
     }
+
+    // ===== 3.1 MODAL: CHI TIẾT TỆP TIN MÔN HỌC CONTROLLER =====
+    let _currentModalCourse = null;
+    let _currentCourseFiles = [];
+
+    async function openCourseFilesModal(courseId) {
+      _currentModalCourse = _courses.find(c => c.id === courseId) || { id: courseId, display_name: 'Môn học' };
+      const modal = document.getElementById('modal-course-files');
+      if (!modal) return;
+
+      const titleEl = document.getElementById('modal-course-title');
+      const folderBadge = document.getElementById('modal-course-folder-badge');
+      const nlmBadge = document.getElementById('modal-course-nlm-badge');
+
+      if (titleEl) titleEl.textContent = _currentModalCourse.display_name || _currentModalCourse.name || 'Chi tiết Môn học';
+      if (folderBadge) folderBadge.textContent = _currentModalCourse.local_folder_name || '—';
+
+      const nlmId = _currentModalCourse.notebooklm_id || _currentModalCourse.notebook_id;
+      if (nlmBadge) {
+        if (nlmId) {
+          nlmBadge.classList.remove('hidden');
+          nlmBadge.href = `https://notebooklm.google.com/notebook/${nlmId}`;
+          nlmBadge.innerHTML = `<span>🧠 Mở NotebookLM</span> <span>↗</span>`;
+          nlmBadge.title = `Bấm để mở trực tiếp sổ NotebookLM (${nlmId})`;
+        } else {
+          nlmBadge.classList.add('hidden');
+        }
+      }
+
+      // Reset filters
+      const searchInput = document.getElementById('modal-files-search');
+      if (searchInput) searchInput.value = '';
+      const typeFilter = document.getElementById('modal-files-type-filter');
+      if (typeFilter) typeFilter.value = '';
+
+      modal.classList.remove('hidden');
+      await loadCourseFiles(courseId);
+    }
+
+    function closeCourseFilesModal() {
+      const modal = document.getElementById('modal-course-files');
+      if (modal) modal.classList.add('hidden');
+      _currentModalCourse = null;
+      _currentCourseFiles = [];
+    }
+
+    function handleModalUploadMore() {
+      if (_currentModalCourse) {
+        const courseId = _currentModalCourse.id;
+        closeCourseFilesModal();
+        selectCourseToUpload(courseId);
+      }
+    }
+
+    function reloadModalCourseFiles() {
+      if (_currentModalCourse) {
+        loadCourseFiles(_currentModalCourse.id);
+      }
+    }
+
+    function formatBytes(bytes) {
+      const b = parseInt(bytes || '0', 10);
+      if (!b || isNaN(b) || b <= 0) return '0 B';
+      if (b < 1024) return b + ' B';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+      if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(2) + ' MB';
+      return (b / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    async function loadCourseFiles(courseId) {
+      const listEl = document.getElementById('modal-course-files-list');
+      const countEl = document.getElementById('modal-course-file-count');
+      const sizeEl = document.getElementById('modal-course-total-size');
+      if (!listEl) return;
+
+      listEl.innerHTML = `
+        <div class="py-12 text-center text-slate-500">
+          <div class="inline-block animate-spin text-2xl mb-2">🔄</div>
+          <div class="text-xs">Đang nạp danh sách tệp tin của môn học...</div>
+        </div>`;
+
+      try {
+        const course = _courses.find(c => c.id === courseId);
+        let url = `${WORKER_URL}/api/files?course_id=${encodeURIComponent(courseId)}`;
+        if (course && course.local_folder_name) {
+          url += `&subject=${encodeURIComponent(course.local_folder_name)}`;
+        }
+        const resp = await fetch(url, { headers: buildHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        _currentCourseFiles = data.files || [];
+
+        // Update stats
+        if (countEl) countEl.textContent = _currentCourseFiles.length;
+        const totalBytes = _currentCourseFiles.reduce((acc, f) => acc + (parseInt(f.size_bytes || '0', 10) || 0), 0);
+        if (sizeEl) sizeEl.textContent = formatBytes(totalBytes);
+
+        renderCourseFilesList(_currentCourseFiles);
+      } catch (err) {
+        listEl.innerHTML = `
+          <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs text-center">
+            Lỗi nạp tệp tin: ${err.message}
+          </div>`;
+        showToast(`Lỗi nạp tệp tin môn học: ${err.message}`, 'error');
+      }
+    }
+
+    function filterCourseFiles() {
+      const query = (document.getElementById('modal-files-search')?.value || '').toLowerCase().trim();
+      const typeFilter = document.getElementById('modal-files-type-filter')?.value || '';
+
+      const filtered = _currentCourseFiles.filter(f => {
+        const nameMatch = !query || (f.filename || '').toLowerCase().includes(query);
+        const typeMatch = !typeFilter || (f.document_type === typeFilter);
+        return nameMatch && typeMatch;
+      });
+
+      renderCourseFilesList(filtered, true);
+    }
+
+    function renderCourseFilesList(files, isFiltered = false) {
+      const listEl = document.getElementById('modal-course-files-list');
+      if (!listEl) return;
+
+      if (!files.length) {
+        if (isFiltered) {
+          listEl.innerHTML = `
+            <div class="py-12 text-center text-slate-500">
+              <div class="text-3xl mb-2">🔍</div>
+              <div class="text-sm font-semibold text-slate-300">Không tìm thấy tệp tin phù hợp</div>
+              <div class="text-xs text-slate-500 mt-1">Hãy thử tìm kiếm với từ khóa khác</div>
+            </div>`;
+        } else {
+          listEl.innerHTML = `
+            <div class="py-12 text-center text-slate-500 bg-slate-950/40 rounded-xl border border-dashed border-slate-800 p-6">
+              <div class="text-3xl mb-2">📂</div>
+              <div class="text-sm font-semibold text-slate-300">Chưa có tệp tin nào trong môn học này</div>
+              <p class="text-xs text-slate-500 mt-1 mb-4">Các tệp tải lên qua Web UI hoặc được Local Agent quét sẽ hiển thị tại đây</p>
+              <button onclick="handleModalUploadMore()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition inline-flex items-center gap-1.5">
+                <span>☁️ Nạp tệp tin ngay</span>
+              </button>
+            </div>`;
+        }
+        return;
+      }
+
+      listEl.innerHTML = files.map(f => {
+        const ext = (f.filename || '').split('.').pop().toLowerCase();
+        let icon = '📄';
+        if (['pdf'].includes(ext)) icon = '📕';
+        else if (['doc', 'docx'].includes(ext)) icon = '📘';
+        else if (['ppt', 'pptx'].includes(ext)) icon = '📙';
+        else if (['txt', 'md'].includes(ext)) icon = '📝';
+        else if (['mp3', 'wav', 'm4a'].includes(ext)) icon = '🎵';
+
+        const typeLabels = {
+          giao_trinh: '📚 Giáo trình',
+          slide: '📊 Slide bài giảng',
+          bai_bao: '🔬 Bài báo',
+          ket_qua: '✅ Ấn phẩm xuất bản'
+        };
+        const docTypeLabel = typeLabels[f.document_type] || 'Tài liệu';
+
+        // 1. Tầng Google Drive
+        const driveViewLink = f.drive_view_link || f.webViewLink || (f.drive_file_id ? `https://drive.google.com/file/d/${f.drive_file_id}/view` : '');
+        const driveDownloadLink = f.drive_file_id ? `https://drive.google.com/uc?export=download&id=${f.drive_file_id}` : '';
+
+        // 2. Tầng NotebookLM
+        const courseNlmId = _currentModalCourse?.notebooklm_id || _currentModalCourse?.notebook_id || f.notebooklm_id || '';
+        const nlmNotebookUrl = courseNlmId ? `https://notebooklm.google.com/notebook/${courseNlmId}` : 'https://notebooklm.google.com/';
+
+        const isNlmSynced = (f.notebooklm_sync_status === 'synced' || !!f.notebooklm_source_id);
+        const isNlmPending = (f.notebooklm_sync_status === 'pending');
+        const isNlmFailed = (f.notebooklm_sync_status === 'failed');
+        const isNlmSkipped = (f.notebooklm_sync_status === 'skipped_ext' || f.notebooklm_sync_status === 'skipped_no_course');
+
+        let nlmShield = '';
+        if (isNlmSynced) {
+          nlmShield = `
+            <a href="${nlmNotebookUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition shadow-sm" title="Đã nạp AI thành công. Bấm để mở trực tiếp sổ NotebookLM">
+              <span>🧠 NLM: Đã nạp</span> <span>↗</span>
+            </a>`;
+        } else if (isNlmPending) {
+          nlmShield = `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 animate-pulse" title="Đang trong hàng đợi nạp AI NotebookLM...">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              <span>🧠 NLM: Đang nạp...</span>
+            </span>`;
+        } else if (isNlmFailed) {
+          const errDetail = f.notebooklm_error || 'Lỗi nạp NLM — bấm để thử lại';
+          nlmShield = `
+            <div class="inline-flex items-center gap-1">
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20 cursor-help" title="${errDetail}">
+                <span>✕ NLM: Lỗi</span>
+              </span>
+              <button onclick="retryFile('${f.id}')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition flex items-center gap-1" title="Bấm để thử nạp lại vào NotebookLM">
+                <span>🔄 Thử lại</span>
+              </button>
+            </div>`;
+        } else if (isNlmSkipped) {
+          nlmShield = `
+            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700" title="Định dạng file không hỗ trợ nạp AI">
+              <span>🧠 Bỏ qua AI</span>
+            </span>`;
+        } else {
+          nlmShield = `
+            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700" title="Chưa liên kết NLM">
+              <span>🧠 NLM: Chưa nạp</span>
+            </span>`;
+        }
+
+        // 3. Tầng Local PC
+        const isLocalSynced = (f.local_sync_status === 'synced' || (f.local_path && f.local_path.trim().length > 0));
+        const isLocalDownloading = (f.local_sync_status === 'downloading');
+        const isLocalFailed = (f.local_sync_status === 'failed');
+
+        const baseStoragePath = document.getElementById('settings-input-local-path')?.value || 'D:\\ThacSi_HTTT\\Mon_Hoc';
+        const localDisplayPath = f.local_path 
+          ? `${baseStoragePath}\\${f.local_path.replace(/^\/+/, '')}`
+          : (_currentModalCourse?.local_folder_name ? `${baseStoragePath}\\${_currentModalCourse.local_folder_name}\\${f.filename}` : f.filename);
+
+        let localShield = '';
+        if (isLocalSynced) {
+          localShield = `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 cursor-help shadow-sm" title="Đã có trên ổ cứng: ${localDisplayPath}">
+              <span>💻 Local: Đã về máy</span>
+            </span>`;
+        } else if (isLocalDownloading) {
+          localShield = `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20 animate-pulse" title="Local Agent đang tải ngầm về ổ cứng: ${localDisplayPath}">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+              <span>💻 Local: Đang tải...</span>
+            </span>`;
+        } else if (isLocalFailed) {
+          localShield = `
+            <div class="inline-flex items-center gap-1">
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20 cursor-help" title="Tải về máy thất bại — bấm để thử lại">
+                <span>✕ Local: Lỗi</span>
+              </span>
+              <button onclick="retryFile('${f.id}')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow-sm transition flex items-center gap-1" title="Bấm để thử tải ngầm lại">
+                <span>🔄 Thử lại</span>
+              </button>
+            </div>`;
+        } else {
+          localShield = `
+            <div class="inline-flex items-center gap-1">
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20" title="Chờ Local Agent đồng bộ về: ${localDisplayPath}">
+                <span>💻 Local: Chờ sync</span>
+              </span>
+              <button onclick="checkSingleFileLocal('${f.id}')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition flex items-center gap-1 shadow-sm" title="Kiểm tra đối soát xem tệp tin đã có sẵn trong ổ đĩa máy tính chưa">
+                <span>🔍 Kiểm tra</span>
+              </button>
+              ${driveDownloadLink ? `
+                <a href="${driveDownloadLink}" target="_blank" download class="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 border border-slate-700 transition" title="Tải trực tiếp từ Drive về máy qua trình duyệt">
+                  <span>📥 Tải ngay</span>
+                </a>` : ''}
+            </div>`;
+        }
+
+        const sizeStr = formatBytes(f.size_bytes);
+        const dateStr = f.created_at ? new Date(f.created_at).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+        return `
+          <div class="p-3.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 transition flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs group">
+            <div class="flex items-start gap-3 min-w-0 flex-1">
+              <span class="text-2xl mt-0.5 select-none">${icon}</span>
+              <div class="min-w-0 flex-1">
+                <div class="font-semibold text-white truncate text-sm" title="${f.filename}">
+                  ${f.filename}
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-400">
+                  <span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/60 text-slate-300 font-medium">
+                    ${docTypeLabel}
+                  </span>
+                  <span>•</span>
+                  <span class="font-mono text-emerald-400 font-medium">${sizeStr}</span>
+                  <span>•</span>
+                  <span class="text-slate-500">${dateStr}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bộ 3 Khiên Trạng Thái: Drive | NLM | Local -->
+            <div class="flex flex-wrap items-center gap-2 justify-start md:justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-800">
+              <!-- Khiên 1: Google Drive -->
+              ${driveViewLink ? `
+                <a href="${driveViewLink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 border border-blue-500/20 transition shadow-sm" title="Mở xem file gốc trên Google Drive">
+                  <span>☁️ Drive</span> <span>↗</span>
+                </a>` : ''}
+
+              <!-- Khiên 2: NotebookLM -->
+              ${nlmShield}
+
+              <!-- Khiên 3: Local PC -->
+              ${localShield}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function retryFile(fileId) {
+      if (!fileId) return;
+      showToast('⏳ Đang kích hoạt lại tác vụ đồng bộ...', 'info');
+
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/files/${encodeURIComponent(fileId)}/retry`, {
+          method: 'POST',
+          headers: buildHeaders({ 'Content-Type': 'application/json' })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.error || 'Lỗi khi thử lại');
+        }
+        showToast('✓ Đã đẩy lại tác vụ vào hàng đợi! Local Agent sẽ xử lý ngay.', 'success');
+        if (_currentModalCourse) {
+          loadCourseFiles(_currentModalCourse.id);
+        }
+      } catch (err) {
+        showToast(`Thao tác thử lại thất bại: ${err.message}`, 'error');
+      }
+    }
+
+    async function handleReconcileLocal() {
+      if (!_currentModalCourse) return;
+      const btn = document.getElementById('modal-btn-reconcile-local');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Đang đối soát...';
+      }
+      showToast('🔍 Đang yêu cầu Local Agent đối soát tệp tin thực tế trên ổ cứng máy tính...', 'info', 3000);
+
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/files/reconcile-local?course_id=${encodeURIComponent(_currentModalCourse.id)}`, {
+          method: 'POST',
+          headers: buildHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ course_id: _currentModalCourse.id })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Lỗi khi gửi lệnh đối soát');
+
+        showToast('✓ Đã phát lệnh đối soát! Đang làm mới dữ liệu từ đĩa Local...', 'success', 2500);
+
+        // Làm mới danh sách sau 1.2s
+        setTimeout(() => {
+          if (_currentModalCourse) loadCourseFiles(_currentModalCourse.id);
+        }, 1200);
+      } catch (err) {
+        showToast(`Đối soát thất bại: ${err.message}`, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔍 Đối soát Local</span>';
+        }
+      }
+    }
+
+    async function checkSingleFileLocal(fileId) {
+      if (!fileId) return;
+      showToast('🔍 Đang kiểm tra đối soát tệp tin với thư mục máy tính...', 'info', 2500);
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/files/reconcile-local`, {
+          method: 'POST',
+          headers: buildHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ file_id: fileId, course_id: _currentModalCourse?.id })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Lỗi kiểm tra');
+        setTimeout(() => {
+          if (_currentModalCourse) loadCourseFiles(_currentModalCourse.id);
+        }, 1200);
+      } catch (err) {
+        showToast(`Kiểm tra thất bại: ${err.message}`, 'error');
+      }
+    }
+
+    // Lắng nghe phím ESC để đóng nhanh modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeCourseFilesModal();
+        closeCreateCourseModal();
+        closeSettingsModal();
+      }
+    });
 
 
     // ===== 4. SECTION 2: KÉO THẢ UPLOAD CONTROLLER =====
+    function updateUploadDropzoneState() {
+      const select = document.getElementById('upload-course-select');
+      const dropZone = document.getElementById('drop-zone');
+      const badge = document.getElementById('dropzone-status-badge');
+      const courseId = select?.value;
+
+      if (!courseId) {
+        if (badge) {
+          badge.className = 'mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20';
+          badge.innerHTML = '<span>⚠️</span> <span>Bước 1: Vui lòng chọn môn học mục tiêu ở trên trước khi chọn tệp</span>';
+        }
+        if (dropZone) {
+          dropZone.classList.add('border-slate-800');
+          dropZone.classList.remove('border-blue-500/50');
+        }
+      } else {
+        const selectedCourse = _courses.find(c => c.id === courseId);
+        const courseName = selectedCourse ? (selectedCourse.display_name || selectedCourse.name) : 'Môn học đã chọn';
+        if (badge) {
+          badge.className = 'mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
+          badge.innerHTML = `<span>✓</span> <span>Mục tiêu: <b>${courseName}</b> (Sẵn sàng chọn hoặc kéo thả tệp)</span>`;
+        }
+        if (dropZone) {
+          dropZone.classList.remove('border-slate-800');
+          dropZone.classList.add('border-slate-700');
+        }
+      }
+    }
+
+    function checkCourseSelected() {
+      const courseId = document.getElementById('upload-course-select')?.value;
+      if (!courseId) {
+        showToast('⚠️ Vui lòng chọn Môn học mục tiêu (ở Bước 1) trước khi chọn tệp tin!', 'warning');
+        const courseSelect = document.getElementById('upload-course-select');
+        if (courseSelect) {
+          courseSelect.focus();
+          courseSelect.classList.add('ring-2', 'ring-amber-400', 'border-amber-400');
+          setTimeout(() => courseSelect.classList.remove('ring-2', 'ring-amber-400', 'border-amber-400'), 2500);
+        }
+        return false;
+      }
+      return true;
+    }
+
     function initDragAndDrop() {
       const dropZone = document.getElementById('drop-zone');
       const fileInput = document.getElementById('file-input');
+      const courseSelect = document.getElementById('upload-course-select');
 
       if (!dropZone || !fileInput) return;
 
-      dropZone.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', () => addFilesToQueue(Array.from(fileInput.files)));
+      if (courseSelect) {
+        courseSelect.addEventListener('change', () => {
+          updateUploadDropzoneState();
+          renderQueue();
+        });
+      }
+
+      dropZone.addEventListener('click', () => {
+        if (!checkCourseSelected()) return;
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', () => {
+        if (!checkCourseSelected()) {
+          fileInput.value = '';
+          return;
+        }
+        addFilesToQueue(Array.from(fileInput.files));
+        fileInput.value = '';
+      });
 
       ['dragenter', 'dragover'].forEach(eventName => {
         dropZone.addEventListener(eventName, (e) => {
@@ -743,6 +1474,7 @@
       });
 
       dropZone.addEventListener('drop', (e) => {
+        if (!checkCourseSelected()) return;
         const files = Array.from(e.dataTransfer.files || []);
         addFilesToQueue(files);
       });
@@ -766,6 +1498,10 @@
       const container = document.getElementById('file-queue-container');
       const list = document.getElementById('file-queue-list');
       const countEl = document.getElementById('queue-count');
+      const headerText = document.getElementById('queue-header-text');
+      const clearDoneBtn = document.getElementById('btn-clear-done');
+      const uploadBtn = document.getElementById('btn-start-upload');
+      const courseId = document.getElementById('upload-course-select')?.value;
 
       if (!container || !list) return;
 
@@ -775,22 +1511,46 @@
       }
 
       container.classList.remove('hidden');
-      if (countEl) countEl.textContent = _queue.length;
 
+      const readyCount = _queue.filter(i => i.status === 'ready' || i.status === 'error').length;
+      const doneCount = _queue.filter(i => i.status === 'done').length;
+      const uploadingCount = _queue.filter(i => i.status === 'uploading').length;
+
+      if (countEl) countEl.textContent = _queue.length;
+      if (headerText) {
+        headerText.innerHTML = `Danh sách hàng đợi tải lên (<span class="text-white">${_queue.length}</span> file` +
+          (doneCount > 0 ? ` • <span class="text-emerald-400 font-semibold">${doneCount} đã hoàn tất</span>` : '') +
+          (readyCount > 0 ? ` • <span class="text-amber-400">${readyCount} chờ nạp</span>` : '') +
+          `)`;
+      }
+
+      // Nút "Dọn tệp đã xong" ở header
+      if (clearDoneBtn) {
+        if (doneCount > 0 && uploadingCount === 0) {
+          clearDoneBtn.classList.remove('hidden');
+        } else {
+          clearDoneBtn.classList.add('hidden');
+        }
+      }
+
+      // Render danh sách file
       list.innerHTML = _queue.map(item => {
         const isDone = item.status === 'done';
         const isError = item.status === 'error';
         const isUploading = item.status === 'uploading';
 
         return `
-          <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-3 text-xs">
+          <div class="p-3.5 rounded-xl bg-slate-800/80 border ${isDone ? 'border-emerald-500/30 bg-emerald-950/10' : 'border-slate-700/80'} flex items-center justify-between gap-3 text-xs transition-all">
             <div class="flex-1 min-w-0">
-              <div class="font-medium text-white truncate">${item.file.name}</div>
+              <div class="font-medium text-white truncate flex items-center gap-1.5">
+                ${isDone ? '<span class="text-emerald-400 font-bold">✓</span>' : '<span>📄</span>'}
+                <span class="truncate">${item.file.name}</span>
+              </div>
               <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
                 <span>${(item.file.size / 1024 / 1024).toFixed(2)} MB</span>
                 <span>•</span>
-                <span class="${isDone ? 'text-emerald-400 font-semibold' : isError ? 'text-rose-400' : isUploading ? 'text-blue-400' : 'text-slate-400'}">
-                  ${isDone ? '✓ Đã stream xong lên Drive & NLM' : isError ? `✗ ${item.errorMsg || 'Lỗi tải lên'}` : isUploading ? '⏳ Đang stream dữ liệu...' : 'Sẵn sàng'}
+                <span class="${isDone ? 'text-emerald-400 font-semibold' : isError ? 'text-rose-400 font-medium' : isUploading ? 'text-blue-400' : 'text-slate-400'}">
+                  ${isDone ? '✓ Đã stream xong lên Drive & NLM' : isError ? `✗ ${item.errorMsg || 'Lỗi tải lên'}` : isUploading ? '⏳ Đang stream dữ liệu...' : 'Sẵn sàng nạp'}
                 </span>
               </div>
               ${isUploading ? `
@@ -799,15 +1559,53 @@
                 </div>` : ''}
             </div>
             ${!isUploading ? `
-              <button onclick="removeQueueItem('${item.id}')" class="text-slate-500 hover:text-rose-400 p-1">
+              <button onclick="removeQueueItem('${item.id}')" title="Xóa tệp này khỏi hàng đợi" class="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-lg transition-colors flex items-center justify-center font-bold text-sm">
                 ✕
               </button>` : ''}
           </div>`;
       }).join('');
+
+      // Cập nhật nút bấm hành động ở dưới cùng
+      if (uploadBtn) {
+        if (uploadingCount > 0) {
+          uploadBtn.disabled = true;
+          uploadBtn.className = 'w-full sm:w-auto px-6 py-3 rounded-xl font-semibold text-sm bg-slate-700 text-slate-300 cursor-not-allowed transition-all flex items-center justify-center gap-2';
+          uploadBtn.innerHTML = '<span class="inline-block animate-spin">⏳</span><span>Đang stream dữ liệu lên Drive & NLM...</span>';
+          uploadBtn.onclick = null;
+        } else if (doneCount > 0 && readyCount === 0) {
+          // Tất cả đều đã hoàn thành -> Chuyển thành nút Hoàn tất / Dọn dẹp
+          uploadBtn.disabled = false;
+          uploadBtn.className = 'w-full sm:w-auto px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer';
+          uploadBtn.innerHTML = '<span>✨ Hoàn tất — Dọn sạch hàng đợi</span>';
+          uploadBtn.onclick = () => clearDoneQueue();
+        } else if (!courseId) {
+          // Chưa chọn môn học -> Disabled với thông báo
+          uploadBtn.disabled = true;
+          uploadBtn.className = 'w-full sm:w-auto px-6 py-3 rounded-xl font-semibold text-sm bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed transition-all flex items-center justify-center gap-2';
+          uploadBtn.innerHTML = '<span>⚠️ Vui lòng chọn Môn học ở Bước 1</span>';
+          uploadBtn.onclick = null;
+        } else if (readyCount > 0) {
+          // Đã chọn môn học và có file sẵn sàng
+          uploadBtn.disabled = false;
+          uploadBtn.className = 'w-full sm:w-auto px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xl shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer';
+          uploadBtn.innerHTML = `<span>🚀 Bắt đầu Nạp Tài liệu (${readyCount} file)</span>`;
+          uploadBtn.onclick = () => startUploadQueue();
+        }
+      }
     }
 
     function clearQueue() {
       _queue = [];
+      renderQueue();
+    }
+
+    function clearDoneQueue() {
+      const beforeCount = _queue.length;
+      _queue = _queue.filter(i => i.status !== 'done');
+      const removedCount = beforeCount - _queue.length;
+      if (removedCount > 0) {
+        showToast(`✓ Đã dọn dẹp ${removedCount} tệp tin đã nạp xong`, 'info');
+      }
       renderQueue();
     }
 
@@ -821,7 +1619,8 @@
       const docType = document.getElementById('upload-type-select')?.value || 'giao_trinh';
 
       if (!courseId) {
-        showToast('Vui lòng chọn môn học mục tiêu trước khi tải lên', 'error');
+        showToast('⚠️ Vui lòng chọn Môn học mục tiêu trước khi tải lên', 'error');
+        checkCourseSelected();
         return;
       }
 
@@ -832,7 +1631,7 @@
       }
 
       const btn = document.getElementById('btn-start-upload');
-      btn.disabled = true;
+      if (btn) btn.disabled = true;
 
       for (const item of pending) {
         item.status = 'uploading';
@@ -854,7 +1653,10 @@
             body: formData
           });
           const resData = await resp.json();
-          if (!resp.ok) throw new Error(resData.error || resData.detail || 'Lỗi tải lên');
+          if (!resp.ok) {
+            const detailMsg = resData.detail ? `: ${resData.detail}` : '';
+            throw new Error((resData.error || 'Lỗi tải lên') + detailMsg);
+          }
 
           item.status = 'done';
           item.progress = 100;
@@ -867,11 +1669,102 @@
         renderQueue();
       }
 
-      btn.disabled = false;
+      // Reload courses in background to refresh metrics/files
+      loadCourses();
     }
 
 
-    // ===== 5. SECTION 3: RECONCILE / KHÁM SỨC KHỎE CONTROLLER =====
+    // ===== 5. SECTION 3: KIỂM TRA & ĐỒNG BỘ DRIVE CONTROLLER =====
+    function renderCoursesSyncMatrix() {
+      const container = document.getElementById('courses-sync-matrix');
+      const countBadge = document.getElementById('courses-sync-count-badge');
+      if (!container) return;
+
+      if (!_courses || !_courses.length) {
+        if (countBadge) countBadge.textContent = '0 môn học';
+        container.innerHTML = `
+          <div class="text-center py-8 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-dashed border-slate-800 p-6">
+            Chưa có môn học nào trong hệ thống. Hãy tạo môn học đầu tiên tại tab "Sổ Ghi Chú Môn Học".
+          </div>`;
+        return;
+      }
+
+      if (countBadge) countBadge.textContent = `${_courses.length} môn học`;
+      const baseLocalPath = document.getElementById('settings-input-local-path')?.value || 'D:\\ThacSi_HTTT\\Mon_Hoc';
+
+      let html = `
+        <table class="w-full text-left text-xs text-slate-300 min-w-[700px]">
+          <thead class="text-[11px] text-slate-400 uppercase bg-slate-800/60 border-b border-slate-700">
+            <tr>
+              <th class="px-4 py-3 font-semibold">Môn học</th>
+              <th class="px-4 py-3 font-semibold">☁️ Thư mục Drive</th>
+              <th class="px-4 py-3 font-semibold">💻 Ổ đĩa Local (Máy tính)</th>
+              <th class="px-4 py-3 font-semibold">🧠 Google NotebookLM</th>
+              <th class="px-4 py-3 font-semibold text-right">Tác vụ</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800">
+      `;
+
+      _courses.forEach(c => {
+        const nlmId = c.notebooklm_id || c.notebook_id;
+        const driveFolderId = c.drive_folder_id;
+        const localFolder = c.local_folder_name || c.name || 'N/A';
+        const displayName = c.display_name || c.name || 'Không tên';
+
+        html += `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="px-4 py-3.5">
+              <div class="font-bold text-white text-sm flex items-center gap-2">
+                <span>📚</span> <span>${displayName}</span>
+              </div>
+              <div class="text-[11px] text-slate-500 font-mono mt-0.5">Mã thư mục: ${localFolder}</div>
+            </td>
+            <td class="px-4 py-3.5">
+              ${driveFolderId ? `
+                <a href="https://drive.google.com/drive/folders/${driveFolderId}" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20 transition font-medium text-xs">
+                  <span>✓ Đã liên kết</span>
+                  <span>↗</span>
+                </a>
+              ` : `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20 text-xs">
+                  Chưa có Drive ID
+                </span>
+              `}
+            </td>
+            <td class="px-4 py-3.5">
+              <div class="flex items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono text-[11px]">
+                  ✓ ${baseLocalPath}\\${localFolder}
+                </span>
+              </div>
+            </td>
+            <td class="px-4 py-3.5">
+              ${nlmId ? `
+                <a href="https://notebooklm.google.com/notebook/${nlmId}" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition font-medium text-xs">
+                  <span>🧠 Sổ AI sẵn sàng</span>
+                  <span>↗</span>
+                </a>
+              ` : `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs">
+                  ⏳ Chờ Agent nạp
+                </span>
+              `}
+            </td>
+            <td class="px-4 py-3.5 text-right whitespace-nowrap">
+              <button onclick="openCourseFilesModal('${c.id}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 transition inline-flex items-center gap-1.5 shadow-sm">
+                <span>📂</span>
+                <span>Chi tiết tệp</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
     async function runReconcile() {
       const btn = document.getElementById('btn-run-reconcile');
       const spinner = document.getElementById('reconcile-spinner');
@@ -888,26 +1781,46 @@
         if (!resp.ok) throw new Error(data.error || 'Không thể quét đồng bộ');
 
         const rec = data.reconcile || {};
-        document.getElementById('stat-drive-folders').textContent = rec.drive_total_folders ?? 0;
-        document.getElementById('stat-system-courses').textContent = rec.courses_total ?? 0;
+        const driveFoldersCount = rec.drive_total_folders ?? 0;
+        document.getElementById('stat-drive-folders').textContent = driveFoldersCount;
+        document.getElementById('stat-system-courses').textContent = _courses.length || rec.courses_total || 0;
         
         const unimported = rec.unimported_drive_folders || [];
-        document.getElementById('stat-unimported-folders').textContent = unimported.length;
         document.getElementById('unimported-count-badge').textContent = `${unimported.length} thư mục`;
 
+        // Update NotebookLM metrics
+        const nlmCount = (_courses || []).filter(c => c.notebooklm_id || c.notebook_id).length;
+        const totalCourses = _courses.length || rec.courses_total || 0;
+        const nlmStatEl = document.getElementById('stat-nlm-courses');
+        if (nlmStatEl) {
+          nlmStatEl.textContent = `${nlmCount}/${totalCourses} môn`;
+        }
+
+        // Link Drive Root Folder
+        const driveLinkEl = document.getElementById('stat-drive-link');
+        if (driveLinkEl) {
+          const rootId = rec.drive_root_folder_id;
+          if (rootId) {
+            driveLinkEl.href = `https://drive.google.com/drive/folders/${rootId}`;
+            driveLinkEl.classList.remove('hidden');
+          }
+        }
+
         const healthEl = document.getElementById('stat-health-status');
-        if (rec.status === 'healthy') {
-          healthEl.innerHTML = '<span class="text-emerald-400 font-bold">✓ Khỏe mạnh (Hoàn toàn khớp)</span>';
+        if (rec.status === 'healthy' && (nlmCount === totalCourses || totalCourses === 0)) {
+          healthEl.innerHTML = '<span class="text-emerald-400 font-bold">✓ Khỏe mạnh (Toàn diện)</span>';
+        } else if (unimported.length > 0) {
+          healthEl.innerHTML = '<span class="text-amber-400 font-bold">⚠ Có thư mục Drive mới</span>';
         } else {
-          healthEl.innerHTML = '<span class="text-amber-400 font-bold">⚠ Cần đồng bộ (Có thư mục mới)</span>';
+          healthEl.innerHTML = '<span class="text-purple-400 font-bold">✓ Drive khớp (Đang nạp AI)</span>';
         }
 
         if (!unimported.length) {
           list.innerHTML = `
-            <div class="text-center py-8 text-slate-400 bg-slate-950/40 rounded-xl border border-dashed border-slate-800 p-6">
-              <span class="text-3xl block mb-2">✨</span>
-              <span class="text-emerald-400 font-semibold text-sm">Hệ thống hoàn toàn chuẩn hóa!</span>
-              <p class="text-xs text-slate-500 mt-1">Tất cả các thư mục trên Google Drive đã được gắn kết với Môn học trên Firestore.</p>
+            <div class="text-center py-6 text-slate-400 bg-slate-950/40 rounded-xl border border-dashed border-slate-800 p-6">
+              <span class="text-2xl block mb-1">✨</span>
+              <span class="text-emerald-400 font-semibold text-xs sm:text-sm">Google Drive đồng bộ hoàn hảo!</span>
+              <p class="text-[11px] text-slate-500 mt-1">Không có thư mục lạ nào trên Google Drive chưa được liên kết với hệ thống.</p>
             </div>`;
         } else {
           list.innerHTML = unimported.map(f => `
@@ -924,9 +1837,41 @@
             </div>`).join('');
         }
 
-        showToast('✓ Khám sức khỏe đồng bộ hoàn tất', 'success');
+        renderCoursesSyncMatrix();
+        showToast('✓ Đã quét và so khớp dữ liệu Google Drive thành công', 'success');
       } catch (err) {
         showToast(`Lỗi đối soát: ${err.message}`, 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+        if (spinner) spinner.classList.add('hidden');
+      }
+    }
+
+    async function handleReconcileAllLocal() {
+      const btn = document.getElementById('btn-run-reconcile-all-local');
+      const spinner = document.getElementById('reconcile-local-spinner');
+      if (btn) btn.disabled = true;
+      if (spinner) spinner.classList.remove('hidden');
+
+      showToast('🔍 Đang yêu cầu Local Agent đối soát toàn bộ ổ đĩa máy tính (H:\\...)...', 'info', 4000);
+
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/files/reconcile-local`, {
+          method: 'POST',
+          headers: buildHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({})
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Lỗi gửi lệnh đối soát');
+
+        showToast('✓ Lệnh đối soát đã phát! Local Agent đang quét ổ đĩa thực tế...', 'success', 3500);
+
+        setTimeout(async () => {
+          await loadCourses();
+          renderCoursesSyncMatrix();
+        }, 1500);
+      } catch (err) {
+        showToast(`Đối soát Local thất bại: ${err.message}`, 'error');
       } finally {
         if (btn) btn.disabled = false;
         if (spinner) spinner.classList.add('hidden');
@@ -950,8 +1895,8 @@
         if (!resp.ok) throw new Error(data.error || 'Import thất bại');
 
         showToast(`✓ Đã import '${folderName}' thành môn học chính thức!`, 'success');
+        await loadCourses();
         runReconcile();
-        loadCourses();
       } catch (err) {
         showToast(`Thao tác thất bại: ${err.message}`, 'error');
       } finally {
@@ -1014,16 +1959,38 @@
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-          document.getElementById('user-name').textContent = payload.name || payload.email;
-          if (payload.picture) document.getElementById('user-avatar').src = payload.picture;
-          profile?.classList.remove('hidden');
-          gsi?.classList.add('hidden');
-        } catch {
-          profile?.classList.add('hidden');
+          const nameElem = document.getElementById('user-name');
+          const avatarElem = document.getElementById('user-avatar');
+          if (nameElem) nameElem.textContent = payload.name || payload.email || 'Người dùng';
+          if (avatarElem && payload.picture) avatarElem.src = payload.picture;
+
+          if (profile) {
+            profile.classList.remove('hidden');
+            profile.style.display = 'flex';
+          }
+          if (gsi) {
+            gsi.classList.add('hidden');
+            gsi.style.setProperty('display', 'none', 'important');
+          }
+        } catch (e) {
+          if (profile) {
+            profile.classList.add('hidden');
+            profile.style.display = 'none';
+          }
+          if (gsi) {
+            gsi.classList.remove('hidden');
+            gsi.style.removeProperty('display');
+          }
         }
       } else {
-        profile?.classList.add('hidden');
-        gsi?.classList.remove('hidden');
+        if (profile) {
+          profile.classList.add('hidden');
+          profile.style.display = 'none';
+        }
+        if (gsi) {
+          gsi.classList.remove('hidden');
+          gsi.style.removeProperty('display');
+        }
       }
     }
 
@@ -1062,6 +2029,80 @@
       document.getElementById('modal-settings')?.classList.add('hidden');
     }
 
+    function extractDriveId(input) {
+      if (!input) return '';
+      let str = String(input).trim();
+      str = str.replace(/[:?\/]+$/, '');
+      const match = str.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      if (match) return match[1];
+      const matchD = str.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (matchD) return matchD[1];
+      const matchQuery = str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (matchQuery) return matchQuery[1];
+      return str;
+    }
+
+    function setLocalPathPreset(path) {
+      const input = document.getElementById('settings-input-local-path');
+      if (input) input.value = path;
+    }
+
+    function selectOnboardingPreset(path) {
+      const input = document.getElementById('onboarding-input-local-path');
+      if (input) input.value = path;
+    }
+
+    function openOnboardingStorage() {
+      const modal = document.getElementById('modal-storage-onboarding');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeOnboardingStorage() {
+      const modal = document.getElementById('modal-storage-onboarding');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function skipOnboardingStorage() {
+      localStorage.setItem('ths_has_configured_storage', 'true');
+      closeOnboardingStorage();
+      showToast('Đã dùng đường dẫn mặc định. Bạn có thể đổi lại bất cứ lúc nào trong Cài đặt ⚙️', 'info');
+    }
+
+    async function handleConfirmOnboardingStorage() {
+      const input = document.getElementById('onboarding-input-local-path');
+      const path = input ? input.value.trim() : 'D:\\ThacSi_HTTT\\Mon_Hoc';
+
+      const btn = document.getElementById('btn-confirm-onboarding-storage');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Đang lưu...';
+      }
+
+      try {
+        const resp = await fetch(`${WORKER_URL}/api/settings/config`, {
+          method: 'PUT',
+          headers: buildHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            local_base_path: path,
+            root_folder: path,
+          }),
+        });
+        if (!resp.ok) throw new Error('Không thể lưu cài đặt');
+
+        localStorage.setItem('ths_has_configured_storage', 'true');
+        showToast(`✓ Đã thiết lập thư mục lưu máy tính: ${path}`, 'success');
+        closeOnboardingStorage();
+        await loadSettingsConfig();
+      } catch (err) {
+        showToast(`Lỗi lưu thư mục: ${err.message}`, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>✓ Xác Nhận & Tiếp Tục</span>';
+        }
+      }
+    }
+
     async function loadSettingsConfig() {
       try {
         const resp = await fetch(`${WORKER_URL}/api/settings/config`, {
@@ -1075,14 +2116,44 @@
           const driveNameElem = document.getElementById('settings-drive-name-display');
           const localPathInput = document.getElementById('settings-input-local-path');
           const driveLink = document.getElementById('settings-drive-link');
+          const provBtnText = document.getElementById('btn-provision-drive-text');
 
-          if (driveIdInput) driveIdInput.value = cfg.google_drive_root_folder_id || '';
-          if (driveNameElem) driveNameElem.textContent = cfg.google_drive_root_name || (cfg.google_drive_root_folder_id ? 'Thư mục cá nhân' : 'Chưa thiết lập');
-          if (localPathInput) localPathInput.value = cfg.local_base_path || 'H:\\2026\\Thac Sy\\Mon_Hoc';
+          const rawDriveId = cfg.google_drive_root_folder_id || cfg.drive_root_folder || '';
+          const cleanDriveId = extractDriveId(rawDriveId);
 
-          if (driveLink && cfg.google_drive_root_folder_id) {
-            driveLink.href = `https://drive.google.com/drive/folders/${cfg.google_drive_root_folder_id}`;
-            driveLink.classList.remove('hidden');
+          const resolvedLocalPath = cfg.local_base_path || cfg.root_folder || 'D:\\ThacSi_HTTT\\Mon_Hoc';
+
+          if (driveIdInput) driveIdInput.value = cleanDriveId;
+          if (driveNameElem) driveNameElem.textContent = cfg.google_drive_root_name || (cleanDriveId ? 'ThacSi_HTTT' : 'Chưa thiết lập');
+          if (localPathInput) localPathInput.value = resolvedLocalPath;
+
+          // Cập nhật hiển thị thư mục lưu trên tab Kéo thả Upload
+          const uploadPathDisplay = document.getElementById('upload-local-path-display');
+          if (uploadPathDisplay) uploadPathDisplay.textContent = resolvedLocalPath;
+
+          // Cập nhật hiển thị thư mục lưu trên Modal Thêm môn học
+          const createCoursePathDisplay = document.getElementById('create-course-local-base-display');
+          if (createCoursePathDisplay) createCoursePathDisplay.textContent = resolvedLocalPath;
+
+          if (cleanDriveId) {
+            if (driveLink) {
+              driveLink.href = `https://drive.google.com/drive/folders/${cleanDriveId}`;
+              driveLink.classList.remove('hidden');
+            }
+            if (provBtnText) {
+              provBtnText.textContent = '✓ Thư Mục Đã Sẵn Sàng (Bấm để Đồng Bộ Quyền)';
+            }
+          } else {
+            if (driveLink) driveLink.classList.add('hidden');
+            if (provBtnText) {
+              provBtnText.textContent = '⚡ Tạo Thư Mục Riêng Tự Động';
+            }
+          }
+
+          // Kiểm tra nếu là user mới đăng nhập lần đầu và chưa cấu hình thư mục lưu
+          const token = getIdToken();
+          if (token && !localStorage.getItem('ths_has_configured_storage') && (!cfg.initialized || !cfg.local_base_path)) {
+            openOnboardingStorage();
           }
         }
       } catch (err) {
@@ -1100,7 +2171,7 @@
       const btn = document.getElementById('btn-provision-drive');
       const originalText = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Đang cấp phát...';
+      btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Đang đồng bộ thư mục...';
 
       try {
         const resp = await fetch(`${WORKER_URL}/api/settings/provision-drive`, {
@@ -1112,7 +2183,8 @@
           throw new Error(res.detail || res.error || 'Cấp phát thất bại');
         }
 
-        showToast(`✓ Đã tạo và phân quyền thư mục '${res.folder_name}' thành công!`, 'success');
+        const actionText = res.status === 'reused' ? 'Đã tái sử dụng & đồng bộ quyền' : 'Đã tạo mới & phân quyền';
+        showToast(`✓ ${actionText} thư mục '${res.folder_name}' thành công!`, 'success');
         await loadSettingsConfig();
       } catch (err) {
         showToast(`Cấp phát thất bại: ${err.message}`, 'error');
@@ -1124,7 +2196,8 @@
 
     async function handleSaveSettings(event) {
       event.preventDefault();
-      const driveId = document.getElementById('settings-input-drive-id')?.value.trim();
+      const rawDriveId = document.getElementById('settings-input-drive-id')?.value.trim();
+      const driveId = extractDriveId(rawDriveId);
       const localPath = document.getElementById('settings-input-local-path')?.value.trim();
 
       const btn = document.getElementById('btn-save-settings');
@@ -1138,7 +2211,9 @@
           headers: buildHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             google_drive_root_folder_id: driveId,
+            drive_root_folder: driveId,
             local_base_path: localPath,
+            root_folder: localPath,
           }),
         });
         const res = await resp.json();
@@ -1147,6 +2222,7 @@
         }
 
         showToast('✓ Đã lưu cài đặt thành công!', 'success');
+        localStorage.setItem('ths_has_configured_storage', 'true');
         await loadSettingsConfig();
         setTimeout(closeSettingsModal, 600);
       } catch (err) {
@@ -1163,7 +2239,18 @@
       initDragAndDrop();
       pingWorkerHealth();
       loadCourses();
+      checkSavedUser();
       setTimeout(initGoogleAuth, 1000);
+
+      const driveInputEl = document.getElementById('settings-input-drive-id');
+      if (driveInputEl) {
+        driveInputEl.addEventListener('input', (e) => {
+          const val = e.target.value.trim();
+          if (val.includes('http') || val.includes('drive.google.com') || val.endsWith(':') || val.endsWith('?')) {
+            e.target.value = extractDriveId(val);
+          }
+        });
+      }
     });
   </script>
 </body>

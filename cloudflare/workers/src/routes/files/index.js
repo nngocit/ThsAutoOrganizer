@@ -7,6 +7,7 @@ import checkHashRouter from './check_hash.js';
 import listRouter from './list.js';
 import reviewRouter from './review.js';
 import deleteRouter from './delete.js';
+import retryRouter from './retry.js';
 
 const router = new Hono();
 
@@ -16,6 +17,9 @@ router.route('/upload', uploadRouter);
 // Local Agent Direct Inflow (file đã có sẵn hoặc tải cục bộ)
 router.route('/register', registerRouter);      // POST /api/files/register
 router.route('/check-hash', checkHashRouter);   // POST /api/files/check-hash
+
+// Thử lại tác vụ đồng bộ cho file
+router.route('/', retryRouter);                 // POST /api/files/:id/retry
 
 // Hàng đợi duyệt nguồn (Review Queue)
 router.route('/', reviewRouter);                // GET /api/files/review + POST /api/files/:id/review
