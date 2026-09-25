@@ -141,7 +141,7 @@ Chưa khai token → Worker bỏ qua im lặng, cron ở (b) vẫn chạy. (Tu�
 
 1. ~~`GET /api/tasks/:queue` chỉ trả `pending` trong 50 document đầu~~ → **ĐÃ SỬA (G1)**: mặc định lọc `pending` ngay tại server bằng `runQuery`; có công tắc để quay lại cách cũ.
 2. ~~Task kẹt `processing` không bao giờ được nhặt lại~~ → **ĐÃ SỬA (G2)**: task `processing` quá ngưỡng (mặc định 15 phút) tự được trả về `pending`; có công tắc để tắt.
-3. `drain_once` **không** xử lý `artifact_download` (cần `googleapiclient` + `token.json`) và `reconcile_local` (cần ổ đĩa PC) — hai việc này vẫn để PC làm.
+3. `drain_once` **không** xử lý `artifact_download` (cần `googleapiclient` + `token.json`) và `reconcile_local` (cần ổ đĩa PC) — hai việc này vẫn để PC làm. Runner cloud nhận diện qua `FOREIGN_ACTIONS` và **giữ nguyên pending** (không mark failed) để máy có handler nhặt lại sau.
 4. PA2 không phải host luôn-bật: nó chỉ chạy khi được kích hoạt (bấm tay / dispatch / cron).
 
 ---
