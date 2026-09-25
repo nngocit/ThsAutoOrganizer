@@ -81,8 +81,21 @@ if (-not $ghCmd) {
 if (-not $ghCmd) { throw "Chua cai gh CLI: winget install GitHub.cli" }
 
 $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($authJson))
-$b64 | & $ghCmd secret set NOTEBOOKLM_AUTH_B64 --repo $Repo
-if ($LASTEXITCODE -ne 0) { throw "gh secret set that bai — kiem tra da 'gh auth login' chua." }
+# sanity: base64 phải chỉ gồm alphabet chuẩn
+if ($b64 -notmatch '^[A-Za-z0-9+/=]+$') { throw "b64 khong hop le (ky tu ngoai alphabet)" }
+
+# KHÔNG pipe string trực tiếp cho gh: PowerShell 5.1 (đặc biệt process con không có console)
+# có thể chèn BOM/CRLF vào stdin → GitHub lưu secret hỏng → runner báo "base64: invalid input".
+# Truyền byte thô qua file redirect của cmd thì an toàn ở mọi ngữ cảnh.
+$tmp = Join-Path $env:TEMP ('nlm_auth_b64_' + [guid]::NewGuid().ToString('N') + '.txt')
+[IO.File]::WriteAllText($tmp, $b64, [Text.UTF8Encoding]::new($false))
+try {
+  cmd /c "`"$ghCmd`" secret set NOTEBOOKLM_AUTH_B64 --repo $Repo < `"$tmp`""
+  if ($LASTEXITCODE -ne 0) { throw "gh secret set that bai — kiem tra da 'gh auth login' chua." }
+}
+finally {
+  Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host "OK — da cap nhat NOTEBOOKLM_AUTH_B64 ($($b64.Length) ky tu base64) tren repo $Repo." -ForegroundColor Green
 Write-Host "Chay thu: gh workflow run nlm-drain.yml -f dry_run=false -f max_passes=1"
