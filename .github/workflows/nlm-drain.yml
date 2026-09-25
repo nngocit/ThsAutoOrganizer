@@ -5,7 +5,7 @@
 # Secrets bắt buộc (Settings → Secrets and variables → Actions):
 #   WORKER_URL            = https://ths-organizer-api.ths-organizer-nngocit.workers.dev
 #   AGENT_SECRET          = <agent_secret trong config.json>
-#   NOTEBOOKLM_AUTH_B64   = base64 của %USERPROFILE%\.notebooklm-mcp-cli\profiles\default\auth.json
+#   NOTEBOOKLM_AUTH_B64   = base64 của %USERPROFILE%\.notebooklm-mcp-cli\auth.json  (FILE GỐC, không phải profiles\default\auth.json)
 
 name: NLM Drain
 
@@ -66,14 +66,16 @@ jobs:
         run: echo '{}' > config.json
 
       - name: Khôi phục phiên Google (auth.json) từ Secret
+        # CLI (notebooklm-mcp-cli >= 0.11) đọc ~/.notebooklm-mcp-cli/auth.json (GỐC).
+        # File profiles/default/auth.json không bao giờ được đọc → không được ghi vào đó.
         env:
           AUTH_B64: ${{ secrets.NOTEBOOKLM_AUTH_B64 }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.notebooklm-mcp-cli/profiles/default"
-          printf '%s' "$AUTH_B64" | base64 -d > "$HOME/.notebooklm-mcp-cli/profiles/default/auth.json"
-          chmod 600 "$HOME/.notebooklm-mcp-cli/profiles/default/auth.json"
-          echo "Đã ghi auth.json ($(wc -c < "$HOME/.notebooklm-mcp-cli/profiles/default/auth.json") bytes)"
+          mkdir -p "$HOME/.notebooklm-mcp-cli"
+          printf '%s' "$AUTH_B64" | base64 -d > "$HOME/.notebooklm-mcp-cli/auth.json"
+          chmod 600 "$HOME/.notebooklm-mcp-cli/auth.json"
+          echo "Đã ghi auth.json ($(wc -c < "$HOME/.notebooklm-mcp-cli/auth.json") bytes)"
 
       - name: Smoke test phiên NotebookLM
         if: inputs.dry_run != 'true'
