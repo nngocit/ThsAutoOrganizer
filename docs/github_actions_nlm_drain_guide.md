@@ -56,6 +56,13 @@
 python -c "import json,time,pathlib; p=pathlib.Path.home()/'.notebooklm-mcp-cli/profiles/default'; c=json.loads((p/'cookies.json').read_text(encoding='utf-8')); m=json.loads((p/'metadata.json').read_text(encoding='utf-8')) if (p/'metadata.json').exists() else {}; d={'cookies':c,'csrf_token':m.get('csrf_token') or '','session_id':m.get('session_id') or '','build_label':m.get('build_label') or '','base_host':m.get('base_host') or '','extracted_at':time.time()}; out=pathlib.Path.home()/'.notebooklm-mcp-cli/auth.json'; out.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding='utf-8'); print('OK',out,out.stat().st_size,'bytes')"
 ```
 
+Hoặc dùng **script có sẵn** (sinh `auth.json` gốc + set secret trong 1 lệnh):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\update_nlm_auth_secret.ps1 -CheckOnly   # chỉ kiểm tra phiên còn hạn không
+powershell -ExecutionPolicy Bypass -File scripts\update_nlm_auth_secret.ps1              # sinh auth.json + cập nhật Secret
+```
+
 ```powershell
 # 1) Mã hoá phiên Google thành base64 (Windows PowerShell) rồi copy vào clipboard
 [Convert]::ToBase64String(
@@ -81,24 +88,24 @@ $env:NOTEBOOKLM_AUTH_B64 | gh secret set NOTEBOOKLM_AUTH_B64 --repo nngocit/ThsA
 
 ---
 
-## 5. Bật chế độ tự động (tùy chọn)
+## 5. Chế độ tự động — ĐÃ BẬT
 
-**a) Tự động sau mỗi upload.** Bỏ comment khối `repository_dispatch` trong workflow, rồi thêm vào `cloudflare/workers/src/routes/files/upload.js` (sau bước tạo task):
+**a) Tự động sau mỗi upload (`repository_dispatch`) ✅** Worker tự báo GitHub Actions ngay khi có task NLM mới — gắn **tập trung** ở `cloudflare/workers/src/lib/tasks.js` (hàm `dispatchNlmDrain`, gọi trong `enqueueTask`) nên mọi route upload/AI đều hưởng lợi, không phải sửa từng route.
 
-```js
-if (c.env.GITHUB_DISPATCH_TOKEN) {
-  c.executionCtx.waitUntil(fetch('https://api.github.com/repos/nngocit/ThsAutoOrganizer/dispatches', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${c.env.GITHUB_DISPATCH_TOKEN}`,
-               Accept: 'application/vnd.github+json', 'User-Agent': 'ths-organizer' },
-    body: JSON.stringify({ event_type: 'nlm-drain', client_payload: { file_id: fileId } }),
-  }).catch(() => {}));
-}
+Cần làm **1 lần** (nếu chưa có): tạo PAT fine-grained cho riêng repo này với quyền tối thiểu **Contents: write**, rồi khai cho Worker:
+
+```powershell
+cd cloudflare\workers
+npx wrangler secret put GITHUB_DISPATCH_TOKEN   # dán PAT vào khi được hỏi
 ```
 
-Cần: PAT fine-grained (chỉ repo này; quyền tối thiểu cho endpoint `dispatches` = **Contents: write**) → `wrangler secret put GITHUB_DISPATCH_TOKEN`.
+Chưa khai token → Worker bỏ qua im lặng, cron ở (b) vẫn chạy. (Tuỳ chọn `GITHUB_DISPATCH_REPO` nếu đổi tên repo.)
 
-**b) Cron 15 phút.** Bỏ comment khối `schedule`. Lưu ý GitHub: cron ngắn nhất **5 phút**, lịch **có thể trễ**, và workflow `schedule` **tự bị vô hiệu sau 60 ngày repo không có hoạt động**.
+**b) Quét định kỳ (`schedule`) ✅** — `*/15 * * * *`, an toàn cả khi PC offline hay dispatch thất bại.
+
+- **Bước "Kiểm tra nhanh hàng đợi"**: curl API đếm task có `action` thuộc `CLOUD_ACTIONS` → rỗng thì **skip toàn bộ steps nặng** (run rỗng chỉ ~15 giây ≈ 0,25 phút → cron 96 lần/ngày vẫn nằm trong quota).
+- Danh sách action trong workflow phải khớp `local_agent/drain_once.py` — được test tự động bởi `tests/test_workflow_cloud_actions.py`.
+- Lưu ý GitHub: cron ngắn nhất **5 phút**, lịch **có thể trễ**, và `schedule` **tự vô hiệu sau 60 ngày repo không hoạt động**.
 
 ---
 
@@ -107,7 +114,7 @@ Cần: PAT fine-grained (chỉ repo này; quyền tối thiểu cho endpoint `di
 | Chỉ số | Giá trị |
 |---|---|
 | Runner | `ubuntu-latest` → 2 vCPU / 7 GB / 14 GB SSD |
-| Phút miễn phí | 2.000 phút/tháng (Free plan); mỗi run ~2–3 phút ⇒ ~700–900 run/tháng |
+| Phút miễn phí | 2.000 phút/tháng (Free plan); run có task ~1–3 phút, run rỗng do cron chỉ ~15 giây (nhờ bước quickcheck) → cron `*/15` (~2.880 run/tháng) ước tính chỉ tốn ~700–900 phút |
 | Vượt quota | Job bị chặn nếu chưa có payment method (theo GitHub docs) |
 | Thời lượng job | tối đa 15 phút (đã đặt `timeout-minutes: 15`) |
 | Egress | Không tính tiền ⇒ tải file từ Drive rồi đẩy lên NotebookLM miễn phí |
@@ -119,11 +126,11 @@ Cần: PAT fine-grained (chỉ repo này; quyền tối thiểu cho endpoint `di
 
 | Hiện tượng | Nguyên nhân | Cách xử lý |
 |---|---|---|
-| `nlm notebook list` báo cần đăng nhập | Cookie hết hạn (vài tuần/lần) | Ở nhà `nlm login` → cập nhật Secret `NOTEBOOKLM_AUTH_B64` |
+| `nlm notebook list` báo cần đăng nhập | Cookie hết hạn (vài tuần/lần) | Ở nhà `nlm login` → chạy `scripts\update_nlm_auth_secret.ps1` (tự sinh `auth.json` + cập nhật Secret), hoặc xem mục 3 |
 | Lỗi sign-in/verification dù cookie mới | IP datacenter bị Google từ chối | Thử lại vài lần; nếu luôn lỗi ⇒ PA2 không dùng được với tài khoản này |
 | `browser_bound_replay` (khi chạy `nlm doctor auth-replay`) | Cookie chỉ dùng được trong browser thật | PA2 vô hiệu ⇒ chuyển PA1 (Termux) hoặc PA4 (nạp tay trong Web UI) |
 | Badge đứng ở "Đang nạp..." nhưng log xanh | Task nằm ngoài 50 doc đầu của queue (`routes/sync/index.js:159-165`) | Bấm "🔄 Nạp lại tệp chờ sync" (route `retry.js`) hoặc xem mục 8 |
-| Task kẹt `processing` (job timeout giữa chừng) | `GET /api/tasks` chỉ trả `pending` | Nút retry thủ công; nên bổ sung cron reset stale (mục 8) |
+| Task kẹt `processing` (job timeout giữa chừng) | Runner bị kill giữa chừng | **ĐÃ CÓ (G2)**: cron 15' tự trả task về `pending`; hoặc bấm "♻️ Hồi phục ngay" trong Cài đặt (mục 10) |
 | Nguồn bị nạp trùng trong notebook | 2 run chồng nhau | Đã chặn bằng `concurrency: group: nlm-drain` — không bỏ khối này |
 | Workflow tự ngừng chạy sau ~2 tháng | `schedule` bị vô hiệu do repo không hoạt động | Bấm Run lại / dispatch, hoặc commit bất kỳ |
 | File không được nhận vào notebook | > 50 MB hoặc > 1000 trang | Chẻ nhỏ tài liệu rồi upload lại |

@@ -14,6 +14,40 @@ export const NLM_ACTIONS = [
 ];
 export const DRIVE_ACTIONS = ['move_to_archive', 'soft_delete_local', 'hard_delete'];
 
+/**
+ * Báo GitHub Actions chạy ngay workflow "NLM Drain" khi có task NLM mới
+ * (repository_dispatch event_type=nlm-drain) → nạp không cần chờ cron 15 phút.
+ *
+ * - Thiếu Worker secret GITHUB_DISPATCH_TOKEN → bỏ qua im lặng (cron vẫn chạy).
+ * - LỖI MẠNG KHÔNG ĐƯỢC làm hỏng request chính: chỉ log warning.
+ * - Await (không dùng fire-and-forget) để Worker không cắt promise khi response trả về.
+ */
+async function dispatchNlmDrain(env, queue, action) {
+  const token = env.GITHUB_DISPATCH_TOKEN;
+  if (!token || queue !== NLM_QUEUE) return;
+  const repo = env.GITHUB_DISPATCH_REPO || 'nngocit/ThsAutoOrganizer';
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+        'User-Agent': 'ths-organizer',
+      },
+      body: JSON.stringify({ event_type: 'nlm-drain', client_payload: { queue, action: action || '' } }),
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+        ? AbortSignal.timeout(5000)
+        : undefined,
+    });
+    if (res.ok) console.log(`[Dispatch] Đã báo GitHub Actions chạy NLM Drain (${action})`);
+    else console.warn(`[Dispatch] GitHub từ chối (${res.status}) cho action=${action}`);
+  } catch (err) {
+    console.warn(`[Dispatch] Không gửi được (bỏ qua): ${err.message}`);
+  }
+}
+
 /** Ghi 1 task vào queue; trả về task id (= job_id phía client) */
 export async function enqueueTask(env, queue, payload) {
   const taskId = crypto.randomUUID();
@@ -23,6 +57,7 @@ export async function enqueueTask(env, queue, payload) {
     created_at: new Date().toISOString(),
     ...payload,
   });
+  await dispatchNlmDrain(env, queue, payload.action);
   return taskId;
 }
 

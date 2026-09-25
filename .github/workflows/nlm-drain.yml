@@ -20,12 +20,15 @@ on:
         description: "Chỉ kiểm tra cấu hình, không gọi API (true/false)"
         required: false
         default: "false"
-  # Bật khi muốn Worker tự kích hoạt sau mỗi lần upload (cần PAT quyền Contents: write):
-  # repository_dispatch:
-  #   types: [nlm-drain]
-  # Quét định kỳ (cron ngắn nhất 5 phút; workflow schedule tự tắt sau 60 ngày repo không hoạt động):
-  # schedule:
-  #   - cron: '*/15 * * * *'
+  # TỰ ĐỘNG #1 — Worker báo ngay khi có task mới (upload từ điện thoại → chạy liền).
+  #   Cần Worker secret GITHUB_DISPATCH_TOKEN (PAT fine-grained, quyền Contents: write). Chưa có thì bỏ qua im lặng.
+  repository_dispatch:
+    types: [nlm-drain]
+  # TỰ ĐỘNG #2 — Quét định kỳ, an toàn cả khi PC offline / dispatch thất bại.
+  #   Lưu ý GitHub: cron ngắn nhất 5 phút, lịch có thể trễ, và schedule tự tắt sau 60 ngày repo không hoạt động.
+  #   Bước "Kiểm tra nhanh hàng đợi" bên dưới giúp run rỗng chỉ tốn ~15 giây.
+  schedule:
+    - cron: '*/15 * * * *'
 
 # Chặn 2 run chồng nhau để không nạp trùng nguồn vào cùng một notebook
 concurrency:
@@ -45,29 +48,57 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Kiểm tra nhanh hàng đợi (chỉ schedule/dispatch — bỏ qua nếu rỗng)
+        # Run tay (workflow_dispatch) luôn chạy đủ để test. Job "rỗng" chỉ tốn ~15 giây
+        # (thay vì ~35 giây) → giữ quota 2.000 phút/tháng khi cron chạy 96 lần/ngày.
+        id: quickcheck
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+          AGENT_SECRET: ${{ secrets.AGENT_SECRET }}
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 15 -H "X-Agent-Secret: ${AGENT_SECRET}" \
+            "${WORKER_URL}/api/tasks/nlm_task_queue" > /tmp/q.json
+          python3 - <<'PY'
+          import json, os, pathlib
+          # GIỮ ĐỒNG BỘ với CLOUD_ACTIONS trong local_agent/drain_once.py (tests/test_workflow_cloud_actions.py kiểm tra)
+          CLOUD = {'source_add', 'source_remove', 'course_create', 'chat_query', 'research_start', 'exam_generate'}
+          tasks = json.load(open('/tmp/q.json', encoding='utf-8')).get('tasks', [])
+          n = sum(1 for t in tasks if t.get('action') in CLOUD)
+          print(f'pending_cloud={n} / total_pending={len(tasks)}')
+          pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='utf-8').write(f'skip={"true" if n == 0 else "false"}\n')
+          PY
+
       - name: Setup Python 3.12
+        if: steps.quickcheck.outputs.skip != 'true'
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.x (pin SHA)
         with:
           python-version: "3.12"
           cache: "pip"
 
       - name: Thông tin môi trường runner
+        if: steps.quickcheck.outputs.skip != 'true'
         run: |
           echo "CPU: $(nproc) core"; free -h | head -2; df -h / | tail -1; python -V
 
       - name: Cài dependencies (chỉ 2 gói)
+        if: steps.quickcheck.outputs.skip != 'true'
         run: pip install --quiet --disable-pip-version-check notebooklm-mcp-cli requests
 
       - name: Đảm bảo lệnh `nlm` có trên PATH
+        if: steps.quickcheck.outputs.skip != 'true'
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Tạo config.json rỗng
         # config.json bị .gitignore → giá trị thật lấy từ Secrets qua biến môi trường
+        if: steps.quickcheck.outputs.skip != 'true'
         run: echo '{}' > config.json
 
       - name: Khôi phục phiên Google (auth.json) từ Secret
         # CLI (notebooklm-mcp-cli >= 0.11) đọc ~/.notebooklm-mcp-cli/auth.json (GỐC).
         # File profiles/default/auth.json không bao giờ được đọc → không được ghi vào đó.
+        if: steps.quickcheck.outputs.skip != 'true'
         env:
           AUTH_B64: ${{ secrets.NOTEBOOKLM_AUTH_B64 }}
         run: |
@@ -78,10 +109,11 @@ jobs:
           echo "Đã ghi auth.json ($(wc -c < "$HOME/.notebooklm-mcp-cli/auth.json") bytes)"
 
       - name: Smoke test phiên NotebookLM
-        if: inputs.dry_run != 'true'
+        if: steps.quickcheck.outputs.skip != 'true' && inputs.dry_run != 'true'
         run: nlm notebook list --json > /dev/null && echo "Phiên NotebookLM OK"
 
       - name: Drain hàng đợi (source_add → NotebookLM)
+        if: steps.quickcheck.outputs.skip != 'true'
         env:
           WORKER_URL: ${{ secrets.WORKER_URL }}
           AGENT_SECRET: ${{ secrets.AGENT_SECRET }}
