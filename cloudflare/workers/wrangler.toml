@@ -8,9 +8,16 @@ ENVIRONMENT = "production"
 DEFAULT_DRIVE_ROOT = "1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg"
 DEFAULT_LOCAL_PATH = "D:\\ThacSi_HTTT\\Mon_Hoc"
 
+# ── Công tắc hàng đợi task (G1 + G2) ──
+# Có thể chỉnh NGAY trên Web UI (Cài đặt → Bảo trì hàng đợi) vì giá trị trong Firestore
+# (system_config/default) được ưu tiên hơn các biến dưới đây. Đặt ở đây khi muốn ép cứng.
+# TASKS_QUERY_MODE = "query"        # "query" = lọc pending phía server (chống bỏ sót) | "legacy" = cách cũ
+# TASKS_RECOVERY_ENABLED = "true"   # tự trả task kẹt 'processing' về 'pending'
+# TASKS_STALE_MINUTES = "15"        # ngưỡng coi là kẹt (phút)
+
 
 [triggers]
-crons = ["0 2 * * *"]
+crons = ["0 2 * * *", "*/15 * * * *"]
 
 # Secrets — set via: wrangler secret put <SECRET_NAME>
 # FIREBASE_SERVICE_ACCOUNT  — JSON string của Firebase Service Account key (dùng cho Firestore & Google Drive JWT 24/7)

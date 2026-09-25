@@ -4,8 +4,14 @@
 const FIRESTORE_BASE = (projectId) =>
   `https://asia-southeast1-firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
-/** Lấy access token từ service account qua JWT Bearer assertion */
-async function getAccessToken(serviceAccount) {
+/** Base URL của Firestore REST documents (dùng cho runQuery / phân trang) */
+export function firestoreRestBaseUrl(env) {
+  const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
+  return FIRESTORE_BASE(sa.project_id);
+}
+
+/** Export dùng chung cho các module Firestore khác (ví dụ firestore_query.js) */
+export async function getAccessToken(serviceAccount) {
   const now = Math.floor(Date.now() / 1000);
   const payload = {
     iss: serviceAccount.client_email,

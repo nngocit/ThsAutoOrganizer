@@ -80,15 +80,20 @@ class FirestorePoller:
         except requests.RequestException as e:
             logger.warning("[%s] Không thể mark task %s: %s", self.queue_name, task_id, e)
 
-    def _process_task(self, task: dict) -> None:
-        """Xử lý một task: tìm handler phù hợp và chạy."""
+    def _process_task(self, task: dict) -> str:
+        """Xử lý một task: tìm handler phù hợp và chạy.
+
+        Returns:
+            Trạng thái đã báo về Worker: 'done' | 'skipped_ext' |
+            'skipped_no_course' | 'failed' | 'no_handler'.
+        """
         task_id = task.get("id", "unknown")
         action = task.get("action", "")
 
         if action not in self._handlers:
             logger.warning("[%s] Không có handler cho action '%s'", self.queue_name, action)
             self._mark_task(task_id, "failed", error=f"No handler for action: {action}")
-            return
+            return "no_handler"
 
         # Mark processing trước khi chạy
         self._mark_task(task_id, "processing")
@@ -102,15 +107,68 @@ class FirestorePoller:
             if result == "skipped_ext":
                 self._mark_task(task_id, "skipped_ext", result="skipped_ext")
                 logger.info("[%s] Task %s (%s) bỏ qua (skipped_ext)", self.queue_name, task_id, action)
+                return "skipped_ext"
             elif result == "skipped_no_course":
                 self._mark_task(task_id, "skipped_no_course", result="skipped_no_course")
                 logger.info("[%s] Task %s (%s) bỏ qua (skipped_no_course)", self.queue_name, task_id, action)
+                return "skipped_no_course"
             else:
                 self._mark_task(task_id, "done", result=result or "")
                 logger.info("[%s] Task %s (%s) hoàn tất", self.queue_name, task_id, action)
+                return "done"
         except Exception as exc:
             logger.exception("[%s] Task %s (%s) thất bại: %s", self.queue_name, task_id, action, exc)
             self._mark_task(task_id, "failed", error=str(exc))
+            return "failed"
+
+    # ---------- Chế độ "chạy rồi thoát" (drain) cho GitHub Actions / Termux ----------
+
+    def fetch_pending(self) -> list[dict]:
+        """Public wrapper: lấy danh sách task đang pending của queue này."""
+        return self._get_pending_tasks()
+
+    def run_once(self) -> dict[str, int]:
+        """Xử lý đúng MỘT vòng: nhặt toàn bộ task pending hiện có rồi trả về thống kê.
+
+        Returns:
+            {"processed": n, "done": n, "failed": n, "skipped": n, "no_handler": n}
+        """
+        summary = {"processed": 0, "done": 0, "failed": 0, "skipped": 0, "no_handler": 0}
+        for task in self._get_pending_tasks():
+            status = self._process_task(task)
+            summary["processed"] += 1
+            if status == "done":
+                summary["done"] += 1
+            elif status == "failed":
+                summary["failed"] += 1
+            elif status == "no_handler":
+                summary["no_handler"] += 1
+            else:
+                summary["skipped"] += 1
+        return summary
+
+    def run_until_idle(self, max_passes: int = 30, idle_sleep: float = 5.0) -> dict[str, int]:
+        """Chạy nhiều vòng cho tới khi hàng đợi rỗng (luôn hữu hạn vòng).
+
+        Dùng cho môi trường "chạy rồi thoát" (GitHub Actions / Termux) — KHÁC với
+        start() vốn chạy thread nền vô hạn cho PC.
+
+        Args:
+            max_passes: số vòng tối đa (chặn treo vô hạn).
+            idle_sleep: giây nghỉ giữa 2 vòng để không dồn dập API.
+        """
+        total = {"processed": 0, "done": 0, "failed": 0, "skipped": 0,
+                 "no_handler": 0, "passes": 0}
+        for _ in range(max(1, int(max_passes))):
+            one = self.run_once()
+            total["passes"] += 1
+            for key in ("processed", "done", "failed", "skipped", "no_handler"):
+                total[key] += one[key]
+            if one["processed"] == 0:
+                break
+            if idle_sleep > 0:
+                time.sleep(idle_sleep)
+        return total
 
     def _poll_loop(self) -> None:
         """Vòng lặp poll chính — chạy trong thread daemon."""

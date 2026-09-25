@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { optionsResponse, isAllowedOrigin } from './lib/cors.js';
 import { handleHardDelete } from './cron/hard_delete.js';
+import { recoverStaleTasks } from './cron/task_recovery.js';
 
 // Route modules
 import authRouter from './routes/auth/index.js';
@@ -84,6 +85,14 @@ export default {
   fetch: app.fetch,
   async scheduled(event, env, ctx) {
     console.log(`[Cron] Trigger: ${event.cron} at ${new Date().toISOString()}`);
+
+    // G2: hồi phục task kẹt 'processing' (tự bỏ qua nếu công tắc đang tắt)
+    ctx.waitUntil(
+      recoverStaleTasks(env).catch((err) =>
+        console.error('[Cron] TaskRecovery lỗi:', err.message)
+      )
+    );
+
     if (event.cron === '0 2 * * *') {
       ctx.waitUntil(handleHardDelete(env));
     }

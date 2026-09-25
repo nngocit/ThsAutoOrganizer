@@ -6,8 +6,12 @@ import { requireAuth, requireAuthOrAgent, resolveTargetUid, getFallbackUid } fro
 import { firestoreGet, firestoreSet, fromFirestoreDoc } from '../../lib/firebase.js';
 import { createDriveFolder, setDriveWriterPermission, setDriveAnyonePermission, findDriveFolderByName } from '../../lib/drive.js';
 import { withCors } from '../../lib/cors.js';
+import taskFlagsRouter from './task_flags.js';
 
 const router = new Hono();
+
+// Công tắc tính năng hàng đợi (G1: truy vấn pending phía server, G2: hồi phục task kẹt)
+router.route('/task-flags', taskFlagsRouter);
 
 export const DEFAULT_DRIVE_ROOT = '1xAZK2zEeqgm2zN5_37ZafJPqYFhtuXtg'; // ThacSi_HTTT master root folder fallback
 export const DEFAULT_LOCAL_PATH = 'D:\\ThacSi_HTTT\\Mon_Hoc';

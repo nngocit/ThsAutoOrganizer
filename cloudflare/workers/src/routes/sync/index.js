@@ -3,6 +3,9 @@
 import { Hono } from 'hono';
 import { requireAgentAuth, requireAuthOrAgent, resolveTargetUid, getFallbackUid } from '../../lib/auth.js';
 import { firestoreList, firestoreGet, firestoreSet, fromFirestoreDoc } from '../../lib/firebase.js';
+import { firestoreRunQuery } from '../../lib/firestore_query.js';
+import { getTaskFlags } from '../../lib/feature_flags.js';
+import { recoverStaleTasks } from '../../cron/task_recovery.js';
 import { listDriveSubfolders } from '../../lib/drive.js';
 import { withCors } from '../../lib/cors.js';
 
@@ -157,14 +160,30 @@ router.get('/:queue', requireAgentAuth(async (c) => {
 
   try {
     const limit = parseInt(c.req.query('limit') || '10', 10);
-    const resp = await firestoreList(c.env, queueName, Math.min(limit, 50));
-    const allDocs = (resp.documents || []).map(fromFirestoreDoc);
+    const flags = await getTaskFlags(c.env);
+    let pendingTasks = [];
 
-    const pendingTasks = allDocs
-      .filter((t) => t.status === 'pending')
-      .slice(0, limit);
+    if (flags.queryMode === 'query') {
+      // G1: lọc 'pending' NGAY TẠI SERVER (tránh bỏ sót task khi collection lớn)
+      pendingTasks = await firestoreRunQuery(c.env, queueName, {
+        fieldPath: 'status',
+        value: 'pending',
+        limit: Math.min(limit, 100),
+      });
+      // FIFO: task cũ nhất trước (created_at là ISO-8601 nên so sánh chuỗi là đủ)
+      pendingTasks.sort((a, b) =>
+        String(a.created_at || '').localeCompare(String(b.created_at || ''))
+      );
+    } else {
+      // Chế độ cũ — bật lại bằng công tắc tasks_query_mode='legacy'
+      const resp = await firestoreList(c.env, queueName, Math.min(limit, 50));
+      pendingTasks = (resp.documents || [])
+        .map(fromFirestoreDoc)
+        .filter((t) => t.status === 'pending')
+        .slice(0, limit);
+    }
 
-    return withCors(c.json({ tasks: pendingTasks, queue: queueName }), origin);
+    return withCors(c.json({ tasks: pendingTasks, queue: queueName, mode: flags.queryMode }), origin);
   } catch (err) {
     console.error(`Get tasks ${queueName} error:`, err);
     return withCors(c.json({ error: 'Không thể lấy tasks', detail: err.message }, 500), origin);
@@ -245,6 +264,27 @@ router.patch('/:queue/:taskId', requireAgentAuth(async (c) => {
   } catch (err) {
     console.error(`Update task ${taskId} error:`, err);
     return withCors(c.json({ error: 'Cập nhật task thất bại', detail: err.message }, 500), origin);
+  }
+}));
+
+/**
+ * POST /api/tasks/maintenance/recover
+ * G2: hồi phục (thủ công) các task kẹt 'processing' về 'pending'.
+ * Query: ?force=true → chạy dù công tắc tasks_recovery_enabled đang tắt.
+ * Cho phép cả user (Bearer) lẫn agent (X-Agent-Secret).
+ */
+router.post('/maintenance/recover', requireAuthOrAgent(async (c) => {
+  const origin = c.req.header('Origin') || '';
+
+  try {
+    const force = ['1', 'true', 'yes'].includes(
+      String(c.req.query('force') || '').trim().toLowerCase()
+    );
+    const stats = await recoverStaleTasks(c.env, { force });
+    return withCors(c.json({ status: 'ok', ...stats }), origin);
+  } catch (err) {
+    console.error('Task recovery error:', err);
+    return withCors(c.json({ error: 'Hồi phục task thất bại', detail: err.message }, 500), origin);
   }
 }));
 

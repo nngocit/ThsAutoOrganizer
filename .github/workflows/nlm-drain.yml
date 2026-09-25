@@ -1,0 +1,90 @@
+# .github/workflows/nlm-drain.yml
+# Nạp tài liệu từ Google Drive vào NotebookLM bằng runner của GitHub (thay PC ở nhà).
+# Repo PRIVATE → runner 2 vCPU / 7 GB RAM / 14 GB SSD, trừ vào 2.000 phút/tháng (Free plan).
+#
+# Secrets bắt buộc (Settings → Secrets and variables → Actions):
+#   WORKER_URL            = https://ths-organizer-api.ths-organizer-nngocit.workers.dev
+#   AGENT_SECRET          = <agent_secret trong config.json>
+#   NOTEBOOKLM_AUTH_B64   = base64 của %USERPROFILE%\.notebooklm-mcp-cli\profiles\default\auth.json
+
+name: NLM Drain
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_passes:
+        description: "Số vòng poll tối đa"
+        required: false
+        default: "30"
+      dry_run:
+        description: "Chỉ kiểm tra cấu hình, không gọi API (true/false)"
+        required: false
+        default: "false"
+  # Bật khi muốn Worker tự kích hoạt sau mỗi lần upload (cần PAT quyền Contents: write):
+  # repository_dispatch:
+  #   types: [nlm-drain]
+  # Quét định kỳ (cron ngắn nhất 5 phút; workflow schedule tự tắt sau 60 ngày repo không hoạt động):
+  # schedule:
+  #   - cron: '*/15 * * * *'
+
+# Chặn 2 run chồng nhau để không nạp trùng nguồn vào cùng một notebook
+concurrency:
+  group: nlm-drain
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.x (pin SHA)
+        with:
+          persist-credentials: false
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.x (pin SHA)
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Thông tin môi trường runner
+        run: |
+          echo "CPU: $(nproc) core"; free -h | head -2; df -h / | tail -1; python -V
+
+      - name: Cài dependencies (chỉ 2 gói)
+        run: pip install --quiet --disable-pip-version-check notebooklm-mcp-cli requests
+
+      - name: Đảm bảo lệnh `nlm` có trên PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Tạo config.json rỗng
+        # config.json bị .gitignore → giá trị thật lấy từ Secrets qua biến môi trường
+        run: echo '{}' > config.json
+
+      - name: Khôi phục phiên Google (auth.json) từ Secret
+        env:
+          AUTH_B64: ${{ secrets.NOTEBOOKLM_AUTH_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.notebooklm-mcp-cli/profiles/default"
+          printf '%s' "$AUTH_B64" | base64 -d > "$HOME/.notebooklm-mcp-cli/profiles/default/auth.json"
+          chmod 600 "$HOME/.notebooklm-mcp-cli/profiles/default/auth.json"
+          echo "Đã ghi auth.json ($(wc -c < "$HOME/.notebooklm-mcp-cli/profiles/default/auth.json") bytes)"
+
+      - name: Smoke test phiên NotebookLM
+        if: inputs.dry_run != 'true'
+        run: nlm notebook list --json > /dev/null && echo "Phiên NotebookLM OK"
+
+      - name: Drain hàng đợi (source_add → NotebookLM)
+        env:
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+          AGENT_SECRET: ${{ secrets.AGENT_SECRET }}
+          LOCAL_BASE_PATH: ${{ runner.temp }}/Mon_Hoc
+        run: |
+          python -m local_agent.drain_once \
+            --max-passes "${{ inputs.max_passes || '30' }}" \
+            ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
