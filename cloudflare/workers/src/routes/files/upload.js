@@ -6,6 +6,7 @@ import { requireAuthOrAgent, resolveTargetUid, getFallbackUid } from '../../lib/
 import { firestoreGet, firestoreSet, fromFirestoreDoc } from '../../lib/firebase.js';
 import { uploadFileToDrive, setDrivePublicReader, setDriveWriterPermission } from '../../lib/drive.js';
 import { withCors } from '../../lib/cors.js';
+import { enqueueTask, NLM_QUEUE } from '../../lib/tasks.js';
 
 const router = new Hono();
 
@@ -113,11 +114,9 @@ router.post('/', requireAuthOrAgent(async (c) => {
     };
     await firestoreSet(c.env, `users/${targetUid}/files/${fileId}`, fileRecord);
 
-    // 6. Tạo task trong nlm_task_queue cho Local Agent nạp AI và tải bản sao local
-    const taskId = crypto.randomUUID();
+    // 6. Tạo task trong nlm_task_queue và tự động dispatch GitHub Actions
     const courseName = course.display_name || course.name || '';
-    await firestoreSet(c.env, `nlm_task_queue/${taskId}`, {
-      id: taskId,
+    const taskId = await enqueueTask(c.env, NLM_QUEUE, {
       action: 'source_add',
       file_id: fileId,
       filename: file.name,
@@ -133,8 +132,6 @@ router.post('/', requireAuthOrAgent(async (c) => {
       local_base_path: localBasePath,
       uid: targetUid,
       owner_email: c.get('user')?.email || '',
-      status: 'pending',
-      created_at: now,
     });
 
     return withCors(c.json({

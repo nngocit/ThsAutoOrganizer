@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { requireAuthOrAgent, resolveTargetUid, getFallbackUid } from '../../lib/auth.js';
 import { firestoreGet, firestoreSet, fromFirestoreDoc } from '../../lib/firebase.js';
 import { withCors } from '../../lib/cors.js';
+import { enqueueTask, NLM_QUEUE } from '../../lib/tasks.js';
 
 const router = new Hono();
 
@@ -22,16 +23,14 @@ router.post('/:id/retry', requireAuthOrAgent(async (c) => {
     }
 
     const file = fromFirestoreDoc(fileDoc);
-    const taskId = crypto.randomUUID();
     const now = new Date().toISOString();
 
     const courseName = file.course_name || file.subject || '';
     const localFolderName = file.local_folder_name || file.subject || '';
     const driveViewLink = file.drive_view_link || file.webViewLink || (file.drive_file_id ? `https://drive.google.com/file/d/${file.drive_file_id}/view` : '');
 
-    // Re-queue task in nlm_task_queue
-    await firestoreSet(c.env, `nlm_task_queue/${taskId}`, {
-      id: taskId,
+    // Re-queue task in nlm_task_queue và tự động dispatch GitHub Actions
+    const taskId = await enqueueTask(c.env, NLM_QUEUE, {
       action: 'source_add',
       file_id: fileId,
       filename: file.filename,
@@ -46,8 +45,6 @@ router.post('/:id/retry', requireAuthOrAgent(async (c) => {
       local_path: file.local_path || (localFolderName ? `${localFolderName}/${file.filename}` : file.filename),
       uid: targetUid,
       owner_email: c.get('user')?.email || '',
-      status: 'pending',
-      created_at: now,
     });
 
     // Update file status
