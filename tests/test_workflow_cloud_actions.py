@@ -39,9 +39,18 @@ def test_quickcheck_skipped_on_manual_dispatch():
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "if: github.event_name != 'workflow_dispatch'" in text
     # Mọi bước nặng phải có guard skip để run rỗng không tốn phút Actions
-    for step in ["Setup Python 3.12", "Cài dependencies (chỉ 2 gói)",
+    for step in ["Cài đặt uv (Astral)", "Cài dependencies (chỉ 2 gói qua uv)",
                  "Khôi phục phiên Google (auth.json) từ Secret", "Drain hàng đợi (source_add → NotebookLM)"]:
         idx = text.find(f"- name: {step}")
         assert idx != -1, f"Không thấy bước {step}"
         block = text[idx:idx + 400]
         assert "steps.quickcheck.outputs.skip != 'true'" in block, f"Bước {step} thiếu guard quickcheck"
+
+
+def test_concurrency_group_scoped_per_course_or_notebook():
+    """Concurrency group phải phân nhánh theo course_id / notebook_id để runner chạy song song giữa các môn."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert re.search(r"group:\s*nlm-drain-\$\{\{\s*github\.event\.client_payload\.course_id\s*\|\|\s*github\.event\.client_payload\.notebook_id\s*\|\|\s*github\.run_id\s*\}\}", text), (
+        "Concurrency group phải là biểu thức nlm-drain-${{ github.event.client_payload.course_id || github.event.client_payload.notebook_id || github.run_id }}"
+    )
+

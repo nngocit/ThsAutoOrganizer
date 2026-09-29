@@ -1993,6 +1993,15 @@
       showToast('Đăng nhập Google thành công!', 'success');
       checkSavedUser();
       loadCourses();
+
+      if (window._cliPortWaiting) {
+        try {
+          const payload = JSON.parse(atob(idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          fetch(`http://127.0.0.1:${window._cliPortWaiting}/callback?uid=${payload.sub}`)
+            .then(() => showToast("Đã xác thực cho ứng dụng máy tính! Bạn có thể đóng tab này.", "success", 10000))
+            .catch(() => showToast("Không thể kết nối đến máy tính. Hãy chắc chắn Terminal đang chạy.", "error"));
+        } catch(e){}
+      }
     }
 
     function checkSavedUser() {
@@ -2363,6 +2372,24 @@
             e.target.value = extractDriveId(val);
           }
         });
+      }
+
+      // CLI Login Handler
+      const urlParams = new URLSearchParams(window.location.search);
+      const cliPort = urlParams.get('cli_login');
+      if (cliPort) {
+        const token = getIdToken();
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            fetch(`http://127.0.0.1:${cliPort}/callback?uid=${payload.sub}`)
+              .then(() => showToast("Đã xác thực cho ứng dụng máy tính! Bạn có thể đóng tab này.", "success", 10000))
+              .catch(() => showToast("Không thể kết nối đến máy tính. Hãy chắc chắn Terminal đang chạy.", "error", 10000));
+          } catch(e) {}
+        } else {
+          showToast("Đang kết nối... Vui lòng đăng nhập Google để hoàn tất xác thực máy tính.", "info", 6000);
+          window._cliPortWaiting = cliPort;
+        }
       }
     });
   </script>

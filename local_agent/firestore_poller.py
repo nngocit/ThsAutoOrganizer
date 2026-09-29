@@ -61,7 +61,10 @@ class FirestorePoller:
         """Lấy danh sách pending tasks từ Worker API."""
         worker_url = get("worker_url", "").rstrip("/")
         limit = get("task_queue_limit", 10)
+        uid = get("uid", "")
         url = f"{worker_url}/api/tasks/{self.queue_name}?limit={limit}"
+        if uid:
+            url += f"&uid={uid}"
         try:
             resp = self._session.get(url, headers=self._auth_headers(), timeout=30)
             resp.raise_for_status()

@@ -15,6 +15,7 @@ _DEFAULTS: dict[str, Any] = {
     "local_base_path": str(Path.home() / "2026" / "Thac Sy" / "Mon_Hoc"),
     "drive_archive_folder": "_Archive_Trash_90Days",
     "log_level": "INFO",
+    "uid": "",
 }
 
 _CONFIG_FILE = Path(__file__).parent.parent / "config.json"
@@ -64,6 +65,8 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
         merged["worker_url"] = os.environ["WORKER_URL"]
     if os.environ.get("AGENT_SECRET"):
         merged["agent_secret"] = os.environ["AGENT_SECRET"]
+    if os.environ.get("UID"):
+        merged["uid"] = os.environ["UID"]
     env_local = os.environ.get("LOCAL_BASE_PATH") or os.environ.get("ROOT_FOLDER")
     if env_local:
         merged["local_base_path"] = env_local

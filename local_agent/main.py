@@ -49,6 +49,11 @@ def _shutdown_handler(signum, frame):
 
 def main():
     """Khởi động Python Local Agent."""
+    if len(sys.argv) > 1 and sys.argv[1] == "login":
+        from .cli_login import run_login
+        run_login()
+        sys.exit(0)
+
     # Load config
     try:
         cfg = load_config()

@@ -160,27 +160,35 @@ router.get('/:queue', requireAgentAuth(async (c) => {
 
   try {
     const limit = parseInt(c.req.query('limit') || '10', 10);
+    const filterUid = c.req.query('uid');
     const flags = await getTaskFlags(c.env);
     let pendingTasks = [];
 
     if (flags.queryMode === 'query') {
       // G1: lọc 'pending' NGAY TẠI SERVER (tránh bỏ sót task khi collection lớn)
-      pendingTasks = await firestoreRunQuery(c.env, queueName, {
+      let rawTasks = await firestoreRunQuery(c.env, queueName, {
         fieldPath: 'status',
         value: 'pending',
-        limit: Math.min(limit, 100),
+        limit: filterUid ? Math.min(limit * 5, 300) : Math.min(limit, 100),
       });
+      if (filterUid) {
+        rawTasks = rawTasks.filter(t => t.uid === filterUid);
+      }
+      pendingTasks = rawTasks.slice(0, limit);
       // FIFO: task cũ nhất trước (created_at là ISO-8601 nên so sánh chuỗi là đủ)
       pendingTasks.sort((a, b) =>
         String(a.created_at || '').localeCompare(String(b.created_at || ''))
       );
     } else {
       // Chế độ cũ — bật lại bằng công tắc tasks_query_mode='legacy'
-      const resp = await firestoreList(c.env, queueName, Math.min(limit, 50));
-      pendingTasks = (resp.documents || [])
+      const resp = await firestoreList(c.env, queueName, Math.min(limit * (filterUid ? 5 : 1), 100));
+      let rawTasks = (resp.documents || [])
         .map(fromFirestoreDoc)
-        .filter((t) => t.status === 'pending')
-        .slice(0, limit);
+        .filter((t) => t.status === 'pending');
+      if (filterUid) {
+        rawTasks = rawTasks.filter(t => t.uid === filterUid);
+      }
+      pendingTasks = rawTasks.slice(0, limit);
     }
 
     return withCors(c.json({ tasks: pendingTasks, queue: queueName, mode: flags.queryMode }), origin);

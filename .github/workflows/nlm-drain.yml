@@ -30,9 +30,9 @@ on:
   schedule:
     - cron: '*/15 * * * *'
 
-# Chặn 2 run chồng nhau để không nạp trùng nguồn vào cùng một notebook
+# Chặn 2 run chồng nhau cho cùng một notebook/môn học (cho phép chạy song song giữa các môn khác nhau)
 concurrency:
-  group: nlm-drain
+  group: nlm-drain-${{ github.event.client_payload.course_id || github.event.client_payload.notebook_id || github.run_id }}
   cancel-in-progress: false
 
 permissions:
@@ -70,21 +70,21 @@ jobs:
           pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='utf-8').write(f'skip={"true" if n == 0 else "false"}\n')
           PY
 
-      - name: Setup Python 3.12
+      - name: Cài đặt uv (Astral)
         if: steps.quickcheck.outputs.skip != 'true'
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.x (pin SHA)
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0 (pin SHA)
         with:
+          enable-cache: true
           python-version: "3.12"
-          cache: "pip"
 
       - name: Thông tin môi trường runner
         if: steps.quickcheck.outputs.skip != 'true'
         run: |
-          echo "CPU: $(nproc) core"; free -h | head -2; df -h / | tail -1; python -V
+          echo "CPU: $(nproc) core"; free -h | head -2; df -h / | tail -1; python -V; uv --version
 
-      - name: Cài dependencies (chỉ 2 gói)
+      - name: Cài dependencies (chỉ 2 gói qua uv)
         if: steps.quickcheck.outputs.skip != 'true'
-        run: pip install --quiet --disable-pip-version-check notebooklm-mcp-cli requests
+        run: uv pip install --system --quiet notebooklm-mcp-cli requests
 
       - name: Đảm bảo lệnh `nlm` có trên PATH
         if: steps.quickcheck.outputs.skip != 'true'
@@ -130,8 +130,10 @@ jobs:
         env:
           WORKER_URL: ${{ secrets.WORKER_URL }}
           AGENT_SECRET: ${{ secrets.AGENT_SECRET }}
+          UID: ${{ secrets.OWNER_UID }}
           LOCAL_BASE_PATH: ${{ runner.temp }}/Mon_Hoc
         run: |
           python -m local_agent.drain_once \
             --max-passes "${{ inputs.max_passes || '30' }}" \
+            --max-workers 2 \
             ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
