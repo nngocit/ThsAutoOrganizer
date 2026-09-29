@@ -1835,7 +1835,7 @@
       loadCourses();
       
       // Show NotebookLM manual sync dialog if at least one file succeeded and user hasn't hidden it
-      const hasSuccess = uploadQueue.some(item => item.status === 'done');
+      const hasSuccess = _queue.some(item => item.status === 'done');
       if (hasSuccess && !localStorage.getItem('hide_nlm_manual_dialog')) {
         setTimeout(() => {
           const modal = document.getElementById('modal-nlm-sync');
