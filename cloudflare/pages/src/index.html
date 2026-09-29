@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ThsAutoOrganizer — Sổ Ghi Chú Môn Học</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -13,23 +16,43 @@
         extend: {
           colors: {
             brand: {
-              50: '#eff6ff',
-              100: '#dbeafe',
-              400: '#60a5fa',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
             },
             dark: {
-              bg: '#0B0F17',
-              surface: '#111827',
-              card: '#182234',
-              border: '#1F2937',
-              muted: '#64748B'
+              bg: '#030712',
+              surface: 'rgba(17, 24, 39, 0.7)',
+              card: 'rgba(31, 41, 55, 0.5)',
+              border: 'rgba(255, 255, 255, 0.08)',
+              muted: '#94a3b8'
             }
           },
           fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+          },
+          animation: {
+            'gradient-x': 'gradient-x 15s ease infinite',
+            'float': 'float 6s ease-in-out infinite',
+          },
+          keyframes: {
+            'gradient-x': {
+              '0%, 100%': {
+                'background-size': '200% 200%',
+                'background-position': 'left center'
+              },
+              '50%': {
+                'background-size': '200% 200%',
+                'background-position': 'right center'
+              }
+            },
+            'float': {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-10px)' }
+            }
           }
         }
       }
@@ -51,24 +74,68 @@
     #gsi-container.hidden {
       display: none !important;
     }
+    
+    /* Premium Glassmorphism Background */
+    .premium-bg {
+      background: radial-gradient(circle at 15% 50%, rgba(20, 184, 166, 0.08), transparent 25%),
+                  radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.12), transparent 25%),
+                  radial-gradient(circle at 50% 80%, rgba(139, 92, 246, 0.08), transparent 25%);
+      background-color: #030712;
+      background-attachment: fixed;
+    }
+    
+    /* Glass Panel Utilities */
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+    }
+    
+    .glass-card {
+      background: rgba(31, 41, 55, 0.4);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
+    }
+    .glass-card:hover {
+      background: rgba(31, 41, 55, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+<body class="premium-bg text-slate-100 min-h-screen font-sans flex flex-col antialiased selection:bg-teal-500/30 selection:text-teal-200">
+
+  <!-- Background decorative blobs -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-teal-500/10 blur-[120px] mix-blend-screen animate-float" style="animation-delay: 0s;"></div>
+    <div class="absolute top-[20%] -right-[10%] w-[40%] h-[40%] rounded-full bg-indigo-500/10 blur-[100px] mix-blend-screen animate-float" style="animation-delay: 2s;"></div>
+    <div class="absolute -bottom-[20%] left-[20%] w-[60%] h-[60%] rounded-full bg-purple-500/10 blur-[120px] mix-blend-screen animate-float" style="animation-delay: 4s;"></div>
+  </div>
 
   <!-- ==================== TOPBAR HEADER ==================== -->
-  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+  <header class="glass-panel sticky top-0 z-40 border-b-0 border-white/5">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       
       <!-- Brand & Status -->
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-bold text-lg">
+      <div class="flex items-center gap-3 relative z-10">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-400 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 text-white font-bold text-xl animate-gradient-x border border-white/20">
           ✨
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <span class="font-bold text-base sm:text-lg tracking-tight text-white">ThsAutoOrganizer</span>
-            <span class="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              Sổ Ghi Chú Môn Học
+            <span class="font-extrabold text-base sm:text-xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-indigo-200">ThsAutoOrganizer</span>
+            <span class="text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-inner">
+              Sổ Ghi Chú AI
             </span>
           </div>
           <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
@@ -81,8 +148,8 @@
       </div>
 
       <!-- Center Navigation Tabs -->
-      <nav class="hidden md:flex items-center p-1 rounded-xl bg-slate-800/80 border border-slate-700/60 shadow-inner" role="tablist">
-        <button id="nav-btn-courses" onclick="switchTab('courses')" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2 bg-blue-600 text-white shadow-md">
+      <nav class="hidden md:flex items-center p-1.5 rounded-2xl bg-black/40 border border-white/10 shadow-inner relative z-10 backdrop-blur-md" role="tablist">
+        <button id="nav-btn-courses" onclick="switchTab('courses')" class="tab-btn px-5 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-2 bg-gradient-to-r from-teal-500 to-indigo-500 text-white shadow-lg shadow-teal-500/25 border border-white/10">
           <span>📚</span>
           <span>Sổ Ghi Chú Môn Học</span>
         </button>
@@ -123,13 +190,13 @@
   </header>
 
   <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
 
     <!-- ==================== SECTION 1: SỔ GHI CHÚ MÔN HỌC (COURSES) ==================== -->
     <section id="section-courses" class="space-y-6">
       
       <!-- Action Bar -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 sm:p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-4 sm:p-6 rounded-2xl border border-white/5 shadow-xl backdrop-blur">
         <div>
           <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             <span>📚</span> Sổ Ghi Chú Môn Học (Courses)
@@ -159,9 +226,9 @@
 
 
     <!-- ==================== SECTION 2: KÉO THẢ UPLOAD (UPLOAD CENTER) ==================== -->
-    <section id="section-upload" class="hidden space-y-6 max-w-4xl mx-auto">
+    <section id="section-upload" class="hidden space-y-6 max-w-4xl mx-auto relative z-10">
       
-      <div class="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 shadow-xl backdrop-blur">
+      <div class="glass-panel p-6 rounded-2xl border border-white/5 shadow-xl backdrop-blur">
         <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
           <span>☁️</span> Kéo Thả Upload Tài Liệu (Upload Center)
         </h1>
