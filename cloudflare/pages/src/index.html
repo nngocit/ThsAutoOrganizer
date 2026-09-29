@@ -525,6 +525,58 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: MANUAL NLM SYNC ==================== -->
+  <div id="modal-nlm-sync" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+      
+      <button onclick="document.getElementById('modal-nlm-sync').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-800 transition">
+        ✕
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-xl">
+          🧠
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white">Đồng bộ NotebookLM</h3>
+          <p class="text-xs text-slate-400">File đã được lưu vào Google Drive của bạn!</p>
+        </div>
+      </div>
+
+      <div class="space-y-4 text-sm text-slate-300">
+        <p>Để trò chuyện với tài liệu này, hãy mở <b>NotebookLM</b> và nạp trực tiếp từ Google Drive của bạn.</p>
+        
+        <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50 space-y-3">
+          <div class="flex items-start gap-2">
+            <span class="text-purple-400 font-bold">1.</span>
+            <span>Mở trang chủ Google NotebookLM.</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="text-purple-400 font-bold">2.</span>
+            <span>Bấm <b>Tạo Sổ Tay</b> (hoặc chọn sổ có sẵn).</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="text-purple-400 font-bold">3.</span>
+            <span>Bấm <b>Thêm Nguồn -> Google Drive</b> và chọn file vừa tải lên.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex flex-col gap-3">
+        <a href="https://notebooklm.google.com/" target="_blank" onclick="document.getElementById('modal-nlm-sync').classList.add('hidden')" class="w-full py-2.5 rounded-xl font-semibold bg-purple-600 hover:bg-purple-500 text-white transition text-center shadow-md flex items-center justify-center gap-2">
+          <span>🚀 Mở Google NotebookLM ngay</span>
+          <span>↗</span>
+        </a>
+        
+        <label class="flex items-center justify-center gap-2 mt-2 cursor-pointer group">
+          <input type="checkbox" id="chk-hide-nlm-modal" onchange="localStorage.setItem('hide_nlm_manual_dialog', this.checked ? 'true' : '')" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500 focus:ring-offset-slate-900">
+          <span class="text-xs text-slate-400 group-hover:text-slate-300 transition">Đã hiểu, đừng hiện lại thông báo này</span>
+        </label>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ==================== MODAL: CÀI ĐẶT TÀI KHOẢN & GOOGLE DRIVE ==================== -->
   <div id="modal-settings" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
@@ -1714,6 +1766,15 @@
 
       // Reload courses in background to refresh metrics/files
       loadCourses();
+      
+      // Show NotebookLM manual sync dialog if at least one file succeeded and user hasn't hidden it
+      const hasSuccess = uploadQueue.some(item => item.status === 'done');
+      if (hasSuccess && !localStorage.getItem('hide_nlm_manual_dialog')) {
+        setTimeout(() => {
+          const modal = document.getElementById('modal-nlm-sync');
+          if (modal) modal.classList.remove('hidden');
+        }, 500);
+      }
     }
 
 
